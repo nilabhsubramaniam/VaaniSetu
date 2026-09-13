@@ -1,0 +1,80 @@
+# VaaniSetu — single root .gitignore for the whole monorepo
+# (frontend/, backend/, ai-services/). No nested .gitignore files are
+# used unless a workspace later demonstrates a real technical need for
+# one that these root patterns can't express.
+#
+# Every rule below is tied to either tooling actually in this repo
+# (Angular + npm in frontend/), a convention already documented in
+# docs/DEVELOPMENT.md for backend/ai-services (Phase 2+, not built yet),
+# or a generated-only artifact that no project ever commits intentionally.
+
+# --- Dependencies ---
+node_modules/
+
+# --- Frontend build output / cache (Angular, frontend/) ---
+dist/
+.angular/
+coverage/
+
+# --- npm logs ---
+npm-debug.log*
+yarn-error.log*
+
+# --- Python (ai-services/, Phase 2+) ---
+# __pycache__, venvs and *.pyc are interpreter-generated regardless of
+# which dependency/lint tool ends up chosen (docs/DEVELOPMENT.md marks
+# that choice TBD); pytest/mypy/ruff caches are listed because
+# docs/DEVELOPMENT.md already names pytest, and the others are always
+# safe to ignore even if never adopted.
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Go (backend/, Phase 2+) ---
+# Compiled output and test binaries; go.sum/go.mod stay tracked.
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+vendor/
+
+# --- Local model weights and caches ---
+# Never committed — docs/DEVELOPMENT.md §15 "Model file handling".
+models/
+*.gguf
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.ckpt
+
+# --- Environment / secrets ---
+# docs/DEVELOPMENT.md "Secret management": local env files are never
+# committed; a checked-in .env.example template is always kept.
+.env
+.env.*
+!.env.example
+
+# --- Editor / IDE metadata (user-specific) ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS-specific files ---
+.DS_Store
+Thumbs.db
+Desktop.ini

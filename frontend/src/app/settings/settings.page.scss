@@ -1,0 +1,19 @@
+@use '../shared/styles/mixins';
+
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--vs-space-5) var(--vs-space-4) var(--vs-space-7);
+}
+
+h1 {
+  font-size: var(--vs-font-size-lg);
+  margin: 0 0 var(--vs-space-4);
+}
+
+@include mixins.breakpoint-desktop {
+  .page {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

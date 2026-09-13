@@ -1,0 +1,15 @@
+<article class="row" [attr.data-role]="turn().role">
+  <div class="bubble" [attr.lang]="langAttr()">
+    <p class="text">{{ turn().text }}</p>
+    <footer class="meta">
+      <app-status-pill [label]="languageName()" tone="neutral" />
+      <span class="time">{{ timeLabel() }}</span>
+      @if (isAssistant()) {
+        <span class="source">Local model</span>
+        @if (turn().latencyMs !== undefined) {
+          <span class="latency">{{ turn().latencyMs }} ms</span>
+        }
+      }
+    </footer>
+  </div>
+</article>

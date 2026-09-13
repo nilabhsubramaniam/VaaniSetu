@@ -1,0 +1,27 @@
+<button
+  type="button"
+  class="mic"
+  [attr.data-state]="state()"
+  [disabled]="isBusy()"
+  [attr.aria-pressed]="isListening()"
+  [attr.aria-label]="
+    isListening() ? 'Stop listening' : state() === 'error' ? 'Try again' : 'Start speaking'
+  "
+  (click)="onPress()"
+>
+  <span class="ring" aria-hidden="true"></span>
+
+  <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+      stroke="currentColor"
+      stroke-width="1.8"
+    />
+    <path
+      d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+    />
+  </svg>
+</button>

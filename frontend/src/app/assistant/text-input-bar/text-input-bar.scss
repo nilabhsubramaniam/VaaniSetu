@@ -1,0 +1,44 @@
+@use '../../shared/styles/mixins';
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  flex: 1;
+}
+
+.field {
+  flex: 1;
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-pill);
+  padding: var(--vs-space-2) var(--vs-space-4);
+  background: var(--vs-surface);
+  font-size: var(--vs-font-size-base);
+
+  @include mixins.focus-ring;
+}
+
+.send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--vs-accent);
+  color: white;
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+
+  &:disabled {
+    background: var(--vs-line-strong);
+    cursor: not-allowed;
+  }
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+}

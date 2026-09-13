@@ -1,0 +1,66 @@
+@use '../../shared/styles/mixins';
+
+.viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--vs-space-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.empty {
+  margin: auto;
+  text-align: center;
+  color: var(--vs-ink-soft);
+  max-width: 32rem;
+}
+
+.empty-sub {
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+}
+
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: var(--vs-space-3) var(--vs-space-4);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vs-ink-faint);
+  animation: bounce 1.2s infinite ease-in-out both;
+  @include mixins.reduced-motion-off;
+
+  &:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  &:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+}
+
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@include mixins.breakpoint-desktop {
+  .viewport {
+    max-width: 46rem;
+    margin: 0 auto;
+    width: 100%;
+  }
+}

@@ -1,0 +1,58 @@
+@use '../../shared/styles/mixins';
+
+.hint {
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+  margin-top: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--vs-space-2);
+}
+
+.option {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: var(--vs-space-2);
+  text-align: left;
+  padding: var(--vs-space-2) var(--vs-space-3);
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-sm);
+  background: var(--vs-surface);
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+
+  &[data-selected='true'] {
+    border-color: var(--vs-accent);
+    background: var(--vs-accent-soft);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.english {
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+}
+
+.soon {
+  margin-left: auto;
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}
+
+@include mixins.breakpoint-tablet {
+  .list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

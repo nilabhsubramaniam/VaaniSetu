@@ -1,0 +1,9 @@
+<div class="indicator">
+  <app-status-pill [label]="description().label" [tone]="tone()" />
+  <span class="hint">{{ description().hint }}</span>
+</div>
+
+<!-- Screen-reader-only announcement of state changes. -->
+<div class="visually-hidden" aria-live="polite" role="status">
+  {{ description().label }}
+</div>

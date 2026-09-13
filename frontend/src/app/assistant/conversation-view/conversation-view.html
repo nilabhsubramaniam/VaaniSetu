@@ -1,0 +1,22 @@
+<div class="viewport">
+  @if (isEmpty()) {
+    <div class="empty">
+      <p>Start speaking or type a message below.</p>
+      <p class="empty-sub">VaaniSetu replies in Hindi or Hinglish, entirely on this device.</p>
+    </div>
+  } @else {
+    @for (turn of turns(); track turn.id) {
+      <app-message-bubble [turn]="turn" />
+    }
+  }
+
+  @if (isThinking()) {
+    <div class="thinking" role="status" aria-label="Assistant is thinking">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+  }
+
+  <div #scrollAnchor></div>
+</div>

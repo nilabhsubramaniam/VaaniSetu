@@ -1,0 +1,15 @@
+.hint {
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+}
+
+.field select {
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--vs-space-2) var(--vs-space-3);
+  border-radius: var(--vs-radius-sm);
+  border: 1px solid var(--vs-line);
+  background: var(--vs-surface-raised);
+  color: var(--vs-ink-faint);
+  cursor: not-allowed;
+}

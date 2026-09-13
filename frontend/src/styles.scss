@@ -1,0 +1,80 @@
+@use './app/shared/styles/tokens';
+
+// Self-hosted Devanagari font (SIL OFL 1.1 — see public/fonts/OFL.txt).
+// Only the weight actually used ships; no CDN dependency, matches the
+// local-first / offline-capable stance in docs/ARCHITECTURE.md §2.
+@font-face {
+  font-family: 'Noto Sans Devanagari';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansDevanagari-Regular.woff2') format('woff2');
+  unicode-range:
+    U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--vs-bg);
+  color: var(--vs-ink);
+  font-family: var(--vs-font-latin);
+  font-size: var(--vs-font-size-base);
+  line-height: var(--vs-line-height);
+  -webkit-font-smoothing: antialiased;
+}
+
+// Any element holding Hindi/Hinglish text should prefer the Devanagari
+// stack so mixed-script text (Hinglish included) renders correctly without
+// component-by-component font decisions.
+[lang='hi'],
+.vs-devanagari {
+  font-family: var(--vs-font-devanagari);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+// Shared surface for grouped settings sections (fieldset or div).
+.card {
+  background: var(--vs-surface);
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-md);
+  box-shadow: var(--vs-shadow-1);
+  padding: var(--vs-space-4) var(--vs-space-5);
+  margin: 0 0 var(--vs-space-4);
+
+  legend {
+    font-weight: 600;
+    padding: 0 var(--vs-space-1);
+  }
+}
+
+// Accessible-but-visually-hidden text (form labels, live-region context).
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

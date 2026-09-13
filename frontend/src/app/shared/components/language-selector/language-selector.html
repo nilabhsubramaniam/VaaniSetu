@@ -1,0 +1,18 @@
+<label class="selector">
+  <span class="visually-hidden">Preferred language</span>
+  <select
+    class="select"
+    aria-label="Preferred language"
+    [value]="preferredLanguage()"
+    (change)="onChange($event)"
+  >
+    @for (option of options; track option.code) {
+      <option [value]="option.code" [disabled]="!option.enabled">
+        {{ option.label }}
+        @if (!option.enabled) {
+          (coming soon)
+        }
+      </option>
+    }
+  </select>
+</label>

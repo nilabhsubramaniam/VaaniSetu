@@ -1,0 +1,28 @@
+<fieldset class="card">
+  <legend>Language preference</legend>
+  <p class="hint">
+    Your pick always wins over automatic detection once detection exists (Phase 3+).
+  </p>
+
+  <ul class="list" role="radiogroup" aria-label="Preferred language">
+    @for (option of options; track option.code) {
+      <li>
+        <button
+          type="button"
+          class="option"
+          role="radio"
+          [attr.aria-checked]="preferredLanguage() === option.code"
+          [disabled]="!option.enabled"
+          [attr.data-selected]="preferredLanguage() === option.code"
+          (click)="select(option.code)"
+        >
+          <span [attr.lang]="option.code === 'hi' ? 'hi' : null">{{ option.label }}</span>
+          <span class="english">{{ option.englishName }}</span>
+          @if (!option.enabled) {
+            <span class="soon">Coming soon</span>
+          }
+        </button>
+      </li>
+    }
+  </ul>
+</fieldset>

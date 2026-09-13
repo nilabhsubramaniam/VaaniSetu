@@ -1,0 +1,121 @@
+// Design tokens for VaaniSetu.
+//
+// Light palette lives on bare :root. Dark overrides are re-declared for both
+// prefers-color-scheme and an explicit [data-theme] attribute, matching the
+// "define once, override twice" pattern so a manual theme toggle always wins
+// over the OS setting.
+
+:root {
+  // Surfaces & ink
+  --vs-bg: #f7f4ee;
+  --vs-surface: #ffffff;
+  --vs-surface-raised: #ffffff;
+  --vs-ink: #1c1b18;
+  --vs-ink-soft: #5b5750;
+  --vs-ink-faint: #8b8579;
+  --vs-line: #ded8cb;
+  --vs-line-strong: #c7bfac;
+
+  // Brand & status
+  --vs-accent: #1f6f5c;
+  --vs-accent-ink: #0f3d32;
+  --vs-accent-soft: #e3efe9;
+  --vs-error: #b5502e;
+  --vs-error-soft: #f4e4db;
+  --vs-user-bubble: #e3efe9;
+  --vs-assistant-bubble: #ffffff;
+
+  // Voice states
+  --vs-state-idle: #8b8579;
+  --vs-state-listening: #1f6f5c;
+  --vs-state-processing: #b58a1f;
+  --vs-state-responding: #3b6ea5;
+  --vs-state-error: #b5502e;
+
+  // Spacing scale
+  --vs-space-1: 4px;
+  --vs-space-2: 8px;
+  --vs-space-3: 12px;
+  --vs-space-4: 16px;
+  --vs-space-5: 24px;
+  --vs-space-6: 32px;
+  --vs-space-7: 48px;
+
+  // Radius & shadow
+  --vs-radius-sm: 8px;
+  --vs-radius-md: 12px;
+  --vs-radius-lg: 20px;
+  --vs-radius-pill: 999px;
+  --vs-shadow-1: 0 1px 2px rgba(28, 27, 24, 0.06), 0 8px 24px -12px rgba(28, 27, 24, 0.12);
+
+  // Typography
+  --vs-font-latin:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --vs-font-devanagari:
+    'Noto Sans Devanagari', 'Nirmala UI', 'Kohinoor Devanagari', var(--vs-font-latin);
+  --vs-font-size-sm: 0.8rem;
+  --vs-font-size-base: 0.95rem;
+  --vs-font-size-md: 1.05rem;
+  --vs-font-size-lg: 1.3rem;
+  --vs-line-height: 1.55;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --vs-bg: #14171a;
+    --vs-surface: #1b1f22;
+    --vs-surface-raised: #20252a;
+    --vs-ink: #ece8df;
+    --vs-ink-soft: #aaa598;
+    --vs-ink-faint: #7d786c;
+    --vs-line: #2b2f33;
+    --vs-line-strong: #3a3f44;
+
+    --vs-accent: #52c0a0;
+    --vs-accent-ink: #bef0dc;
+    --vs-accent-soft: #1b2c27;
+    --vs-error: #e0895f;
+    --vs-error-soft: #2e211b;
+    --vs-user-bubble: #1b2c27;
+    --vs-assistant-bubble: #20252a;
+
+    --vs-state-idle: #7d786c;
+    --vs-state-listening: #52c0a0;
+    --vs-state-processing: #d8c25f;
+    --vs-state-responding: #7fb3ee;
+    --vs-state-error: #e0895f;
+
+    --vs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -14px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --vs-bg: #14171a;
+  --vs-surface: #1b1f22;
+  --vs-surface-raised: #20252a;
+  --vs-ink: #ece8df;
+  --vs-ink-soft: #aaa598;
+  --vs-ink-faint: #7d786c;
+  --vs-line: #2b2f33;
+  --vs-line-strong: #3a3f44;
+
+  --vs-accent: #52c0a0;
+  --vs-accent-ink: #bef0dc;
+  --vs-accent-soft: #1b2c27;
+  --vs-error: #e0895f;
+  --vs-error-soft: #2e211b;
+  --vs-user-bubble: #1b2c27;
+  --vs-assistant-bubble: #20252a;
+
+  --vs-state-idle: #7d786c;
+  --vs-state-listening: #52c0a0;
+  --vs-state-processing: #d8c25f;
+  --vs-state-responding: #7fb3ee;
+  --vs-state-error: #e0895f;
+
+  --vs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -14px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}

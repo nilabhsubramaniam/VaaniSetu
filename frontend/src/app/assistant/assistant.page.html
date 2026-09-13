@@ -1,0 +1,20 @@
+<section class="page">
+  <app-conversation-view class="conversation" />
+
+  @if (hasError()) {
+    <div class="error-banner" role="alert">
+      Something went wrong. Tap the mic or send your message again.
+    </div>
+  }
+
+  <footer class="controls">
+    <app-voice-state-indicator />
+    <div class="input-row">
+      <app-mic-button />
+      <app-text-input-bar />
+    </div>
+    <button type="button" class="dev-affordance" (click)="onSimulateError()">
+      Simulate error (dev)
+    </button>
+  </footer>
+</section>

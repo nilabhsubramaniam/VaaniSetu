@@ -1,0 +1,11 @@
+.indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  justify-content: center;
+}
+
+.hint {
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}

@@ -1,0 +1,65 @@
+@use '../../styles/mixins';
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-4);
+  padding: var(--vs-space-3) var(--vs-space-4);
+  border-bottom: 1px solid var(--vs-line);
+  background: var(--vs-surface);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  text-decoration: none;
+  color: var(--vs-ink);
+
+  @include mixins.focus-ring;
+}
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--vs-radius-sm);
+  background: var(--vs-accent);
+  color: white;
+  font-family: var(--vs-font-devanagari);
+  font-weight: 700;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: var(--vs-font-size-md);
+}
+
+.nav {
+  display: flex;
+  gap: var(--vs-space-3);
+  margin-right: auto;
+
+  a {
+    color: var(--vs-ink-soft);
+    text-decoration: none;
+    font-size: var(--vs-font-size-sm);
+    padding: var(--vs-space-1) var(--vs-space-2);
+    border-radius: var(--vs-radius-sm);
+
+    @include mixins.focus-ring;
+
+    &.active {
+      color: var(--vs-accent-ink);
+      background: var(--vs-accent-soft);
+    }
+  }
+}
+
+@include mixins.breakpoint-tablet {
+  .header {
+    gap: var(--vs-space-5);
+  }
+}

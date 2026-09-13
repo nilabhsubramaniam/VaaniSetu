@@ -1,0 +1,29 @@
+<fieldset class="card">
+  <legend>Privacy (preview)</legend>
+  <p class="hint">
+    Not yet connected to anything — these previews the consent controls planned in
+    docs/ARCHITECTURE.md. No data is stored or sent anywhere in this build.
+  </p>
+
+  <ul class="list">
+    @for (item of toggles; track item.key) {
+      <li class="row">
+        <div>
+          <p class="label">{{ item.label }}</p>
+          <p class="description">{{ item.description }}</p>
+        </div>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          [attr.aria-checked]="isOn(item.key)"
+          [attr.data-on]="isOn(item.key)"
+          [attr.aria-label]="item.label"
+          (click)="toggle(item.key)"
+        >
+          <span class="knob"></span>
+        </button>
+      </li>
+    }
+  </ul>
+</fieldset>

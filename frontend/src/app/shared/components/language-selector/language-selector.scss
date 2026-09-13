@@ -1,0 +1,17 @@
+@use '../../styles/mixins';
+
+.selector {
+  display: inline-flex;
+}
+
+.select {
+  appearance: none;
+  background: var(--vs-surface);
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-sm);
+  padding: var(--vs-space-1) var(--vs-space-3);
+  font-size: var(--vs-font-size-sm);
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+}

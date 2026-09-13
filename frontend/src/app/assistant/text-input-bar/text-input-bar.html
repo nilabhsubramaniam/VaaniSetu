@@ -1,0 +1,22 @@
+<form class="bar" (submit)="$event.preventDefault(); send()">
+  <label class="visually-hidden" for="text-input-bar-field">Type a message</label>
+  <input
+    id="text-input-bar-field"
+    class="field"
+    type="text"
+    autocomplete="off"
+    placeholder="Type in Hindi, Hinglish, or English…"
+    [value]="draft()"
+    (input)="onInput($any($event.target).value)"
+  />
+  <button type="submit" class="send" [disabled]="!canSend()" aria-label="Send message">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" class="icon">
+      <path
+        d="m4 12 16-8-6 16-2.5-7L4 12Z"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+</form>
