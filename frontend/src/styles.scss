@@ -19,7 +19,17 @@
 
 html,
 body {
+  // 100dvh (dynamic viewport height) accounts for mobile browser chrome
+  // showing/hiding; the 100% line above is the fallback for browsers that
+  // don't support dvh yet.
   height: 100%;
+  height: 100dvh;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -63,6 +73,24 @@ img {
   legend {
     font-weight: 600;
     padding: 0 var(--vs-space-1);
+  }
+}
+
+// Paired with the RevealOnScroll directive: an element starts slightly
+// lowered and transparent, then settles into place once it scrolls into
+// view. The directive itself never applies either class when
+// prefers-reduced-motion is set, so this rule only ever runs for viewers
+// who haven't asked for less motion.
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+
+  &.is-visible {
+    opacity: 1;
+    transform: none;
   }
 }
 

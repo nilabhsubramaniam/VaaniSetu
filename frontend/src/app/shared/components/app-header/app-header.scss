@@ -1,10 +1,13 @@
 @use '../../styles/mixins';
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: var(--vs-space-4);
-  padding: var(--vs-space-3) var(--vs-space-4);
+  padding: var(--vs-space-4);
   border-bottom: 1px solid var(--vs-line);
   background: var(--vs-surface);
 }
@@ -23,18 +26,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--vs-radius-sm);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--vs-radius-md);
   background: var(--vs-accent);
   color: white;
   font-family: var(--vs-font-devanagari);
   font-weight: 700;
+  font-size: var(--vs-font-size-md);
+  box-shadow: 0 0 0 3px var(--vs-accent-soft);
 }
 
 .brand-name {
   font-weight: 700;
   font-size: var(--vs-font-size-md);
+  letter-spacing: -0.01em;
 }
 
 .nav {

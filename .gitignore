@@ -45,8 +45,13 @@ venv/
 vendor/
 
 # --- Local model weights and caches ---
-# Never committed — docs/DEVELOPMENT.md §15 "Model file handling".
-models/
+# Never committed — docs/DEVELOPMENT.md §15 "Model file handling". Anchored
+# to the repo root: docs/DEVELOPMENT.md's target tree places this as one
+# top-level `models/` directory alongside frontend/backend/ai-services, not
+# any directory named "models" anywhere in the tree — unanchored, this
+# pattern was also matching (and silently untracking) the real TypeScript
+# source folder frontend/src/app/core/models/.
+/models/
 *.gguf
 *.pt
 *.pth

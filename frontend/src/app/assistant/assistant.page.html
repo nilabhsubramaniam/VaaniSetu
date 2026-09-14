@@ -7,14 +7,21 @@
     </div>
   }
 
-  <footer class="controls">
-    <app-voice-state-indicator />
-    <div class="input-row">
+  <footer class="console">
+    <div class="console-primary">
       <app-mic-button />
-      <app-text-input-bar />
+      <app-voice-state-indicator />
     </div>
-    <button type="button" class="dev-affordance" (click)="onSimulateError()">
-      Simulate error (dev)
-    </button>
+
+    <div class="console-secondary">
+      <app-language-selector />
+      <app-text-input-bar class="text-input" />
+    </div>
+
+    @if (!isProduction) {
+      <button type="button" class="dev-affordance" (click)="onSimulateError()">
+        Simulate error (dev)
+      </button>
+    }
   </footer>
 </section>

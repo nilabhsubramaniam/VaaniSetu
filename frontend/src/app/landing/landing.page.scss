@@ -1,0 +1,358 @@
+@use '../shared/styles/mixins';
+
+// No height:100% here (unlike assistant/settings) — natural page scroll.
+.landing {
+  display: block;
+}
+
+.section {
+  padding: var(--vs-space-7) var(--vs-space-4);
+}
+
+.section-alt {
+  background: var(--vs-surface);
+}
+
+.section-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+
+  &.narrow {
+    max-width: 42rem;
+  }
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vs-space-3);
+  margin-bottom: var(--vs-space-5);
+
+  h2 {
+    margin: 0;
+  }
+}
+
+h2 {
+  font-size: var(--vs-font-size-xl);
+  margin: 0 0 var(--vs-space-3);
+}
+
+.section-lede {
+  color: var(--vs-ink-soft);
+  max-width: 46rem;
+}
+
+// ---- hero ----
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(var(--vs-space-7), 10vw, 7rem) var(--vs-space-4) var(--vs-space-7);
+  text-align: center;
+}
+
+.hero-glow {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 32rem;
+  background:
+    radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--vs-accent) 22%, transparent),
+      transparent
+    ),
+    radial-gradient(
+        closest-side,
+        color-mix(in srgb, var(--vs-state-responding) 16%, transparent),
+        transparent
+      )
+      25% 60% / 55% 55% no-repeat;
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+.hero-motif {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(70vw, 640px);
+  height: min(70vw, 640px);
+  transform: translate(-50%, -50%);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+
+  .ring {
+    fill: none;
+    stroke: var(--vs-line-strong);
+    stroke-width: 1;
+  }
+
+  .ring-2 {
+    stroke: var(--vs-accent);
+    opacity: 0.5;
+  }
+
+  .facet {
+    stroke: var(--vs-line-strong);
+    stroke-width: 1;
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-motif {
+    animation: hero-spin 90s linear infinite;
+  }
+}
+
+@keyframes hero-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-size: var(--vs-font-size-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--vs-accent-ink);
+  font-weight: 600;
+  margin: 0 0 var(--vs-space-3);
+}
+
+.hero h1 {
+  font-size: var(--vs-font-size-display);
+  line-height: 1.1;
+  margin: 0 0 var(--vs-space-4);
+}
+
+.dek {
+  font-size: var(--vs-font-size-md);
+  color: var(--vs-ink-soft);
+  margin: 0 auto var(--vs-space-5);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--vs-space-3);
+  margin-bottom: var(--vs-space-4);
+}
+
+.hero-note {
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+// ---- buttons ----
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--vs-space-3) var(--vs-space-5);
+  border-radius: var(--vs-radius-pill);
+  font-size: var(--vs-font-size-base);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  @include mixins.focus-ring;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.btn-primary {
+  background: var(--vs-accent);
+  color: white;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--vs-ink);
+  border: 1px solid var(--vs-line-strong);
+}
+
+// ---- pipeline (How it works) ----
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--vs-space-5);
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--vs-space-2);
+}
+
+.pipeline-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--vs-surface);
+  border: 1px solid var(--vs-line);
+  color: var(--vs-accent-ink);
+
+  svg {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+.pipeline-index {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--vs-accent);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pipeline-label {
+  font-weight: 600;
+}
+
+.pipeline-desc {
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}
+
+// ---- languages ----
+.lang-groups {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--vs-space-5);
+}
+
+.lang-group h3 {
+  font-size: var(--vs-font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--vs-ink-faint);
+  margin: 0 0 var(--vs-space-3);
+}
+
+.lang-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vs-space-2);
+}
+
+// ---- capabilities ----
+.capabilities {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--vs-space-4);
+}
+
+.capability {
+  display: flex;
+  gap: var(--vs-space-3);
+}
+
+.capability-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  color: var(--vs-accent);
+}
+
+.capability-label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.capability-note {
+  font-weight: 400;
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+}
+
+.capability-desc {
+  margin: 2px 0 0;
+  color: var(--vs-ink-soft);
+  font-size: var(--vs-font-size-sm);
+}
+
+// ---- privacy ----
+.privacy-note {
+  color: var(--vs-ink-faint);
+  font-size: var(--vs-font-size-sm);
+}
+
+// ---- future ----
+.future-list {
+  margin: 0;
+  padding-left: 1.1em;
+
+  li {
+    margin-bottom: var(--vs-space-2);
+    color: var(--vs-ink-soft);
+  }
+}
+
+// ---- closing CTA ----
+.cta-section {
+  text-align: center;
+}
+
+.cta-inner p {
+  color: var(--vs-ink-soft);
+  margin-bottom: var(--vs-space-4);
+}
+
+@include mixins.breakpoint-tablet {
+  .lang-groups {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .capabilities {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@include mixins.breakpoint-desktop {
+  .section {
+    padding: var(--vs-space-7) var(--vs-space-5);
+  }
+}

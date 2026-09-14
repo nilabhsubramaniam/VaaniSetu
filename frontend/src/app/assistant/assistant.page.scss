@@ -7,8 +7,13 @@
   min-height: 0;
 }
 
+// Explicit column direction: this used to rely on a flex row's default
+// cross-axis stretch to fill height with a single child, which worked but
+// only by accident. Spelling it out keeps the fixed-shell/inner-scroll
+// contract robust as the console area around it changes.
 .conversation {
   display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
@@ -22,22 +27,40 @@
   font-size: var(--vs-font-size-sm);
 }
 
-.controls {
+// The voice console: mic + state label as the clear primary focus, a
+// secondary row for language/text/send beneath it. Given its own surface
+// (a step up from the page background, distinct from the conversation
+// above it) and a soft upward shadow so it reads as one cohesive
+// interaction dock rather than a plain bottom bar. Safe-area padding keeps
+// it clear of the home indicator on iOS.
+.console {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--vs-space-3);
-  padding: var(--vs-space-3) var(--vs-space-4) var(--vs-space-4);
-  border-top: 1px solid var(--vs-line);
-  background: var(--vs-surface);
+  gap: var(--vs-space-4);
+  padding: var(--vs-space-4) var(--vs-space-4) calc(var(--vs-space-4) + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, var(--vs-surface) 0%, var(--vs-surface-raised) 100%);
+  box-shadow: 0 -6px 20px -14px rgba(0, 0, 0, 0.18);
 }
 
-.input-row {
+.console-primary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vs-space-2);
+}
+
+.console-secondary {
   display: flex;
   align-items: center;
   gap: var(--vs-space-3);
   width: 100%;
-  max-width: 46rem;
+  max-width: 40rem;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .dev-affordance {
@@ -53,7 +76,11 @@
 }
 
 @include mixins.breakpoint-tablet {
-  .input-row {
+  .console {
+    gap: var(--vs-space-5);
+  }
+
+  .console-secondary {
     gap: var(--vs-space-4);
   }
 }

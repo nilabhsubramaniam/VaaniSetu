@@ -57,6 +57,8 @@
   --vs-font-size-base: 0.95rem;
   --vs-font-size-md: 1.05rem;
   --vs-font-size-lg: 1.3rem;
+  --vs-font-size-xl: 1.75rem;
+  --vs-font-size-display: clamp(2.25rem, 2.7vw + 1.6rem, 3.25rem);
   --vs-line-height: 1.55;
 
   color-scheme: light;

@@ -1,5 +1,11 @@
 @use '../../shared/styles/mixins';
 
+// The host itself (styled `flex`/`min-height:0` by the parent's `.conversation`
+// class) is the positioning context for the floating jump-to-latest pill.
+:host {
+  position: relative;
+}
+
 .viewport {
   flex: 1;
   overflow-y: auto;
@@ -8,16 +14,62 @@
   flex-direction: column;
 }
 
-.empty {
+.welcome {
   margin: auto;
   text-align: center;
-  color: var(--vs-ink-soft);
-  max-width: 32rem;
+  max-width: 30rem;
+  width: 100%;
 }
 
-.empty-sub {
-  color: var(--vs-ink-faint);
+.welcome-title {
+  font-size: var(--vs-font-size-xl);
+  margin: 0 0 var(--vs-space-2);
+}
+
+.welcome-sub {
+  color: var(--vs-ink-soft);
+  margin: 0 0 var(--vs-space-5);
+}
+
+.examples {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vs-space-2);
+  text-align: left;
+}
+
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--vs-space-3) var(--vs-space-4);
+  border-radius: var(--vs-radius-md);
+  border: 1px solid var(--vs-line);
+  background: var(--vs-surface);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+
+  @include mixins.focus-ring;
+
+  &:hover {
+    border-color: var(--vs-accent);
+    background: var(--vs-accent-soft);
+  }
+}
+
+.example-lang {
   font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}
+
+.example-text {
+  color: var(--vs-ink);
 }
 
 .thinking {
@@ -63,4 +115,24 @@
     margin: 0 auto;
     width: 100%;
   }
+}
+
+.jump-to-latest {
+  position: absolute;
+  bottom: var(--vs-space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vs-space-1);
+  padding: var(--vs-space-1) var(--vs-space-3);
+  border-radius: var(--vs-radius-pill);
+  border: 1px solid var(--vs-line-strong);
+  background: var(--vs-surface);
+  color: var(--vs-ink);
+  font-size: var(--vs-font-size-sm);
+  box-shadow: var(--vs-shadow-1);
+  cursor: pointer;
+
+  @include mixins.focus-ring;
 }

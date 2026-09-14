@@ -5,8 +5,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   border-radius: var(--vs-radius-pill);
   border: none;
   background: var(--vs-accent);
@@ -45,43 +45,112 @@
 }
 
 .icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   z-index: 1;
 }
 
+// ---- idle: a very slow, ambient breathing scale ----
+.mic[data-state='idle'] {
+  animation: mic-breathe 4s ease-in-out infinite;
+  @include mixins.reduced-motion-off;
+}
+
+// ---- listening: a two-ring ripple, staggered ----
 .ring {
   position: absolute;
-  inset: -6px;
+  inset: -8px;
   border-radius: inherit;
   border: 2px solid currentColor;
   opacity: 0;
 }
 
 .mic[data-state='listening'] .ring {
-  opacity: 0.55;
-  animation: pulse 1.4s ease-out infinite;
+  animation: mic-ripple 1.8s ease-out infinite;
   @include mixins.reduced-motion-off;
 }
 
-.mic[data-state='processing'] .icon {
-  animation: spin 1s linear infinite;
+.mic[data-state='listening'] .ring-2 {
+  animation-delay: 0.6s;
+}
+
+// ---- processing: a segmented arc rotates around the still glyph ----
+.arc {
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+  border: 3px solid transparent;
+  opacity: 0;
+}
+
+.mic[data-state='processing'] .arc {
+  opacity: 1;
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  animation: mic-rotate 1.6s linear infinite;
   @include mixins.reduced-motion-off;
 }
 
-@keyframes pulse {
+// ---- responding: a slow, soft breathing glow ----
+.mic[data-state='responding'] .ring-1 {
+  animation: mic-glow 2.2s ease-in-out infinite;
+  @include mixins.reduced-motion-off;
+}
+
+// ---- error: one restrained shake, then settle ----
+.mic[data-state='error'] {
+  animation: mic-shake 0.4s ease-in-out 1;
+  @include mixins.reduced-motion-off;
+}
+
+@keyframes mic-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes mic-ripple {
   0% {
     transform: scale(1);
-    opacity: 0.55;
+    opacity: 0.5;
   }
   100% {
-    transform: scale(1.35);
+    transform: scale(1.4);
     opacity: 0;
   }
 }
 
-@keyframes spin {
+@keyframes mic-rotate {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes mic-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes mic-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
   }
 }

@@ -44,9 +44,9 @@ A privacy-first, local-first AI voice assistant built for Indian languages and H
 
 What that means concretely today:
 
-- ✅ Project documentation (`AGENTS.md`, `docs/`) is established and is the source of truth for scope and process.
-- ✅ An Angular frontend exists at [`frontend/`](frontend/) with a conversation UI, a mic control, a settings screen, and a full mock data layer — no real backend call is made anywhere in it.
-- ❌ There is no Go backend, no Python AI service, no database, and no speech, language-model, or retrieval functionality implemented anywhere in this repository.
+- Project documentation (`AGENTS.md`, `docs/`) is established and is the source of truth for scope and process.
+- An Angular frontend exists at [`frontend/`](frontend/) with a conversation UI, a mic control, a settings screen, and a full mock data layer — no real backend call is made anywhere in it.
+- There is no Go backend, no Python AI service, no database, and no speech, language-model, or retrieval functionality implemented anywhere in this repository.
 
 The full status, updated as work lands, lives in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 

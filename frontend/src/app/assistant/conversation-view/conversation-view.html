@@ -1,8 +1,23 @@
-<div class="viewport">
+<div class="viewport" #viewport (scroll)="onScroll()">
   @if (isEmpty()) {
-    <div class="empty">
-      <p>Start speaking or type a message below.</p>
-      <p class="empty-sub">VaaniSetu replies in Hindi or Hinglish, entirely on this device.</p>
+    <div class="welcome">
+      <h2 class="welcome-title">How can I help?</h2>
+      <p class="welcome-sub">
+        Speak naturally in Hindi or Hinglish — VaaniSetu replies entirely on this device.
+      </p>
+
+      <ul class="examples">
+        @for (example of examples; track example.text) {
+          <li>
+            <button type="button" class="example" (click)="sendExample(example)">
+              <span class="example-lang">{{ example.languageLabel }}</span>
+              <span class="example-text" [attr.lang]="example.language === 'hi' ? 'hi' : null">{{
+                example.text
+              }}</span>
+            </button>
+          </li>
+        }
+      </ul>
     </div>
   } @else {
     @for (turn of turns(); track turn.id) {
@@ -20,3 +35,9 @@
 
   <div #scrollAnchor></div>
 </div>
+
+@if (showJumpToLatest()) {
+  <button type="button" class="jump-to-latest" (click)="jumpToLatest()">
+    <span aria-hidden="true">↓</span> New messages
+  </button>
+}

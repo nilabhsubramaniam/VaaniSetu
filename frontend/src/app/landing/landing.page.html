@@ -1,0 +1,305 @@
+<main class="landing">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <svg class="hero-motif" viewBox="0 0 400 400" aria-hidden="true">
+      <circle cx="200" cy="200" r="150" class="ring ring-1" />
+      <circle cx="200" cy="200" r="118" class="ring ring-2" />
+      <circle cx="200" cy="200" r="86" class="ring ring-3" />
+      @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; track i) {
+        <line
+          x1="200"
+          y1="200"
+          x2="200"
+          y2="46"
+          class="facet"
+          [attr.transform]="'rotate(' + i * 30 + ' 200 200)'"
+        />
+      }
+    </svg>
+
+    <div class="hero-content">
+      <p class="eyebrow">A local voice bridge for Indian languages</p>
+      <h1>Speak your language. Keep your voice on your own device.</h1>
+      <p class="dek">
+        VaaniSetu is a privacy-first, local-first AI voice assistant built for Hindi, Hinglish, and
+        the languages of India — composed from open-source models instead of one hosted service.
+      </p>
+
+      <div class="hero-actions">
+        <a routerLink="/assistant" class="btn btn-primary">Open the assistant</a>
+        <a href="#how-it-works" class="btn btn-secondary">See how it works</a>
+      </div>
+
+      <p class="hero-note">
+        Early preview — the assistant workspace currently runs on mock data while the local AI
+        pipeline below is being built.
+      </p>
+    </div>
+  </section>
+
+  <!-- What is VaaniSetu -->
+  <section class="section" appRevealOnScroll>
+    <div class="section-inner narrow">
+      <h2>What is VaaniSetu?</h2>
+      <p>
+        Most voice assistants send your speech to a remote server, and most of them handle
+        Hindi–English code-switching — completely ordinary speech for a huge number of people —
+        poorly. VaaniSetu is voice-first, built around Hindi and Hinglish rather than translated
+        into them, and designed so the components that hear, understand, and reply to you run on
+        your own hardware by default.
+      </p>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="section-inner">
+      <div class="section-head" appRevealOnScroll>
+        <h2>How it works</h2>
+        <app-status-pill label="Planned architecture — not yet implemented" tone="neutral" />
+      </div>
+
+      <ol class="pipeline">
+        @for (step of pipelineSteps; track step.id; let i = $index) {
+          <li class="pipeline-step" appRevealOnScroll [style.transition-delay.ms]="i * 60">
+            <span class="pipeline-icon" aria-hidden="true">
+              <span class="pipeline-index">{{ i + 1 }}</span>
+              <svg viewBox="0 0 24 24" fill="none">
+                @switch (step.id) {
+                  @case ('mic') {
+                    <path
+                      d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                    />
+                    <path
+                      d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    />
+                  }
+                  @case ('vad') {
+                    <path
+                      d="M4 12h.01M8 8v8M12 5v14M16 8v8M20 12h.01"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    />
+                  }
+                  @case ('stt') {
+                    <path
+                      d="M4 6h16v9H9l-3 3v-3H4Z"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M7 10h10M7 13h6"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      stroke-linecap="round"
+                    />
+                  }
+                  @case ('lang') {
+                    <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6" />
+                    <path
+                      d="M4 12h16M12 4c2.5 2.5 2.5 13.5 0 16M12 4c-2.5 2.5-2.5 13.5 0 16"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                    />
+                  }
+                  @case ('ai') {
+                    <rect
+                      x="7"
+                      y="7"
+                      width="10"
+                      height="10"
+                      rx="2"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                    />
+                    <path
+                      d="M9 4v3M15 4v3M9 17v3M15 17v3M4 9h3M4 15h3M17 9h3M17 15h3"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      stroke-linecap="round"
+                    />
+                  }
+                  @case ('rag') {
+                    <path
+                      d="M5 5h9a2 2 0 0 1 2 2v12H7a2 2 0 0 1-2-2V5Z"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M16 7h3v12h-3"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linejoin="round"
+                    />
+                  }
+                  @case ('tts') {
+                    <path
+                      d="M5 10v4h3l4 3V7L8 10H5Z"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M16.5 9.5a4 4 0 0 1 0 5M19 8a7 7 0 0 1 0 8"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      stroke-linecap="round"
+                    />
+                  }
+                  @case ('response') {
+                    <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6" />
+                    <path
+                      d="m8.5 12.5 2.5 2.5 4.5-5"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  }
+                }
+              </svg>
+            </span>
+            <span class="pipeline-text">
+              <span class="pipeline-label">{{ step.label }}</span>
+              <span class="pipeline-desc">{{ step.description }}</span>
+            </span>
+          </li>
+        }
+      </ol>
+    </div>
+  </section>
+
+  <!-- Supported languages -->
+  <section class="section" id="languages" appRevealOnScroll>
+    <div class="section-inner">
+      <h2>Built for Indian languages, not just Hindi</h2>
+      <p class="section-lede">
+        Language is a shared, typed concept across the app rather than something assumed. Two
+        languages are active in the current UI; the rest are already part of the plan, enabled one
+        at a time as each meets its quality bar.
+      </p>
+
+      <div class="lang-groups">
+        <div class="lang-group">
+          <h3>Available now</h3>
+          <ul class="lang-list">
+            @for (lang of languages; track lang.code) {
+              @if (lang.enabled) {
+                <li>
+                  <app-status-pill [label]="lang.label + ' · ' + lang.englishName" tone="accent" />
+                </li>
+              }
+            }
+          </ul>
+        </div>
+        <div class="lang-group">
+          <h3>Coming next</h3>
+          <ul class="lang-list">
+            @for (lang of languages; track lang.code) {
+              @if (!lang.enabled) {
+                <li>
+                  <app-status-pill [label]="lang.label + ' · ' + lang.englishName" tone="neutral" />
+                </li>
+              }
+            }
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Capabilities -->
+  <section class="section section-alt" id="capabilities" appRevealOnScroll>
+    <div class="section-inner">
+      <h2>What you'll be able to do</h2>
+      <ul class="capabilities">
+        @for (item of capabilities; track item.label) {
+          <li class="capability">
+            <svg class="capability-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="m5 12.5 4 4 10-10"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <div>
+              <p class="capability-label">
+                {{ item.label }}
+                @if (item.note) {
+                  <span class="capability-note">({{ item.note }})</span>
+                }
+              </p>
+              <p class="capability-desc">{{ item.description }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="section" id="privacy" appRevealOnScroll>
+    <div class="section-inner narrow">
+      <h2>Local-first, by design</h2>
+      <p>
+        VaaniSetu is designed with local-first processing and user control over data as core
+        principles: every component in the eventual voice loop — listening, understanding,
+        retrieving, and replying — is meant to run on your own hardware by default, with a cloud
+        model only ever an explicit, revocable choice, never a silent fallback.
+      </p>
+      <p class="privacy-note">
+        Today, the assistant workspace makes no network calls and stores nothing beyond a language
+        preference in your browser — there's simply nothing to process yet. The principles above
+        describe what this project is building toward.
+      </p>
+    </div>
+  </section>
+
+  <!-- Why VaaniSetu -->
+  <section class="section section-alt" id="why" appRevealOnScroll>
+    <div class="section-inner narrow">
+      <h2>Why VaaniSetu</h2>
+      <p>
+        Capable open-source speech and language models for Indian languages already exist. Turning
+        them into one coherent, private assistant that speaks the way people actually speak — Hindi,
+        English, and the two mixed together — is still an unsolved integration problem. That's the
+        gap VaaniSetu is built to close.
+      </p>
+    </div>
+  </section>
+
+  <!-- Future direction -->
+  <section class="section" id="future" appRevealOnScroll>
+    <div class="section-inner">
+      <h2>Where this is going</h2>
+      <ul class="future-list">
+        @for (item of futureDirection; track item) {
+          <li>{{ item }}</li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="section cta-section" appRevealOnScroll>
+    <div class="section-inner narrow cta-inner">
+      <h2>Try the assistant workspace</h2>
+      <p>
+        See the interaction model today — voice states, conversation view, and language switching —
+        running on mock data.
+      </p>
+      <a routerLink="/assistant" class="btn btn-primary">Open the assistant</a>
+    </div>
+  </section>
+</main>
