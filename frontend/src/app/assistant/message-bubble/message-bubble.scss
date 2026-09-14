@@ -32,6 +32,11 @@
 .text {
   margin: 0 0 var(--vs-space-2);
   white-space: pre-wrap;
+  // A single long unbroken token (a URL, a long compound word) would
+  // otherwise overflow the bubble's max-width and force the conversation
+  // viewport into horizontal scroll — pre-wrap alone only breaks at
+  // existing whitespace/line boundaries.
+  overflow-wrap: anywhere;
   font-size: var(--vs-font-size-md);
 }
 

@@ -125,7 +125,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--vs-space-1);
-  padding: var(--vs-space-1) var(--vs-space-3);
+  padding: var(--vs-space-1) var(--vs-space-4);
+  // Meets the 44px minimum touch-target size while keeping the pill visually
+  // compact — the padding alone doesn't reliably clear 44px at this font size.
+  min-height: 44px;
   border-radius: var(--vs-radius-pill);
   border: 1px solid var(--vs-line-strong);
   background: var(--vs-surface);

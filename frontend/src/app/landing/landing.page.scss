@@ -180,7 +180,7 @@ h2 {
 
 .btn-primary {
   background: var(--vs-accent);
-  color: white;
+  color: var(--vs-on-accent);
 }
 
 .btn-secondary {
@@ -233,7 +233,7 @@ h2 {
   height: 18px;
   border-radius: 50%;
   background: var(--vs-accent);
-  color: white;
+  color: var(--vs-on-accent);
   font-size: 0.65rem;
   font-weight: 700;
   display: inline-flex;

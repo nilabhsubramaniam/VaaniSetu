@@ -25,6 +25,14 @@
   --vs-user-bubble: #e3efe9;
   --vs-assistant-bubble: #ffffff;
 
+  // Text/icon color for content placed ON an accent- or state-colored
+  // surface (mic button, send button, primary CTA buttons, brand mark).
+  // White is correct here in light mode, where those surfaces are dark —
+  // but they invert to light tints in dark mode, so this token must invert
+  // too rather than being hardcoded `white` at each call site (that was the
+  // Phase 1 dark-mode contrast bug: white-on-light-teal failed WCAG AA).
+  --vs-on-accent: #ffffff;
+
   // Voice states
   --vs-state-idle: #8b8579;
   --vs-state-listening: #1f6f5c;
@@ -82,6 +90,7 @@
     --vs-error-soft: #2e211b;
     --vs-user-bubble: #1b2c27;
     --vs-assistant-bubble: #20252a;
+    --vs-on-accent: #14171a;
 
     --vs-state-idle: #7d786c;
     --vs-state-listening: #52c0a0;
@@ -111,6 +120,7 @@
   --vs-error-soft: #2e211b;
   --vs-user-bubble: #1b2c27;
   --vs-assistant-bubble: #20252a;
+  --vs-on-accent: #14171a;
 
   --vs-state-idle: #7d786c;
   --vs-state-listening: #52c0a0;
