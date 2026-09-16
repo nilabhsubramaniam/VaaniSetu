@@ -1,9 +1,12 @@
 /**
  * Development environment defaults.
  *
- * `useMockData: true` is the only thing Phase 1 actually reads (indirectly,
- * via which service provider is wired up in `app.config.ts`). `apiBaseUrl`
- * is unused until a real backend client exists.
+ * `apiBaseUrl` is read by `ConversationRealService` for both the Go
+ * backend's endpoints (Milestone 2b's frontend integration); points at the
+ * local backend's default port (`ng serve` + `make run` side by side).
+ * `useMockData` remains unread by any service — which provider is real vs.
+ * mock is controlled entirely by `app.config.ts`'s `useClass` lines
+ * (ADR-009), not by this flag.
  */
 export const environment = {
   production: false,

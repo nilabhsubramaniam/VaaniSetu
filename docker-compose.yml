@@ -1,0 +1,59 @@
+# Phase 2, Milestone 2b: postgres + backend + ai-services. Model weights
+# are never baked into the ai-services image (docs/ARCHITECTURE.md §6) —
+# run `ai-services/scripts/download_models.py` on the host first; the
+# ./models/llm bind mount below is how the container sees them.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: vaanisetu
+      POSTGRES_PASSWORD: vaanisetu
+      POSTGRES_DB: vaanisetu
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vaanisetu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai-services:
+    build:
+      context: ./ai-services
+    ports:
+      - "8090:8090"
+    volumes:
+      # Read-only: this container only ever reads weights, never writes
+      # them (docs/ARCHITECTURE.md §6 — downloaded on the host, not
+      # inside the container).
+      - ./models/llm:/app/models/llm:ro
+    environment:
+      VAANISETU_LLM_PORT: "8090"
+      VAANISETU_LLM_MODEL_STORE: "/app/models/llm"
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      VAANISETU_PORT: "8080"
+      VAANISETU_DATABASE_URL: "postgres://vaanisetu:vaanisetu@postgres:5432/vaanisetu?sslmode=disable"
+      VAANISETU_LOG_LEVEL: "info"
+      # Default already matches Angular's dev server; only needs overriding
+      # for a differently-configured frontend origin.
+      VAANISETU_ALLOWED_ORIGIN: "http://localhost:4200"
+      # Set, as of Milestone 2b: the ai-services container above now
+      # implements this contract (proto/llm.openapi.yaml), so the backend
+      # uses HTTPLLMClient instead of FakeLLMClient.
+      VAANISETU_LLM_SERVICE_URL: "http://ai-services:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-services:
+        condition: service_started
+
+volumes:
+  postgres-data:

@@ -1,0 +1,186 @@
+openapi: 3.0.3
+info:
+  title: VaaniSetu Backend — Chat API
+  version: "2.0.0"
+  description: >
+    Phase 2 (Local LLM) chat surface. Hand-maintained rather than generated
+    from Go annotations — see docs/DECISIONS.md for why swaggo was not used
+    at this endpoint count. Keep this file and
+    backend/internal/api/{dto,server}.go in sync by hand. CORS: the server
+    allows exactly one configured origin (config.Config.AllowedOrigin,
+    Angular's dev server by default) — never "*".
+servers:
+  - url: http://localhost:8080/api/v1
+
+paths:
+  /chat:
+    post:
+      summary: Send a message and receive the assistant's reply.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+            example:
+              text: "आज मौसम कैसा है?"
+              language: hi
+      responses:
+        "200":
+          description: Both the persisted user turn and the assistant's reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+              example:
+                userTurn:
+                  id: "36395ae3-769f-4ee9-828d-310d40c5f89b"
+                  role: user
+                  text: "आज मौसम कैसा है?"
+                  language: hi
+                  createdAt: "2026-09-15T11:52:25Z"
+                assistantTurn:
+                  id: "e3d063cc-e154-4fcc-897d-a45bc71d06e4"
+                  role: assistant
+                  text: "नमस्ते! यह अभी एक डेमो जवाब है — असली मॉडल Milestone 2b में जुड़ेगा।"
+                  language: hi
+                  createdAt: "2026-09-15T11:52:25Z"
+                  latencyMs: 0
+        "400":
+          description: Empty text or an unrecognized language code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: invalid_request
+                  message: "text must not be empty"
+        "502":
+          description: The LLM capability (Milestone 2b's Python service) is unreachable or failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: llm_unavailable
+                  message: "the assistant is temporarily unavailable, please try again"
+        "500":
+          description: An unexpected internal error (e.g. a persistence failure).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: internal
+                  message: "something went wrong"
+
+  /chat/history:
+    get:
+      summary: >
+        List every turn in the current (Phase 2: single, implicit) session,
+        oldest first. Returns an empty list if no message has ever been sent.
+      responses:
+        "200":
+          description: The session's turns.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+              example:
+                turns:
+                  - id: "36395ae3-769f-4ee9-828d-310d40c5f89b"
+                    role: user
+                    text: "आज मौसम कैसा है?"
+                    language: hi
+                    createdAt: "2026-09-15T11:52:25Z"
+                  - id: "e3d063cc-e154-4fcc-897d-a45bc71d06e4"
+                    role: assistant
+                    text: "नमस्ते! यह अभी एक डेमो जवाब है — असली मॉडल Milestone 2b में जुड़ेगा।"
+                    language: hi
+                    createdAt: "2026-09-15T11:52:25Z"
+                    latencyMs: 0
+        "500":
+          description: An unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    LanguageCode:
+      type: string
+      description: >
+        Must match frontend/src/app/core/models/language.model.ts's
+        LanguageCode exactly — this list is the normative source of truth
+        for both sides, since the type cannot be shared across TypeScript
+        and Go.
+      enum: [hi, hinglish, en, bn, gu, mr, ta, te, kn, ml, pa, or]
+
+    Turn:
+      type: object
+      description: Matches frontend/src/app/core/models/turn.model.ts's Turn interface.
+      required: [id, role, text, language, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant]
+        text:
+          type: string
+        language:
+          $ref: "#/components/schemas/LanguageCode"
+        createdAt:
+          type: string
+          format: date-time
+        latencyMs:
+          type: integer
+          description: Present only on assistant turns.
+
+    ChatRequest:
+      type: object
+      required: [text, language]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        language:
+          $ref: "#/components/schemas/LanguageCode"
+
+    ChatResponse:
+      type: object
+      required: [userTurn, assistantTurn]
+      properties:
+        userTurn:
+          $ref: "#/components/schemas/Turn"
+        assistantTurn:
+          $ref: "#/components/schemas/Turn"
+
+    HistoryResponse:
+      type: object
+      required: [turns]
+      properties:
+        turns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Turn"
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid_request, llm_unavailable, internal]
+            message:
+              type: string
+              description: Safe to show a user; never the raw underlying error.

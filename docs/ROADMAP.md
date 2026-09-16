@@ -14,7 +14,7 @@ Milestone-based plan for VaaniSetu.
 |-------|------|--------|
 | 0 | Project Foundation | DONE |
 | 1 | UI Foundation | DONE |
-| 2 | Local LLM | NOT STARTED (next) |
+| 2 | Local LLM | DONE |
 | 3 | Speech-to-Text | NOT STARTED |
 | 4 | Text-to-Speech | NOT STARTED |
 | 5 | End-to-End Voice MVP | NOT STARTED |
@@ -88,7 +88,10 @@ Milestone-based plan for VaaniSetu.
 
 ## Phase 2 - Local LLM
 
-**Status:** NOT STARTED
+**Status:** DONE — Milestone 2a (Go backend against `FakeLLMClient`) and
+Milestone 2b (Python `llm` service, model benchmark + selection ADR, real
+end-to-end wiring) are both complete. See `docs/CURRENT_STATE.md` and
+`docs/DECISIONS.md` ADR-015/ADR-016.
 
 - **Objective:** Run a local open-source LLM as a Python service and let the
   UI hold a **text** conversation through the Go backend.

@@ -36,7 +36,13 @@ venv/
 .ruff_cache/
 
 # --- Go (backend/, Phase 2+) ---
-# Compiled output and test binaries; go.sum/go.mod stay tracked.
+# Compiled output and test binaries; go.sum/go.mod stay tracked. `go build
+# ./...` from backend/ with no -o flag names the binary after the cmd/
+# directory with no extension at all on macOS/Linux (here, `api`, from
+# cmd/api) — anchored to backend/ specifically so this can't accidentally
+# match something meaningful elsewhere in the tree the way an unanchored
+# bare `api` pattern could (e.g. internal/api/).
+/backend/api
 *.exe
 *.dll
 *.so

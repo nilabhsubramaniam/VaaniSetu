@@ -2,10 +2,10 @@
 
 Development conventions for VaaniSetu.
 
-The repository currently contains `LICENSE`, `AGENTS.md`, `docs/`, and
-`frontend/` (Phase 1, done). `backend/` and `ai-services/` do not exist yet —
-their conventions stay **TBD** until Phase 2 introduces them. Do not invent
-commands or tools that are not actually present.
+The repository currently contains `LICENSE`, `AGENTS.md`, `docs/`,
+`frontend/` (Phase 1, done), `backend/` and `proto/` (Phase 2, Milestone
+2a), and `ai-services/` (Phase 2, Milestone 2b). Do not invent commands or
+tools that are not actually present.
 
 ---
 
@@ -35,7 +35,9 @@ VaaniSetu/
     CURRENT_STATE.md
     DEVELOPMENT.md
     EVALUATION.md
-  frontend/                          Angular 22, standalone, mock data only
+  frontend/                          Angular 22, standalone, real backend
+                                      (ConversationService); VoiceSessionService
+                                      still mocked
     angular.json, package.json, tsconfig*.json
     eslint.config.js, .prettierrc
     public/fonts/                    self-hosted Noto Sans Devanagari + OFL.txt
@@ -53,23 +55,36 @@ VaaniSetu/
         shared/
           components/               app-header, language-selector, status-pill
           styles/                   _tokens.scss, _mixins.scss
+  backend/                          Go 1.26+, stdlib net/http, pgx/sqlc
+    cmd/api/                        entrypoint
+    internal/
+      api/                          HTTP handlers, DTOs, CORS
+      conversation/                 turn persistence + LLM orchestration
+      llm/                          LLMClient interface: Fake + HTTP clients
+      config/, db/, logging/
+    migrations/                     goose SQL, embedded into the binary
+    SETUP.md, Makefile, .env.example
+  ai-services/                      Python 3.12+, uv, FastAPI + Uvicorn
+    app/
+      main.py                      POST /v1/generate, GET /healthz
+      config.py, registry.py
+      engines/                     LLMEngine interface: llama_cpp implementation
+    scripts/                       download_models.py, benchmark.py
+    tests/
+    models.yaml                    model registry (docs/ARCHITECTURE.md §3.6)
+    benchmark_results/             stored phase-scoped benchmark reports
+    Makefile, .env.example, Dockerfile
+  proto/                           llm.openapi.yaml (Go<->Python contract)
+  docker-compose.yml               postgres + backend + ai-services
+  models/                          local weights, git-ignored (not in git)
+    llm/                           GGUF files ai-services/models.yaml references
 ```
 
-Target (created incrementally by the phases that need each part):
-
-```
-VaaniSetu/
-  frontend/        Angular + TypeScript + SCSS        (Phase 1 — done)
-  backend/         Go API, orchestrator, migrations   (Phase 2)
-  ai-services/     Python inference + offline jobs    (Phase 2+)
-  proto/           shared service contracts           (Phase 2)
-  docker/          Dockerfiles, compose files         (Phase 2)
-  docs/            persistent documentation           (exists)
-  models/          local weights, git-ignored         (Phase 2+)
-```
-
-Exact sub-layout of `backend/` and `ai-services/` is **TBD**, decided in
-Phase 2 and documented here at that time.
+`docker/` (a directory of standalone Dockerfiles) was superseded in practice
+by one `Dockerfile` per workspace (`backend/Dockerfile`,
+`ai-services/Dockerfile`) plus one root `docker-compose.yml` — simpler for
+two services with no shared base image need. Update this note if that
+stops being true.
 
 ## 3. Frontend conventions (Angular + TypeScript + SCSS)
 
@@ -95,17 +110,22 @@ Phase 2 and documented here at that time.
   and no icon library — a lightweight custom design system only (ADR-011).
   Icons are hand-authored inline SVG.
 - All data access goes through an abstract-class interface + DI token
-  (`ConversationService`, `VoiceSessionService` in `core/services/`). Phase 1
-  provides only the mock implementations (`*.mock.service.ts`), wired in
-  `app.config.ts`. UI components never call `fetch` / `HttpClient` directly;
-  when Phase 2 adds a real backend client, only the two `useClass` lines in
-  `app.config.ts` change.
+  (`ConversationService`, `VoiceSessionService` in `core/services/`). Only
+  the two `useClass` lines in `app.config.ts` ever change between
+  milestones (ADR-009); UI components never call `fetch` / `HttpClient`
+  directly. As of Milestone 2b's frontend integration, `ConversationService`
+  is wired to `ConversationRealService` (`conversation.real.service.ts`),
+  which calls the Go backend over `HttpClient`; `VoiceSessionService` is
+  still `VoiceSessionMockService` — it has no backend counterpart yet.
+  `*.mock.service.ts` implementations remain in the tree and are still used
+  in tests.
 - State: no state-management library. Two services hold all state as signals
-  (`ConversationMockService.turns`, `VoiceSessionMockService.state`), plus
+  (`ConversationRealService.turns`, `VoiceSessionMockService.state`), plus
   `SettingsStore` for the one persisted preference (ADR-011).
 - `src/environments/environment.ts` / `environment.development.ts` hold an
-  `apiBaseUrl` placeholder and a `useMockData` flag for Phase 2; nothing reads
-  `apiBaseUrl` yet.
+  `apiBaseUrl` value (`/api` in production, `http://localhost:8080/api` in
+  development). `ConversationRealService` reads it for both endpoints;
+  never hardcode a host in a service.
 - Accessibility: keyboard-usable, labelled controls, visible focus rings, an
   `aria-live` region announcing voice-state changes, `prefers-reduced-motion`
   respected for state animations.
@@ -116,7 +136,7 @@ Run from `frontend/`:
 
 | Command | Purpose |
 |---|---|
-| `npm start` (`ng serve`) | Dev server with live reload, mock data only |
+| `npm start` (`ng serve`) | Dev server with live reload, calls the real backend at `apiBaseUrl` (needs `make run` in `backend/` alongside it) |
 | `npm run build` (`ng build`) | Production build to `frontend/dist/` |
 | `npm test` (`ng test`) | Vitest unit/component tests, single run |
 | `npm run lint` (`ng lint`) | ESLint |
@@ -124,29 +144,120 @@ Run from `frontend/`:
 
 ## 4. Backend conventions (Go)
 
-- Language: Go. Version and module path: **TBD** (Phase 2).
-- Layout: `cmd/` for entrypoints, `internal/` for packages not meant for import,
-  `pkg/` only for genuinely reusable helpers.
-- The backend runs no inference and imports no model. It calls the Python AI
-  service over the `proto/` contracts.
+- Language: Go 1.26 (`backend/go.mod`, matching the toolchain actually used).
+  Module path: `github.com/nilabhsubramaniam/VaaniSetu/backend`, matching the
+  repository's real remote.
+- Layout: `cmd/api/` the entrypoint; `internal/{api,conversation,llm,config,
+  db,logging}` for Phase 2; `pkg/` still unused — nothing has qualified as a
+  genuinely reusable helper yet. `internal/gateway/`, `internal/orchestrator/`,
+  `internal/auth/`, `internal/documents/` are deliberately not created —
+  they belong to later phases (voice loop, deferred auth, RAG).
+- The backend runs no inference and imports no model. `internal/llm.LLMClient`
+  is the capability interface; `FakeLLMClient` (no network) and
+  `HTTPLLMClient` (calls the Python `llm` service per `proto/llm.openapi.yaml`)
+  both implement it, selected by one config value
+  (`config.Config.UsesFakeLLM`), never a code change.
+- HTTP router: standard library `net/http`, using Go 1.22+'s method+path
+  `ServeMux` patterns. No chi/gin — see ADR-013.
+- CORS: a small hand-written middleware in `internal/api` (`Server.withCORS`),
+  not a library. Allows exactly one configured origin
+  (`config.Config.AllowedOrigin`, env `VAANISETU_ALLOWED_ORIGIN`, default
+  `http://localhost:4200` for Angular's dev server) — never a `*` wildcard,
+  and the allowed origin is never derived from the request.
+- Config: hand-rolled `internal/config.Load()` reading `os.Getenv`, no
+  library.
+- Structured logging: standard library `log/slog`
+  (`internal/logging.New`). The "never log transcript/document content at
+  info level" rule (§12) is enforced in code, not just by convention: see
+  `internal/logging.RedactedText`.
 - Errors are returned and wrapped with context, not panicked, outside `main`.
-- Database access through a single data layer; SQL migrations are versioned
-  files (tool **TBD**, Phase 2).
-- HTTP handlers thin; logic in packages that are unit-testable without a server.
+- Database access: `pgx/v5` + `sqlc`-generated queries
+  (`internal/db/queries/*.sql` -> `sqlc generate` -> `internal/db/*.go`, never
+  hand-edited). See ADR-013.
+- Migrations: `goose`, one file per version with `-- +goose Up`/`Down`
+  annotations, embedded into the compiled binary
+  (`backend/migrations/embed.go`) and applied automatically by
+  `db.Migrate` at startup — see ADR-013.
+- Linting: `golangci-lint` (v2 config format, `backend/.golangci.yml`), its
+  own `standard` set plus `errcheck`/`staticcheck`/`unused`/`ineffassign`.
+  Run via `golangci-lint run ./...` from `backend/`.
+- API documentation: hand-maintained OpenAPI at `docs/openapi/chat.yaml`
+  (frontend-facing) and `proto/llm.openapi.yaml` (the Go<->Python `llm`
+  contract) — not swaggo-generated. See ADR-013.
+- HTTP handlers thin; logic in packages that are unit-testable without a
+  server (`internal/api` depends on the `ConversationService` interface,
+  not the concrete `conversation.Service`, so handler tests use an
+  in-memory fake rather than a real database).
+- Commands: `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt -l .`,
+  `golangci-lint run ./...`, all run from `backend/` (or `make check` — see
+  `backend/Makefile`).
+
+### 4.1 Backend local setup and commands
+
+Full walkthrough (Postgres install/start, role/database creation, the
+exact `VAANISETU_DATABASE_URL` value, migrations, running, verifying, and
+troubleshooting the "VAANISETU_DATABASE_URL is required" error): see
+[`backend/SETUP.md`](../backend/SETUP.md). Copy `backend/.env.example` to
+get the required/optional variables. Summary:
+
+| Command | Purpose |
+|---|---|
+| `go run ./cmd/api` (or `make run`) | Start the backend; applies migrations automatically |
+| `go build ./...` (or `make build`) | Compile |
+| `go vet ./...` (or `make vet`) | Static analysis |
+| `go test ./...` (or `make test`) | Unit tests always run; Postgres integration tests skip themselves without Docker |
+| `gofmt -l .` (or `make fmt`) | Formatting check |
+| `golangci-lint run ./...` (or `make lint`) | Lint |
+| `make check` | All of the above, in order |
+
+Docker (`docker compose up`) is optional — the backend runs natively
+against any reachable PostgreSQL, as `backend/SETUP.md` demonstrates.
 
 ## 5. Python / AI conventions
 
-- Language: Python. Version: **TBD** (Phase 2), pin exactly - ML dependencies
-  are version-sensitive.
-- Dependency management: **TBD** (candidate: `uv` or `poetry`), decided in
-  Phase 2 and pinned with a lockfile.
+- Language: Python 3.12+ (`ai-services/pyproject.toml`'s `requires-python`);
+  pinned exactly via `ai-services/uv.lock`. See ADR-015.
+- Dependency management: `uv`, with `pyproject.toml` + `uv.lock`. Run
+  `uv sync` from `ai-services/` once per checkout/dependency change.
 - One module per capability (`vad`, `asr`, `langid`, `llm`, `tts`, `rag`), each
   exposing its service contract and wrapping a model engine behind an interface.
-- Model identity and parameters come from a model-registry config file, never
-  hardcoded. Application code references a capability, not a model name.
+  Milestone 2b adds the first: `app.engines` for `llm`
+  (`app/engines/base.py`'s `LLMEngine` interface,
+  `app/engines/llama_cpp_engine.py`'s implementation).
+- Web framework: FastAPI + Uvicorn (ADR-015), exposing exactly the routes
+  each capability's contract in `proto/` defines — `POST /v1/generate` for
+  `llm` — plus an unversioned `/healthz` per capability for the "model
+  warm/ready" check `docs/ARCHITECTURE.md` §3.3 asks for.
+- Inference engine: `llama-cpp-python` (GGUF weights), chosen over an
+  Apple-Silicon-only engine specifically so the service still runs inside
+  the project's actual Linux-container deployment target — see ADR-015.
+- Model identity and parameters come from a model-registry config file
+  (`ai-services/models.yaml`), never hardcoded. Application code references
+  a capability, not a model name. Download registry-listed weights with
+  `ai-services/scripts/download_models.py` into the git-ignored
+  `models/<capability>/` directory before starting the service.
 - Offline jobs (dataset prep, evaluation, fine-tuning) live in separate modules,
-  never imported by the request path.
+  never imported by the request path. Phase-scoped benchmarking scripts
+  (`ai-services/scripts/benchmark.py`) are one such offline job.
 - Audio utilities (resampling, framing) live in one shared module.
+
+### 5.1 AI-services setup and commands
+
+Full walkthrough (installing `uv`, downloading models, running the
+service, wiring it into the backend, troubleshooting): see
+[`ai-services/SETUP.md`](../ai-services/SETUP.md). Summary — run from
+`ai-services/`:
+
+| Command | Purpose |
+|---|---|
+| `uv sync` (or `make sync`) | Install/update dependencies into `.venv` |
+| `uv run uvicorn app.main:app --port 8090` (or `make run`) | Start the service |
+| `uv run scripts/download_models.py` (or `make download-models`) | Download every registry-listed model into `models/<capability>/` |
+| `uv run scripts/benchmark.py` (or `make benchmark`) | Run the phase-scoped latency/memory/quality benchmark |
+| `uv run pytest` (or `make test`) | Unit + contract tests |
+| `uv run ruff check .` (or `make lint`) | Lint |
+| `uv run ruff format --check .` (or `make fmt-check`) | Formatting check (`make fmt` to fix) |
+| `make check` | test + fmt-check + lint |
 
 ## 6. Environment configuration
 
@@ -171,8 +282,11 @@ Run from `frontend/`:
   (`@angular/build:unit-test`, run via `ng test`), with jsdom. Globals
   (`describe`/`it`/`expect`/`vi`) are enabled via `vitest/globals` in
   `tsconfig.spec.json` — no explicit import needed in spec files.
-- Backend: table-driven unit tests; integration tests against a real PostgreSQL
-  (containerized) for the data layer; contract tests against mocked AI services.
+- Backend: table-driven unit tests; integration tests against a real
+  PostgreSQL via `testcontainers-go` for the data layer — these skip
+  themselves with a clear message when no Docker daemon is available rather
+  than failing the suite; contract tests against mocked AI services
+  (`internal/api`'s handler tests use an in-memory fake `ConversationService`).
 - Python: `pytest`; golden-file tests for text / audio processing; metric
   calculations unit-tested; model-quality checks run as evaluation, not as unit
   tests.
@@ -184,9 +298,8 @@ Run from `frontend/`:
 
 - Frontend: ESLint via `@angular-eslint/schematics` (its `22.x` line, matching
   Angular 22), configured in `frontend/eslint.config.js`. Run via `ng lint`.
-- Backend: `gofmt` plus a linter aggregator (candidate: `golangci-lint`),
-  **TBD** (Phase 2).
-- Python: a linter (candidate: `ruff`), **TBD** (Phase 2).
+- Backend: `gofmt` plus `golangci-lint` (§4).
+- Python: `ruff check .` (§5).
 - Lint must pass for the affected workspace before a task is done.
 
 ## 10. Formatting
@@ -195,7 +308,7 @@ Run from `frontend/`:
   default. Run via `npx prettier --check "src/**/*.{ts,html,scss}"` (or
   `--write` to fix); not yet wired into an `npm` script.
 - Backend: `gofmt` / `goimports`.
-- Python: an autoformatter (candidate: `ruff format` or `black`), **TBD**.
+- Python: `ruff format` (§5).
 - Formatting is enforced, not debated. CI checks it once CI exists.
 
 ## 11. Error handling

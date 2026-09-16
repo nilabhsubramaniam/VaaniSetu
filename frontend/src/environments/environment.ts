@@ -1,10 +1,11 @@
 /**
  * Production environment defaults.
  *
- * `apiBaseUrl` is a placeholder for the future Go backend (Phase 2+).
+ * `apiBaseUrl` is read by `ConversationRealService` for both the Go
+ * backend's endpoints (Milestone 2b's frontend integration); expected to be
+ * served from the same origin in production, hence the relative path.
  * `useMockData` stays `false` here so a production build never silently
- * falls back to mock data if a real API integration is added later.
- * Phase 1 has no code path that reads `apiBaseUrl` yet.
+ * falls back to mock data.
  */
 export const environment = {
   production: true,
