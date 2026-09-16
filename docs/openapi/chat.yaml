@@ -3,12 +3,15 @@ info:
   title: VaaniSetu Backend — Chat API
   version: "2.0.0"
   description: >
-    Phase 2 (Local LLM) chat surface. Hand-maintained rather than generated
-    from Go annotations — see docs/DECISIONS.md for why swaggo was not used
-    at this endpoint count. Keep this file and
-    backend/internal/api/{dto,server}.go in sync by hand. CORS: the server
-    allows exactly one configured origin (config.Config.AllowedOrigin,
-    Angular's dev server by default) — never "*".
+    Phase 2 (Local LLM) chat surface, unchanged by Phase 3's addition of
+    speech input (see docs/openapi/speech.yaml) — a transcript is fed into
+    POST /chat exactly like typed text (docs/DECISIONS.md ADR-017).
+    Hand-maintained rather than generated from Go annotations — see
+    docs/DECISIONS.md for why swaggo was not used at this endpoint count.
+    Keep this file and backend/internal/api/{dto,server}.go in sync by
+    hand. CORS: the server allows exactly one configured origin
+    (config.Config.AllowedOrigin, Angular's dev server by default) — never
+    "*".
 servers:
   - url: http://localhost:8080/api/v1
 
@@ -39,6 +42,7 @@ paths:
                   text: "आज मौसम कैसा है?"
                   language: hi
                   createdAt: "2026-09-15T11:52:25Z"
+                  script: "Devanagari"
                 assistantTurn:
                   id: "e3d063cc-e154-4fcc-897d-a45bc71d06e4"
                   role: assistant
@@ -46,6 +50,7 @@ paths:
                   language: hi
                   createdAt: "2026-09-15T11:52:25Z"
                   latencyMs: 0
+                  script: "Devanagari"
         "400":
           description: Empty text or an unrecognized language code.
           content:
@@ -96,12 +101,14 @@ paths:
                     text: "आज मौसम कैसा है?"
                     language: hi
                     createdAt: "2026-09-15T11:52:25Z"
+                    script: "Devanagari"
                   - id: "e3d063cc-e154-4fcc-897d-a45bc71d06e4"
                     role: assistant
                     text: "नमस्ते! यह अभी एक डेमो जवाब है — असली मॉडल Milestone 2b में जुड़ेगा।"
                     language: hi
                     createdAt: "2026-09-15T11:52:25Z"
                     latencyMs: 0
+                    script: "Devanagari"
         "500":
           description: An unexpected internal error.
           content:
@@ -141,6 +148,13 @@ components:
         latencyMs:
           type: integer
           description: Present only on assistant turns.
+        script:
+          type: string
+          description: >
+            The writing system `text` is actually in (e.g. "Devanagari",
+            "Latin", "Bengali") — computed deterministically per turn
+            (Phase 3, docs/DECISIONS.md ADR-017), not a language-ID model.
+            Absent only on turns persisted before this field existed.
 
     ChatRequest:
       type: object
@@ -180,7 +194,12 @@ components:
           properties:
             code:
               type: string
-              enum: [invalid_request, llm_unavailable, internal]
+              enum: [invalid_request, llm_unavailable, asr_unavailable, internal]
+              description: >
+                asr_unavailable is only ever returned by
+                docs/openapi/speech.yaml's endpoint, not by /chat — listed
+                here because docs/openapi/speech.yaml references this same
+                ErrorResponse schema rather than duplicating it.
             message:
               type: string
               description: Safe to show a user; never the raw underlying error.

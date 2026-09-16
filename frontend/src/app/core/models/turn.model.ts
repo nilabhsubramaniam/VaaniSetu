@@ -21,6 +21,14 @@ export interface Turn {
   readonly createdAt: Date;
   /** Mock latency in ms for assistant turns; undefined for user turns. */
   readonly latencyMs?: number;
+  /**
+   * The writing system `text` is actually in (e.g. "Devanagari", "Latin"),
+   * computed backend-side per turn (Phase 3, docs/DECISIONS.md ADR-017).
+   * Undefined only for turns persisted before this field existed. Not
+   * rendered anywhere yet — carried through so a future UI (e.g. a
+   * per-script font choice) doesn't need a backend change to use it.
+   */
+  readonly script?: string;
   /** Reserved for a future multi-agent backend. Not used in Phase 1. */
   readonly agentId?: string;
 }

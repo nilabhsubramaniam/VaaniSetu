@@ -84,6 +84,9 @@ func TestService_SendMessage_PersistsBothTurns(t *testing.T) {
 	if assistantTurn.LatencyMs == nil {
 		t.Error("assistant turn LatencyMs is nil, want a measured value")
 	}
+	if userTurn.Script == nil || *userTurn.Script != "Devanagari" {
+		t.Errorf("user turn Script = %v, want a computed \"Devanagari\"", userTurn.Script)
+	}
 
 	history, err := svc.History(ctx)
 	if err != nil {

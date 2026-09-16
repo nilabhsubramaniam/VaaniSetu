@@ -1,7 +1,8 @@
-# Phase 2, Milestone 2b: postgres + backend + ai-services. Model weights
-# are never baked into the ai-services image (docs/ARCHITECTURE.md §6) —
-# run `ai-services/scripts/download_models.py` on the host first; the
-# ./models/llm bind mount below is how the container sees them.
+# Phase 2/3: postgres + backend + ai-services (llm + asr capabilities).
+# Model weights are never baked into the ai-services image
+# (docs/ARCHITECTURE.md §6) — run `ai-services/scripts/download_models.py`
+# on the host first; the ./models bind mount below is how the container
+# sees them.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -27,11 +28,13 @@ services:
     volumes:
       # Read-only: this container only ever reads weights, never writes
       # them (docs/ARCHITECTURE.md §6 — downloaded on the host, not
-      # inside the container).
-      - ./models/llm:/app/models/llm:ro
+      # inside the container). One mount covers both capabilities'
+      # subdirectories.
+      - ./models:/app/models:ro
     environment:
       VAANISETU_LLM_PORT: "8090"
       VAANISETU_LLM_MODEL_STORE: "/app/models/llm"
+      VAANISETU_ASR_MODEL_STORE: "/app/models/asr"
 
   backend:
     build:
@@ -45,10 +48,12 @@ services:
       # Default already matches Angular's dev server; only needs overriding
       # for a differently-configured frontend origin.
       VAANISETU_ALLOWED_ORIGIN: "http://localhost:4200"
-      # Set, as of Milestone 2b: the ai-services container above now
-      # implements this contract (proto/llm.openapi.yaml), so the backend
-      # uses HTTPLLMClient instead of FakeLLMClient.
+      # Set, as of Milestone 2b/3b: the ai-services container above now
+      # implements both contracts (proto/llm.openapi.yaml,
+      # proto/asr.openapi.yaml), so the backend uses HTTPLLMClient/
+      # HTTPASRClient instead of the fake clients.
       VAANISETU_LLM_SERVICE_URL: "http://ai-services:8090"
+      VAANISETU_ASR_SERVICE_URL: "http://ai-services:8090"
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,13 +1,14 @@
 [project]
-name = "vaanisetu-llm-service"
+name = "vaanisetu-ai-services"
 version = "0.1.0"
-description = "VaaniSetu's Python `llm` capability service (Phase 2, Milestone 2b) — see proto/llm.openapi.yaml for the contract this implements."
+description = "VaaniSetu's Python AI service — the `llm` (Milestone 2b) and `asr` (Milestone 3b) capabilities, hosted in one FastAPI app per docs/DECISIONS.md ADR-017."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn[standard]>=0.32,<1",
     "llama-cpp-python>=0.3,<1",
     "pyyaml>=6.0,<7",
+    "faster-whisper>=1.2,<2",
 ]
 
 [dependency-groups]

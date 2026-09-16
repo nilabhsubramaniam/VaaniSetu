@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/api"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/asr"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/config"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
@@ -60,8 +61,16 @@ func run() error {
 		llmClient = llm.NewHTTPLLMClient(cfg.LLMServiceURL)
 	}
 
+	var asrClient asr.ASRClient
+	if cfg.UsesFakeASR() {
+		logger.Warn("no VAANISETU_ASR_SERVICE_URL set — using FakeASRClient (Milestone 3a behavior)")
+		asrClient = asr.NewFakeASRClient()
+	} else {
+		asrClient = asr.NewHTTPASRClient(cfg.ASRServiceURL)
+	}
+
 	convService := conversation.NewService(pool, llmClient)
-	server := api.NewServer(convService, logger, cfg.AllowedOrigin)
+	server := api.NewServer(convService, asrClient, logger, cfg.AllowedOrigin)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -78,7 +87,12 @@ func run() error {
 		}
 	}()
 
-	logger.Info("listening", "port", cfg.Port, "usesFakeLLM", cfg.UsesFakeLLM(), "allowedOrigin", cfg.AllowedOrigin)
+	logger.Info("listening",
+		"port", cfg.Port,
+		"usesFakeLLM", cfg.UsesFakeLLM(),
+		"usesFakeASR", cfg.UsesFakeASR(),
+		"allowedOrigin", cfg.AllowedOrigin,
+	)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

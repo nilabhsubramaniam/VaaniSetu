@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: VaaniSetu Backend — Speech API
+  version: "1.0.0"
+  description: >
+    Phase 3 (Speech-to-Text) transcription surface. Hand-maintained, same
+    convention as docs/openapi/chat.yaml — see that file's description for
+    why. This endpoint has no persistence side effect: it only returns
+    text. The caller feeds the transcript into POST /chat separately
+    (docs/openapi/chat.yaml), reusing that endpoint's existing
+    turn-persistence path unchanged (docs/DECISIONS.md ADR-017). CORS:
+    same policy as the chat API — see docs/openapi/chat.yaml.
+servers:
+  - url: http://localhost:8080/api/v1
+
+paths:
+  /speech/transcribe:
+    post:
+      summary: >
+        Transcribe a recorded utterance. Audio is never persisted or
+        retained — discarded once this call returns
+        (docs/PROJECT_GOAL.md).
+      parameters:
+        - name: language
+          in: query
+          required: true
+          schema:
+            $ref: "./chat.yaml#/components/schemas/LanguageCode"
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: The recognized transcript.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transcript]
+                properties:
+                  transcript:
+                    type: string
+              example:
+                transcript: "आज मौसम कैसा है?"
+        "400":
+          description: >
+            Missing/unrecognized language code, empty or oversized audio
+            body, or no speech was recognized in the recording (e.g.
+            silence) — the call succeeded but produced nothing to send.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: invalid_request
+                  message: "no speech was recognized in that recording"
+        "502":
+          description: >
+            The ASR capability (Phase 3 Milestone 3b's Python module) is
+            unreachable or failed.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: asr_unavailable
+                  message: "speech recognition is temporarily unavailable, please try again or type instead"

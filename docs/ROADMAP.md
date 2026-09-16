@@ -15,7 +15,7 @@ Milestone-based plan for VaaniSetu.
 | 0 | Project Foundation | DONE |
 | 1 | UI Foundation | DONE |
 | 2 | Local LLM | DONE |
-| 3 | Speech-to-Text | NOT STARTED |
+| 3 | Speech-to-Text | DONE |
 | 4 | Text-to-Speech | NOT STARTED |
 | 5 | End-to-End Voice MVP | NOT STARTED |
 | 6 | Indian Language Support | NOT STARTED |
@@ -115,7 +115,17 @@ end-to-end wiring) are both complete. See `docs/CURRENT_STATE.md` and
 
 ## Phase 3 - Speech-to-Text
 
-**Status:** NOT STARTED
+**Status:** DONE — Milestone 3a (real browser audio capture, Go
+transcription endpoint, script tagging) and Milestone 3b (Python `asr`
+capability, WER benchmark + selection ADR, real end-to-end wiring) are
+both complete; speech-to-transcript works for Hindi and English within
+`docs/EVALUATION.md`'s provisional WER target. **Known gap, not blocking:**
+Hinglish (code-switched) transcription accuracy is meaningfully below
+`docs/EVALUATION.md`'s "within +10pts of monolingual Hindi WER" target for
+every benchmarked candidate — a genuine Whisper-family limitation, not an
+integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
+(Indian Language Support), which owns code-switching quality. See
+`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-017/ADR-018.
 
 - **Objective:** Add microphone capture and local transcription so a user can
   **speak** their turn.

@@ -29,6 +29,9 @@ func TestLoad(t *testing.T) {
 				if !c.UsesFakeLLM() {
 					t.Error("UsesFakeLLM() = false, want true when LLMServiceURL is unset")
 				}
+				if !c.UsesFakeASR() {
+					t.Error("UsesFakeASR() = false, want true when ASRServiceURL is unset")
+				}
 				if c.AllowedOrigin != "http://localhost:4200" {
 					t.Errorf("AllowedOrigin = %q, want default http://localhost:4200", c.AllowedOrigin)
 				}
@@ -43,6 +46,18 @@ func TestLoad(t *testing.T) {
 			check: func(t *testing.T, c Config) {
 				if c.UsesFakeLLM() {
 					t.Error("UsesFakeLLM() = true, want false when LLMServiceURL is set")
+				}
+			},
+		},
+		{
+			name: "explicit ASR service URL disables the fake client",
+			env: map[string]string{
+				"VAANISETU_DATABASE_URL":    "postgres://localhost/vaanisetu",
+				"VAANISETU_ASR_SERVICE_URL": "http://ai-services:8090",
+			},
+			check: func(t *testing.T, c Config) {
+				if c.UsesFakeASR() {
+					t.Error("UsesFakeASR() = true, want false when ASRServiceURL is set")
 				}
 			},
 		},
@@ -66,6 +81,7 @@ func TestLoad(t *testing.T) {
 				"VAANISETU_PORT",
 				"VAANISETU_DATABASE_URL",
 				"VAANISETU_LLM_SERVICE_URL",
+				"VAANISETU_ASR_SERVICE_URL",
 				"VAANISETU_LOG_LEVEL",
 				"VAANISETU_ALLOWED_ORIGIN",
 			} {

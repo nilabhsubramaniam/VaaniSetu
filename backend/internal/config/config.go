@@ -23,6 +23,13 @@ type Config struct {
 	// docs/ARCHITECTURE.md §5.
 	LLMServiceURL string
 
+	// ASRServiceURL, when set, points HTTPASRClient at the Python `asr`
+	// capability (see internal/asr) — typically the same host:port as
+	// LLMServiceURL, since both capabilities can be hosted in the same
+	// Python process (docs/DEVELOPMENT.md §5). When empty, the backend
+	// uses FakeASRClient instead.
+	ASRServiceURL string
+
 	// LogLevel is one of "debug", "info", "warn", "error" (see
 	// internal/logging). Defaults to "info".
 	LogLevel string
@@ -37,14 +44,16 @@ type Config struct {
 // optional and failing fast on anything required but missing.
 //
 // Required: VAANISETU_DATABASE_URL.
-// Optional: VAANISETU_PORT (default "8080"), VAANISETU_LLM_SERVICE_URL
-// (default "", meaning use the fake client), VAANISETU_LOG_LEVEL (default
-// "info"), VAANISETU_ALLOWED_ORIGIN (default "http://localhost:4200").
+// Optional: VAANISETU_PORT (default "8080"), VAANISETU_LLM_SERVICE_URL and
+// VAANISETU_ASR_SERVICE_URL (default "", meaning use the fake clients),
+// VAANISETU_LOG_LEVEL (default "info"), VAANISETU_ALLOWED_ORIGIN (default
+// "http://localhost:4200").
 func Load() (Config, error) {
 	cfg := Config{
 		Port:          getEnvDefault("VAANISETU_PORT", "8080"),
 		DatabaseURL:   os.Getenv("VAANISETU_DATABASE_URL"),
 		LLMServiceURL: os.Getenv("VAANISETU_LLM_SERVICE_URL"),
+		ASRServiceURL: os.Getenv("VAANISETU_ASR_SERVICE_URL"),
 		LogLevel:      getEnvDefault("VAANISETU_LOG_LEVEL", "info"),
 		AllowedOrigin: getEnvDefault("VAANISETU_ALLOWED_ORIGIN", "http://localhost:4200"),
 	}
@@ -61,6 +70,13 @@ func Load() (Config, error) {
 // llm.HTTPLLMClient.
 func (c Config) UsesFakeLLM() bool {
 	return c.LLMServiceURL == ""
+}
+
+// UsesFakeASR reports whether no real ASR service has been configured, in
+// which case the caller should wire up asr.FakeASRClient instead of
+// asr.HTTPASRClient.
+func (c Config) UsesFakeASR() bool {
+	return c.ASRServiceURL == ""
 }
 
 func getEnvDefault(key, fallback string) string {

@@ -35,6 +35,13 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+# --- Generated ASR benchmark audio (ai-services/, Phase 3) ---
+# Synthesized on demand by scripts/generate_audio_fixtures.py from the
+# committed eval_data/asr_fixtures.yaml manifest — regenerable, not a
+# real recorded corpus, so it stays out of git the same way build output
+# does.
+/ai-services/eval_data/audio/
+
 # --- Go (backend/, Phase 2+) ---
 # Compiled output and test binaries; go.sum/go.mod stay tracked. `go build
 # ./...` from backend/ with no -o flag names the binary after the cmd/

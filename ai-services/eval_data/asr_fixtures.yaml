@@ -1,0 +1,55 @@
+# Milestone 3b's lightweight, phase-scoped ASR benchmark fixture set
+# (docs/ROADMAP.md Phase 3's "small fixed Hindi + Hinglish audio set" —
+# not Phase 9's future rigorous, human-recorded evaluation corpus).
+#
+# This manifest (ground truth text + language + which system TTS voice
+# reads it) is committed; the actual audio is NOT — it's synthesized on
+# demand by scripts/generate_audio_fixtures.py into the git-ignored
+# eval_data/audio/ directory. This sidesteps two real constraints at
+# once: no real human-recorded Hindi/Hinglish speech corpus exists in
+# this repository yet (Phase 8's dataset pipeline is what would build
+# one properly), and building a text-to-speech capability to generate
+# this audio is explicitly Phase 4, out of scope here — using the
+# operating system's own pre-existing `say` command as a one-time dev
+# tool to bootstrap test fixtures is not the same as building or shipping
+# a TTS capability.
+#
+# Known limitation, stated plainly: this is synthetic, single-speaker
+# voice, not real human speech — WER measured against it is optimistic
+# and does not substitute for real recordings. Regenerating requires
+# macOS (the `say` command); this is a real portability limitation of
+# this specific benchmark run, not of the ASR service itself, which
+# accepts any recorded audio regardless of how it was produced.
+fixtures:
+  - id: hi-weather
+    language: hi
+    text: "आज मौसम कैसा है?"
+    voice: Lekha
+  - id: hi-capital
+    language: hi
+    text: "भारत की राजधानी क्या है?"
+    voice: Lekha
+  - id: hi-story
+    language: hi
+    text: "मुझे एक छोटी कहानी सुनाओ"
+    voice: Lekha
+  - id: hi-greeting
+    language: hi
+    text: "नमस्ते, आप कैसे हैं?"
+    voice: Lekha
+  - id: hinglish-weather
+    language: hinglish
+    text: "kal ka weather kaisa rahega, bata sakte ho"
+    voice: Tara
+  - id: hinglish-joke
+    language: hinglish
+    text: "mujhe ek chhoti si joke sunao"
+    voice: Rishi
+  - id: en-learn-hindi
+    language: en
+    text: "What's a good way to learn Hindi quickly?"
+    voice: Samantha
+  - id: en-schedule
+    language: en
+    text: "What's on my schedule today?"
+    voice: Aman

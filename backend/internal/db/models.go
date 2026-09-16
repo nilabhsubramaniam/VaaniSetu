@@ -21,4 +21,5 @@ type Turn struct {
 	Text      string             `json:"text"`
 	LatencyMs *int32             `json:"latency_ms"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Script    *string            `json:"script"`
 }
