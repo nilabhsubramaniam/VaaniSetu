@@ -1,0 +1,58 @@
+# The Go<->Python `llm` capability contract (docs/ARCHITECTURE.md §5).
+#
+# This is OpenAPI/JSON, not a .proto (Protocol Buffers) file, even though it
+# lives in proto/ — docs/ARCHITECTURE.md §4 explicitly allows "gRPC or
+# HTTP" between Go and Python with contracts kept in "proto/ (or
+# equivalent)". Phase 2 is non-streaming (streaming is explicitly deferred
+# to Phase 11), so gRPC's main advantage doesn't apply yet; standing up
+# protoc + codegen for both languages for one unary call would be more
+# machinery than this phase's actual need. Revisit gRPC when Phase 11 (or
+# Phase 3/4's audio framing) actually needs streaming. See docs/DECISIONS.md
+# for the recorded ADR.
+#
+# backend/internal/llm.HTTPLLMClient is the Go-side implementation of this
+# contract; the Python `llm` service (Milestone 2b, not yet built) is the
+# server side.
+openapi: 3.0.3
+info:
+  title: VaaniSetu — llm capability contract
+  version: "2.0.0"
+servers:
+  - url: http://ai-services:8090/v1
+
+paths:
+  /generate:
+    post:
+      summary: Generate a reply to a single message. No conversation context/history is passed in Phase 2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, language]
+              properties:
+                text:
+                  type: string
+                language:
+                  type: string
+                  description: >
+                    Same LanguageCode values as docs/openapi/chat.yaml.
+                    Validation happens in Go before this call is made; the
+                    Python service can assume it is one of the known codes.
+      responses:
+        "200":
+          description: The generated reply.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reply]
+                properties:
+                  reply:
+                    type: string
+        "5XX":
+          description: >
+            Any failure (model not loaded, OOM, timeout). Go treats any
+            non-200 response identically — it does not need a typed error
+            envelope from Python for Phase 2, only the HTTP status.

@@ -1,0 +1,152 @@
+{
+  "prompts": [
+    {
+      "language": "hi",
+      "text": "आज मौसम कैसा है?"
+    },
+    {
+      "language": "hi",
+      "text": "भारत की राजधानी क्या है?"
+    },
+    {
+      "language": "hinglish",
+      "text": "kal ka weather kaisa rahega, bata sakte ho?"
+    },
+    {
+      "language": "hinglish",
+      "text": "mujhe ek chhoti si joke sunao"
+    },
+    {
+      "language": "en",
+      "text": "What's a good way to learn Hindi quickly?"
+    }
+  ],
+  "results": [
+    {
+      "key": "qwen2.5-3b-instruct",
+      "repo_id": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+      "filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
+      "license": "Apache-2.0",
+      "load_seconds": 1.199,
+      "mean_latency_seconds": 0.559,
+      "max_latency_seconds": 0.982,
+      "peak_rss_mb": 3970.6,
+      "runs": [
+        {
+          "language": "hi",
+          "prompt": "आज मौसम कैसा है?",
+          "reply": "आज का मौसम बहुत अच्छा है, तुम्हारी खुशहार में शुभकामना!",
+          "latency_seconds": 0.982
+        },
+        {
+          "language": "hi",
+          "prompt": "भारत की राजधानी क्या है?",
+          "reply": "दिल्ली है",
+          "latency_seconds": 0.202
+        },
+        {
+          "language": "hinglish",
+          "prompt": "kal ka weather kaisa rahega, bata sakte ho?",
+          "reply": "Kya koi specific date bola hai? Yeh sabka weather bina specific date k liye bata nahi pata.",
+          "latency_seconds": 0.624
+        },
+        {
+          "language": "hinglish",
+          "prompt": "mujhe ek chhoti si joke sunao",
+          "reply": "क्या तुम एक छोटी चीज की कहाज़ा चाहते हो?",
+          "latency_seconds": 0.544
+        },
+        {
+          "language": "en",
+          "prompt": "What's a good way to learn Hindi quickly?",
+          "reply": "Try watching Hindi movies or TV shows with subtitles, it's a fun way to learn.",
+          "latency_seconds": 0.445
+        }
+      ]
+    },
+    {
+      "key": "llama-3.2-3b-instruct",
+      "repo_id": "bartowski/Llama-3.2-3B-Instruct-GGUF",
+      "filename": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+      "license": "Llama 3.2 Community License",
+      "load_seconds": 1.232,
+      "mean_latency_seconds": 0.937,
+      "max_latency_seconds": 1.94,
+      "peak_rss_mb": 4433.2,
+      "runs": [
+        {
+          "language": "hi",
+          "prompt": "आज मौसम कैसा है?",
+          "reply": "आज मौसम ठंडा और सूखा है, लेकिन रात में थोड़ा ठंडा होने की संभावना है।",
+          "latency_seconds": 0.892
+        },
+        {
+          "language": "hi",
+          "prompt": "भारत की राजधानी क्या है?",
+          "reply": "भारत की राजधानी नई दिल्ली है।",
+          "latency_seconds": 0.277
+        },
+        {
+          "language": "hinglish",
+          "prompt": "kal ka weather kaisa rahega, bata sakte ho?",
+          "reply": "Aaj ka weather thoda thanda hoga, phir se baad mein thanda hi rahega.",
+          "latency_seconds": 0.579
+        },
+        {
+          "language": "hinglish",
+          "prompt": "mujhe ek chhoti si joke sunao",
+          "reply": "tere dost ke liye ek joke, yeh hai: koi dost apne doston se poocha, \"tum sabse kuchh kya pasand karte ho?\" usne doosre dost se poocha, \"main pasand karta hoon ki tum mujhe kuchh nahi karein.\"",
+          "latency_seconds": 0.997
+        },
+        {
+          "language": "en",
+          "prompt": "What's a good way to learn Hindi quickly?",
+          "reply": "Bilkul, learning Hindi can be a bit challenging, but with the right approach, you can pick it up quickly. First, start with the basics - learn the Devanagari script, it's the writing system for Hindi. Then, focus on common phrases and vocabulary, like greetings, introductions, and basic conversations. You can use language learning apps like Duolingo or Rosetta Stone, or watch Hindi movies and TV shows with English subtitles. Also, try to practice speaking with a native speaker or language exchange partner. And don't forget to listen to Hindi music and podcasts to get a feel for the language.",
+          "latency_seconds": 1.94
+        }
+      ]
+    },
+    {
+      "key": "gemma-2-2b-it",
+      "repo_id": "bartowski/gemma-2-2b-it-GGUF",
+      "filename": "gemma-2-2b-it-Q4_K_M.gguf",
+      "license": "Gemma Terms of Use",
+      "load_seconds": 0.986,
+      "mean_latency_seconds": 0.359,
+      "max_latency_seconds": 0.645,
+      "peak_rss_mb": 3811.6,
+      "runs": [
+        {
+          "language": "hi",
+          "prompt": "आज मौसम कैसा है?",
+          "reply": "आज मौसम ठंडा है।",
+          "latency_seconds": 0.443
+        },
+        {
+          "language": "hi",
+          "prompt": "भारत की राजधानी क्या है?",
+          "reply": "भारत की राजधानी दिल्ली है।",
+          "latency_seconds": 0.176
+        },
+        {
+          "language": "hinglish",
+          "prompt": "kal ka weather kaisa rahega, bata sakte ho?",
+          "reply": "Kal ka weather kya hai?",
+          "latency_seconds": 0.278
+        },
+        {
+          "language": "hinglish",
+          "prompt": "mujhe ek chhoti si joke sunao",
+          "reply": "Okay,  tell me, kya chhoti si joke hai? 😉",
+          "latency_seconds": 0.255
+        },
+        {
+          "language": "en",
+          "prompt": "What's a good way to learn Hindi quickly?",
+          "reply": "Hey there!  There are lots of ways to learn Hindi fast.  Try finding a good teacher, watching Hindi movies with subtitles, and practicing speaking with native speakers.  Good luck!",
+          "latency_seconds": 0.645
+        }
+      ]
+    }
+  ]
+}
