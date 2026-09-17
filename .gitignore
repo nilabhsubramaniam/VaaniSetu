@@ -92,6 +92,11 @@ vendor/
 *.swo
 *~
 
+# --- Local dev orchestration (scripts/dev.sh) ---
+# Per-service stdout/stderr logs, regenerated on every start — not
+# something anyone needs from a previous run once it's over.
+/.dev-logs/
+
 # --- OS-specific files ---
 .DS_Store
 Thumbs.db

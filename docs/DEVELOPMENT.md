@@ -19,6 +19,16 @@ tools that are not actually present.
 - Prefer the smallest setup that works. Add a service or container only when a
   phase needs it.
 
+Running all three services by hand (three terminals, each workspace's own
+`make run`/`npm start`) works but gets old fast, especially when
+restarting one that's already running. `scripts/dev.sh` (repo root)
+wraps that: `start`/`stop`/`restart`/`status` for all three at once,
+freeing each port first so a restart never leaves a stale duplicate
+process behind. It doesn't set anything up (Postgres, `.env` files,
+downloaded models are still per-workspace `SETUP.md` — see §4.1/§5.1);
+it only starts and stops the three processes. Logs land in
+`.dev-logs/<service>.log` (git-ignored).
+
 ## 2. Repository structure
 
 Current:

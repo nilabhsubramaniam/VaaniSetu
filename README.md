@@ -164,6 +164,8 @@ Phases `0`-`3` are done; everything from `4` onward is not started. Full detail,
 
 Three pieces now exist: the frontend, the Go backend, and the Python AI service. Each has its own detailed setup guide; this is the short version.
 
+Once each is set up at least once (models downloaded, `.env` files copied), `scripts/dev.sh start` starts all three together, `scripts/dev.sh stop` stops them, and `scripts/dev.sh restart` does both — safe to run even if some are already up. See `docs/DEVELOPMENT.md` for details. The per-service walkthroughs below are what that script assumes is already done at least once.
+
 **Frontend** — Node.js/npm compatible with Angular 22 (developed against Node 24.x / npm 11.x):
 
 ```bash
