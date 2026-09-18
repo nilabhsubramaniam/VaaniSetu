@@ -15,7 +15,7 @@ Milestone-based plan for VaaniSetu.
 | 0 | Project Foundation | DONE |
 | 1 | UI Foundation | DONE |
 | 2 | Local LLM | DONE |
-| 3 | Speech-to-Text | NOT STARTED |
+| 3 | Speech-to-Text | DONE |
 | 4 | Text-to-Speech | NOT STARTED |
 | 5 | End-to-End Voice MVP | NOT STARTED |
 | 6 | Indian Language Support | NOT STARTED |
@@ -115,13 +115,29 @@ end-to-end wiring) are both complete. See `docs/CURRENT_STATE.md` and
 
 ## Phase 3 - Speech-to-Text
 
-**Status:** NOT STARTED
+**Status:** DONE — Milestone 3a (real browser audio capture, Go
+transcription endpoint, script tagging) and Milestone 3b (Python `asr`
+capability, WER benchmark + selection ADR, real end-to-end wiring) are
+both complete; speech-to-transcript works for Hindi and English within
+`docs/EVALUATION.md`'s provisional WER target. **Known gap, not blocking:**
+Hinglish (code-switched) transcription accuracy is meaningfully below
+`docs/EVALUATION.md`'s "within +10pts of monolingual Hindi WER" target for
+every benchmarked candidate — a genuine Whisper-family limitation, not an
+integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
+(Indian Language Support), which owns code-switching quality. See
+`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-017/ADR-018.
 
 - **Objective:** Add microphone capture and local transcription so a user can
   **speak** their turn.
 - **Scope:** Browser audio capture in Angular; audio transport to Go; Python
   ASR service behind an `asr` capability interface; VAD / endpointing as needed
   for turn capture; language + script tag stored per turn.
+  - Resolved in Milestone 3a (`docs/DECISIONS.md` ADR-017): endpointing is
+    manual (tap to start, tap again to stop), not an automatic VAD model —
+    sufficient for this phase's turn capture. An automatic VAD model is
+    introduced only in Phase 11, to drive barge-in interruption; no phase
+    before that builds one as its own benchmarked capability the way `asr`,
+    `llm`, and `tts` each are.
 - **Dependencies:** Phase 2.
 - **Expected result:** Speak in Hindi or Hinglish, see an accurate transcript,
   get a text (or existing) reply.
@@ -165,9 +181,19 @@ end-to-end wiring) are both complete. See `docs/CURRENT_STATE.md` and
 - **Objective:** Connect the stages into one working spoken loop for Hindi and
   Hinglish, single user, single machine, no RAG.
 - **Scope:** Go turn orchestrator (state machine: listen -> transcribe ->
-  detect language -> think -> speak); full wiring of VAD + ASR + LLM + TTS;
-  end-to-end latency measurement; `docker compose up` brings up the whole
-  stack.
+  select language -> think -> speak); wiring ASR + LLM + TTS into that single
+  loop; end-to-end latency measurement; `docker compose up` brings up the
+  whole stack.
+  - "Listen" uses the manual endpointing already built in Phase 3 Milestone
+    3a (tap to start, tap again to stop — ADR-017) — automatic Voice
+    Activity Detection is not built here. A VAD model is only introduced in
+    Phase 11, where it drives barge-in interruption; Phase 5's loop does not
+    need or assume one exists.
+  - "Select language" uses the manual language preference already built in
+    Phase 1 (`SettingsStore`) — this phase does not add automatic language
+    identification. A dedicated language-detection service is Phase 6's
+    scope; Phase 5's orchestrator is wired to call it once Phase 6 exists,
+    but does not require it.
 - **Dependencies:** Phases 2, 3, 4.
 - **Expected result:** A user holds a spoken Hindi / Hinglish conversation
   entirely offline.
@@ -178,6 +204,9 @@ end-to-end wiring) are both complete. See `docs/CURRENT_STATE.md` and
   Hinglish; end-to-end latency and no-egress checks pass; orchestrator covered
   by tests; docs updated; `docs/CURRENT_STATE.md` reflects MVP reached.
 - **Explicitly deferred:** More languages. RAG. Streaming. Barge-in. Multi-user.
+  Automatic Voice Activity Detection (Phase 11). Automatic language
+  identification (Phase 6) — the manual selector remains authoritative
+  through this phase.
 
 ---
 

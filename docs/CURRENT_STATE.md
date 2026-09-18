@@ -5,13 +5,14 @@ project moves between milestones or a phase's status changes.
 
 ---
 
-- **Current phase:** Phase 2 - Local LLM, **DONE**. Milestones 2a and 2b are
-  both complete; Phase 2's Definition of Done (`docs/ROADMAP.md`) is met.
+- **Current phase:** Phase 2 - Local LLM, **DONE**. Phase 3 - Speech-to-Text,
+  **DONE** (Milestones 3a and 3b both complete).
 - **Current focus:** none active — awaiting the user's decision on the next
-  phase (`docs/ROADMAP.md` Phase 3, Speech-to-Text, is next in order; see
+  phase (`docs/ROADMAP.md` Phase 4, Text-to-Speech, is next in order; see
   `AGENTS.md` §5, "never advance to the next milestone automatically").
-- **Last updated:** 2026-09-16 (Milestone 2b: Python `llm` service built,
-  benchmarked, wired to the backend, and verified live end to end)
+- **Last updated:** 2026-09-17 (Milestone 3b: Python `asr` capability
+  built, benchmarked, wired to the backend, and verified live end to end —
+  a real recording now produces a real transcript and a real reply)
 
 ## Completed
 
@@ -134,16 +135,102 @@ project moves between milestones or a phase's status changes.
     development environment; each piece has instead been run and verified
     natively. Verify the Compose stack on a machine with Docker before
     treating it as proven.
+- **Phase 3, Milestone 3a - real audio capture, transport, and script
+  tagging:**
+  - Frontend: `AudioCaptureService` wraps the browser's `MediaRecorder`
+    API (start/stop/cancel); `SpeechService` uploads the recorded audio to
+    the backend and returns a transcript. `MicButton` now really records
+    (tap to start, tap again to stop — manual endpointing, ADR-017) and
+    feeds the real transcript into the existing, unchanged
+    `ConversationService.sendUserTurn`.
+  - Backend: new `internal/asr` package mirrors `internal/llm`'s
+    fake/real-client shape exactly (`ASRClient` interface,
+    `FakeASRClient` in use now, `HTTPASRClient` built for Milestone 3b).
+    New `POST /api/v1/speech/transcribe` (raw binary audio body, language
+    as a query param, per `docs/openapi/speech.yaml` and
+    `proto/asr.openapi.yaml`) has no persistence side effect — it only
+    returns a transcript.
+  - Database: additive migration `0002_add_script.sql` adds a nullable
+    `turns.script` column. `internal/conversation.DetectScript` computes
+    it deterministically (Unicode-range classification, not a
+    language-ID model) for every turn, typed or spoken, at persist time.
+  - `VAANISETU_ASR_SERVICE_URL` config var added (mirrors
+    `VAANISETU_LLM_SERVICE_URL`'s "swap by config" mechanism, ADR-006);
+    unset by default, so `make run` needs no `ai-services/` checkout.
+  - Tests: 8 new Go tests (`internal/asr`'s fake/HTTP clients, 5 new
+    `handleTranscribe` handler tests) and 14 new Go `DetectScript`/config
+    tests; 13 new frontend tests (`AudioCaptureService` against a mocked
+    `MediaRecorder`, `SpeechService` against `HttpTestingController`, and
+    a rewritten `MicButton` spec covering the real record/transcribe/send
+    flow, permission-denied, and transcription-failure cases). All pass;
+    `go build/vet/test`, `gofmt`, `golangci-lint`, `ng test/lint/build`,
+    and `prettier` all clean.
+  - Real browser/microphone testing was not performed by the agent (no
+    interactive browser available); the transport and persistence path
+    was proven via Go/TypeScript unit and handler tests, and — once
+    Milestone 3b's real model existed — via live curl-driven audio
+    uploads (see below). A hands-on browser/microphone smoke test is
+    still worth doing.
+  - `docs/DECISIONS.md` ADR-017 records the audio-transport, one-process-
+    two-capabilities, manual-endpointing, and script-vs-language-ID
+    decisions this milestone made.
+- **Phase 3, Milestone 3b - Python `asr` capability, benchmark, and real
+  wiring:**
+  - `ai-services/app/engines/asr/` (new capability module, hosted in the
+    same FastAPI process as `llm` per ADR-017): `ASREngine` interface,
+    `FasterWhisperEngine` implementation (`faster-whisper`/CTranslate2,
+    chosen for the same reasons `llama-cpp-python` was — ADR-015/ADR-018).
+    `app/main.py` now loads both capabilities at startup and implements
+    `proto/asr.openapi.yaml`'s `POST /v1/transcribe` alongside the
+    existing `POST /v1/generate`; `/healthz` reports both models.
+  - Model registry gained an `asr` section in `ai-services/models.yaml`:
+    three candidates (`faster-whisper-small`/`-medium`/`-large-v3-turbo`),
+    `selected: faster-whisper-large-v3-turbo`.
+  - A committed fixture manifest (`ai-services/eval_data/asr_fixtures.yaml`,
+    8 Hindi/Hinglish/English utterances) plus a macOS-only generation
+    script (`scripts/generate_audio_fixtures.py`, using the OS's own `say`
+    — a one-time dev tool, not a TTS capability) produce the git-ignored
+    audio `scripts/benchmark_asr.py` benchmarks against. Full results in
+    `ai-services/benchmark_results/asr_milestone_3b.json`.
+  - `faster-whisper-large-v3-turbo` selected: 0% WER on all 4 Hindi and
+    both English fixtures (the other two candidates: 38.8% and 10% mean
+    Hindi WER respectively), and the best — though still imperfect —
+    Hinglish result of the three. See `docs/DECISIONS.md` ADR-018,
+    including a real finding along the way: auto-detecting the language
+    for "hinglish" caused every candidate to transcribe romanized
+    Hindi-English speech into Devanagari script instead of the intended
+    Latin script; forcing English decoding fixed the script (not fully
+    the accuracy — a documented, genuine Whisper-family limitation for
+    code-switched Indian-language speech, not a bug in this integration).
+  - `HTTPASRClient` (already built in Milestone 3a) is now wired to a real
+    service: setting `VAANISETU_ASR_SERVICE_URL` on the backend switches
+    it from `FakeASRClient` with no code change.
+  - `docker-compose.yml`'s `ai-services` volume mount widened from
+    `./models/llm` to `./models` (covers both capabilities' subdirectories);
+    `backend`'s `VAANISETU_ASR_SERVICE_URL` now points at it too.
+  - Tests: 9 new Python tests (`FasterWhisperEngine` request/response
+    handling against a fake underlying model, `/v1/transcribe` contract
+    tests, WER-calculation unit tests) plus updates to existing
+    registry/`/healthz` tests for the two-capability shape — 35 total, all
+    pass; `ruff check`/`ruff format --check` clean.
+  - **Verified live, end to end:** the AI service loads both models and
+    reports both ready; a real synthesized Hindi recording, uploaded
+    through the Go backend's `/speech/transcribe`, produces a correct
+    transcript, which — fed into the existing, unchanged `/chat` — produces
+    a genuine LLM-generated Hindi story reply, with both turns correctly
+    auto-tagged `"script":"Devanagari"`. The known Hinglish weakness was
+    also verified live, not just in the benchmark, for honest reporting.
+  - `docs/DEVELOPMENT.md` §5/§5.1 and its repository-structure tree
+    updated for the second capability module and its scripts/fixtures.
 
 ## Next
 
 - No milestone is currently approved to start. `docs/ROADMAP.md` names
-  Phase 3 (Speech-to-Text) as next in order; per `AGENTS.md` §5, work does
+  Phase 4 (Text-to-Speech) as next in order; per `AGENTS.md` §5, work does
   not begin on it until the user decides to move the project there.
 
 ## Not started
 
-- Speech-to-Text
 - Text-to-Speech
 - End-to-end voice loop
 - Indian language breadth (beyond Hindi / Hinglish scope)
@@ -158,9 +245,11 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean. Its `ConversationService` now
-  runs against the real backend (`ConversationRealService`); only
-  `VoiceSessionService` still uses a mock (see above).
+- `frontend/` builds, lints, and tests clean (88 tests). Its
+  `ConversationService` runs against the real backend
+  (`ConversationRealService`); `MicButton` now really records audio via
+  `AudioCaptureService`/`SpeechService`; only `VoiceSessionService` still
+  uses a mock (see above).
 - `backend/` builds, vets, lints (`golangci-lint`), and tests clean, and has
   now been run for real against a live, native PostgreSQL and a live,
   native `ai-services` instance (see above) — a developer following
@@ -169,19 +258,23 @@ project moves between milestones or a phase's status changes.
   specifically still require a Docker daemon, which remains unavailable in
   this environment — they skip themselves cleanly rather than failing, and
   have not been run for real against a container.
-- `ai-services/` builds its dependencies (`uv sync`, including compiling
-  `llama-cpp-python`), tests, lints, and formats clean. Its own tests never
-  load a real model (a fake `LLMEngine` is dependency-injected); the model
-  actually running has been verified separately, live, per above.
+- `ai-services/` builds its dependencies (`uv sync` — `llama-cpp-python`
+  compiles from source, `faster-whisper`/`ctranslate2` use prebuilt
+  wheels), tests (35), lints, and formats clean. Its own tests never load
+  a real model (fake `LLMEngine`/`ASREngine` implementations are
+  dependency-injected); both models actually running have been verified
+  separately, live, per above.
 - The `docker-compose.yml` stack (postgres + backend + ai-services) has not
   been run for real — Docker remains unavailable in this environment. Each
   service has instead been verified running natively. `backend/Dockerfile`
   and `ai-services/Dockerfile` have not been built. Worth doing on a
   machine with Docker before either milestone is treated as fully verified
   in every respect.
-- The `llm` capability's model is selected (`llama-3.2-3b-instruct`,
-  ADR-016). Every other capability's model choice is still `TBD` (see
-  ADR-008).
+- Two capabilities' models are selected: `llm`
+  (`llama-3.2-3b-instruct`, ADR-016) and `asr`
+  (`faster-whisper-large-v3-turbo`, ADR-018). Every other capability's
+  model choice is still `TBD` (see ADR-008).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
-  Postgres data, and `/models/` (downloaded GGUF weights) are all
+  Postgres data, `/models/` (downloaded weights), and
+  `ai-services/eval_data/audio/` (generated ASR test fixtures) are all
   git-ignored via the repository's single root `.gitignore`.

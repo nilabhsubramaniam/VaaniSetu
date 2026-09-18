@@ -32,6 +32,10 @@ type Turn struct {
 	Text      string
 	LatencyMs *int32
 	CreatedAt time.Time
+	// Script is the writing system Text is actually in (see
+	// DetectScript), computed at persist time for every turn. Nil only
+	// for turns written before this column existed (Phase 3).
+	Script *string
 }
 
 // Service is the business-logic layer behind the chat API. It owns getting
@@ -61,11 +65,13 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 		return Turn{}, Turn{}, fmt.Errorf("conversation: get or create session: %w", err)
 	}
 
+	userScript := DetectScript(text)
 	dbUserTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
 		SessionID: sessionID,
 		Role:      "user",
 		Language:  language,
 		Text:      text,
+		Script:    &userScript,
 	})
 	if err != nil {
 		return Turn{}, Turn{}, fmt.Errorf("conversation: persist user turn: %w", err)
@@ -78,6 +84,7 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 		return userTurn, Turn{}, fmt.Errorf("%w: %v", ErrGenerateFailed, err)
 	}
 	latencyMs := int32(time.Since(started).Milliseconds())
+	assistantScript := DetectScript(genResp.Reply)
 
 	dbAssistantTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
 		SessionID: sessionID,
@@ -85,6 +92,7 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 		Language:  language,
 		Text:      genResp.Reply,
 		LatencyMs: &latencyMs,
+		Script:    &assistantScript,
 	})
 	if err != nil {
 		return userTurn, Turn{}, fmt.Errorf("conversation: persist assistant turn: %w", err)
@@ -145,5 +153,6 @@ func turnFromDB(t db.Turn) Turn {
 		Text:      t.Text,
 		LatencyMs: t.LatencyMs,
 		CreatedAt: t.CreatedAt.Time,
+		Script:    t.Script,
 	}
 }

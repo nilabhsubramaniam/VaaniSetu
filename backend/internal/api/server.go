@@ -4,13 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/asr"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
 )
+
+// maxAudioBytes bounds a single POST /api/v1/speech/transcribe body.
+// Generous for one short utterance (a few tens of seconds of compressed
+// audio); guards against an unbounded upload rather than tuning a
+// realistic maximum.
+const maxAudioBytes = 10 << 20 // 10 MiB
 
 // ConversationService is the subset of *conversation.Service the API layer
 // needs. Depending on this interface, rather than the concrete type,
@@ -27,28 +35,31 @@ type ConversationService interface {
 // [NewServer] and mount its handlers with [Server.Routes].
 type Server struct {
 	conversation  ConversationService
+	asrClient     asr.ASRClient
 	logger        *slog.Logger
 	allowedOrigin string
 }
 
-// NewServer builds a Server. conv does all the actual work; logger is used
-// only for operational logging (see internal/logging for the
+// NewServer builds a Server. conv and asrClient do the actual work; logger
+// is used only for operational logging (see internal/logging for the
 // no-transcript-at-info-level enforcement every handler here follows).
 // allowedOrigin is the single origin permitted by CORS (see [Server.Routes])
 // — typically config.Config.AllowedOrigin.
-func NewServer(conv ConversationService, logger *slog.Logger, allowedOrigin string) *Server {
-	return &Server{conversation: conv, logger: logger, allowedOrigin: allowedOrigin}
+func NewServer(conv ConversationService, asrClient asr.ASRClient, logger *slog.Logger, allowedOrigin string) *Server {
+	return &Server{conversation: conv, asrClient: asrClient, logger: logger, allowedOrigin: allowedOrigin}
 }
 
-// Routes returns the backend's HTTP surface for Phase 2: exactly the two
-// endpoints in docs/openapi/chat.yaml, wrapped in minimal CORS handling so
-// the Angular frontend (a different origin in local development) can call
+// Routes returns the backend's HTTP surface: the two Phase 2 endpoints in
+// docs/openapi/chat.yaml plus Phase 3's transcription endpoint in
+// docs/openapi/speech.yaml, wrapped in minimal CORS handling so the
+// Angular frontend (a different origin in local development) can call
 // them. Uses the standard library's method+path pattern matching (Go
 // 1.22+) rather than a third-party router — see docs/DECISIONS.md for why.
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/chat", s.handleChat)
 	mux.HandleFunc("GET /api/v1/chat/history", s.handleHistory)
+	mux.HandleFunc("POST /api/v1/speech/transcribe", s.handleTranscribe)
 	return s.withCORS(mux)
 }
 
@@ -128,6 +139,52 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		dtos = append(dtos, turnToDTO(t))
 	}
 	writeJSON(w, http.StatusOK, historyResponse{Turns: dtos})
+}
+
+// handleTranscribe implements POST /api/v1/speech/transcribe per
+// docs/openapi/speech.yaml. It has no persistence side effect — it only
+// returns text; the caller is expected to feed that transcript into the
+// existing POST /api/v1/chat unchanged (docs/DECISIONS.md ADR-017), which
+// is what actually persists a turn.
+func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
+	language := r.URL.Query().Get("language")
+	if !isValidLanguage(language) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "unknown or missing language code")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAudioBytes)
+	audio, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "audio body too large or unreadable")
+		return
+	}
+	if len(audio) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_request", "audio must not be empty")
+		return
+	}
+
+	result, err := s.asrClient.Transcribe(r.Context(), asr.TranscribeRequest{
+		Audio:       audio,
+		ContentType: r.Header.Get("Content-Type"),
+		Language:    language,
+	})
+	if err != nil {
+		// Never log the audio itself — only metadata. Audio is discarded
+		// after this call regardless of outcome (docs/PROJECT_GOAL.md).
+		s.logger.Warn("asr transcribe failed", "language", language, "audioBytes", len(audio), "error", err)
+		writeError(w, http.StatusBadGateway, "asr_unavailable",
+			"speech recognition is temporarily unavailable, please try again or type instead")
+		return
+	}
+
+	transcript := strings.TrimSpace(result.Transcript)
+	if transcript == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "no speech was recognized in that recording")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, transcribeResponse{Transcript: transcript})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

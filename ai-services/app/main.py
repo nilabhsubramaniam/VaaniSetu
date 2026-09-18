@@ -1,7 +1,12 @@
-"""The `llm` capability's HTTP surface — implements proto/llm.openapi.yaml
-exactly (one route, `POST /v1/generate`) plus an operational `/healthz`
-that the contract doesn't require but docs/ARCHITECTURE.md §3.3 asks every
-AI service to expose ("model warm / ready state").
+"""VaaniSetu's Python AI service HTTP surface: the `llm` capability
+(proto/llm.openapi.yaml, `POST /v1/generate`) and the `asr` capability
+(proto/asr.openapi.yaml, `POST /v1/transcribe`), hosted in one FastAPI app
+per docs/DECISIONS.md ADR-017 — "one module per capability" is a
+code-organization convention (docs/DEVELOPMENT.md §5), not a
+one-process-per-capability deployment rule. Plus an operational
+`/healthz` that neither contract requires but
+docs/ARCHITECTURE.md §3.3 asks every AI service to expose ("model warm /
+ready state").
 
 Run with: `uvicorn app.main:app --port 8090` (or `make run` — see
 ai-services/Makefile).
@@ -13,38 +18,46 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from . import config, registry
+from .engines.asr.base import ASREngine, TranscribeRequest
 from .engines.base import GenerateRequest, LLMEngine
 
-logger = logging.getLogger("vaanisetu.llm")
+logger = logging.getLogger("vaanisetu.ai_services")
 
 _cfg = config.load()
 logging.basicConfig(level=_cfg.log_level.upper())
 
 
 class _AppState:
-    """Holds the loaded engine. A plain object on `app.state`, not a
-    global, so tests can swap it via FastAPI's dependency override instead
-    of monkeypatching module state.
+    """Holds both loaded engines. A plain object on `app.state`, not a
+    global, so tests can swap either via FastAPI's dependency override
+    instead of monkeypatching module state.
     """
 
-    engine: LLMEngine | None = None
-    selected_model_key: str | None = None
+    llm_engine: LLMEngine | None = None
+    llm_model_key: str | None = None
+    asr_engine: ASREngine | None = None
+    asr_model_key: str | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
-        entry = registry.load_selected_entry(_cfg.model_registry_path)
-        app.state.state.engine = registry.build_engine(entry, _cfg.model_store_dir)
-        app.state.state.selected_model_key = entry.key
-        logger.info("model loaded: %s (%s)", entry.key, entry.repo_id)
+        llm_entry = registry.load_selected_entry(_cfg.model_registry_path, "llm")
+        app.state.state.llm_engine = registry.build_engine(llm_entry, _cfg.llm_model_store_dir)
+        app.state.state.llm_model_key = llm_entry.key
+        logger.info("llm model loaded: %s (%s)", llm_entry.key, llm_entry.repo_id)
+
+        asr_entry = registry.load_selected_entry(_cfg.model_registry_path, "asr")
+        app.state.state.asr_engine = registry.build_engine(asr_entry, _cfg.asr_model_store_dir)
+        app.state.state.asr_model_key = asr_entry.key
+        logger.info("asr model loaded: %s (%s)", asr_entry.key, asr_entry.repo_id)
     except registry.RegistryError as e:
         # Fail loudly at startup rather than on the first request — an
-        # operator finds out immediately that the configured model isn't
+        # operator finds out immediately that a configured model isn't
         # actually present, per docs/DEVELOPMENT.md §11 "fail loudly in
         # development".
         logger.error("failed to load model: %s", e)
@@ -52,14 +65,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="VaaniSetu llm capability service", lifespan=lifespan)
+app = FastAPI(title="VaaniSetu AI services", lifespan=lifespan)
 app.state.state = _AppState()
 
 
-def get_engine() -> LLMEngine:
-    engine = app.state.state.engine
+def get_llm_engine() -> LLMEngine:
+    engine = app.state.state.llm_engine
     if engine is None:
-        raise HTTPException(status_code=503, detail="model not loaded")
+        raise HTTPException(status_code=503, detail="llm model not loaded")
+    return engine
+
+
+def get_asr_engine() -> ASREngine:
+    engine = app.state.state.asr_engine
+    if engine is None:
+        raise HTTPException(status_code=503, detail="asr model not loaded")
     return engine
 
 
@@ -74,7 +94,7 @@ class GenerateResponseBody(BaseModel):
 
 @app.post("/v1/generate", response_model=GenerateResponseBody)
 def generate(
-    body: GenerateRequestBody, engine: LLMEngine = Depends(get_engine)
+    body: GenerateRequestBody, engine: LLMEngine = Depends(get_llm_engine)
 ) -> GenerateResponseBody:
     try:
         result = engine.generate(GenerateRequest(text=body.text, language=body.language))
@@ -88,9 +108,40 @@ def generate(
     return GenerateResponseBody(reply=result.reply)
 
 
+class TranscribeResponseBody(BaseModel):
+    transcript: str
+
+
+@app.post("/v1/transcribe", response_model=TranscribeResponseBody)
+async def transcribe(
+    request: Request, language: str, engine: ASREngine = Depends(get_asr_engine)
+) -> TranscribeResponseBody:
+    audio = await request.body()
+    if not audio:
+        raise HTTPException(status_code=400, detail="empty audio body")
+
+    try:
+        result = engine.transcribe(
+            TranscribeRequest(
+                audio=audio,
+                content_type=request.headers.get("content-type", ""),
+                language=language,
+            )
+        )
+    except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
+        # Never log the audio itself, only its size — same rule
+        # backend/internal/api applies (docs/DEVELOPMENT.md §12).
+        logger.error("transcribe failed (audio bytes=%d): %s", len(audio), e)
+        raise HTTPException(status_code=500, detail="transcription failed") from e
+
+    return TranscribeResponseBody(transcript=result.transcript)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, object]:
+    state = app.state.state
     return {
-        "ready": app.state.state.engine is not None,
-        "model": app.state.state.selected_model_key,
+        "ready": state.llm_engine is not None and state.asr_engine is not None,
+        "llm_model": state.llm_model_key,
+        "asr_model": state.asr_model_key,
     }

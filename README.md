@@ -4,7 +4,7 @@
 
 A privacy-first, local-first AI voice assistant built for Indian languages and Hinglish, composed from open-source models rather than a single hosted model.
 
-> **Status: early development.** Phases 0-2 (project foundation, UI foundation, local LLM) are complete. A real Angular frontend, Go backend, PostgreSQL database, and Python LLM service all exist and talk to each other over HTTP — type a message and get a genuine, locally generated reply. There is no speech, RAG, or multi-language support yet. See [Project status](#project-status) below for exactly what exists today.
+> **Status: early development.** Phases 0-3 (project foundation, UI foundation, local LLM, speech-to-text) are complete. You can speak or type a message in Hindi, Hinglish, or English and get a genuine, locally generated reply — real microphone capture, a real transcription model, and a real language model, all running on this machine and talking to each other over HTTP. There is no spoken reply (text-to-speech), RAG, or multi-language support yet. See [Project status](#project-status) below for exactly what exists today.
 
 ---
 
@@ -40,15 +40,17 @@ A privacy-first, local-first AI voice assistant built for Indian languages and H
 | 0 | Project Foundation | **Done** |
 | 1 | UI Foundation | **Done** |
 | 2 | Local LLM | **Done** |
-| 3–12 | STT, TTS, end-to-end voice, language breadth, RAG, dataset pipeline, evaluation, fine-tuning, streaming, production hardening | Not started |
+| 3 | Speech-to-Text | **Done** |
+| 4–12 | TTS, end-to-end voice, language breadth, RAG, dataset pipeline, evaluation, fine-tuning, streaming, production hardening | Not started |
 
 What that means concretely today:
 
 - Project documentation (`AGENTS.md`, `docs/`) is established and is the source of truth for scope and process.
-- An Angular frontend exists at [`frontend/`](frontend/) with a conversation UI, a mic control, a settings screen, and real HTTP calls to a Go backend for every chat turn.
-- A Go backend at [`backend/`](backend/) persists conversations in PostgreSQL and calls a Python LLM service for each reply.
-- A Python AI service at [`ai-services/`](ai-services/) runs a real, locally-loaded open-source language model (Llama-3.2-3B-Instruct, selected by benchmark — see [`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-016) and answers in Hindi, Hinglish, or English depending on what you type.
-- There is still no speech (STT/TTS), no retrieval (RAG), and no language beyond Hindi/Hinglish/English enabled.
+- An Angular frontend exists at [`frontend/`](frontend/) with a conversation UI, a real microphone control, a settings screen, and real HTTP calls to a Go backend for every turn.
+- A Go backend at [`backend/`](backend/) persists conversations in PostgreSQL, transcribes uploaded audio, and calls a Python service for each reply.
+- A Python AI service at [`ai-services/`](ai-services/) runs two real, locally-loaded open-source models: a language model (Llama-3.2-3B-Instruct, selected by benchmark — [`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-016) and a speech-to-text model (faster-whisper-large-v3-turbo, ADR-018).
+- Speaking or typing in Hindi or English works well; Hinglish (code-switched) speech transcribes with reduced accuracy — a known, documented Whisper-family limitation, not a bug (ADR-018).
+- There is still no spoken reply (TTS), no retrieval (RAG), and no language beyond Hindi/Hinglish/English enabled.
 
 The full status, updated as work lands, lives in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
@@ -60,7 +62,7 @@ VaaniSetu's goal is a voice assistant that understands and replies naturally in 
 Microphone → VAD → Speech-to-Text → Language Detection → Local AI → RAG / Tools → Text-to-Speech → Speaker
 ```
 
-**None of this pipeline is implemented yet.** It is the destination the roadmap in [`docs/ROADMAP.md`](docs/ROADMAP.md) is working toward, built one stage at a time, not the current state of the code. Full detail: [`docs/PROJECT_GOAL.md`](docs/PROJECT_GOAL.md).
+**Two of these seven stages are implemented** (Speech-to-Text and the Local AI/LLM stage); the rest are the destination the roadmap in [`docs/ROADMAP.md`](docs/ROADMAP.md) is working toward, built one stage at a time. Full detail: [`docs/PROJECT_GOAL.md`](docs/PROJECT_GOAL.md).
 
 ## Why VaaniSetu
 
@@ -79,14 +81,14 @@ The long-term voice loop, and what's actually built so far:
 
 | Stage | Purpose | Status |
 |---|---|---|
-| Voice Activity Detection | Detect when the user is speaking | Not implemented |
-| Speech-to-Text | Transcribe speech | Not implemented |
-| Language Detection | Tag the turn's language/script | Not implemented — language is currently a manual selector, not detected |
+| Voice Activity Detection | Detect when the user is speaking | Not implemented — endpointing is manual (tap the mic to start, tap again to stop), not automatic (see [`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-017) |
+| Speech-to-Text | Transcribe speech | **Implemented** — a real, locally-loaded model (faster-whisper-large-v3-turbo) transcribes every recording |
+| Language Detection | Tag the turn's language/script | Partially — the *script* a turn is written in (Devanagari, Latin, ...) is computed automatically per turn; which *language* it is remains a manual selector, not detected (full language ID is Phase 6) |
 | Local AI (LLM) | Generate a reply | **Implemented** — a real, locally-loaded open-source model (Llama-3.2-3B-Instruct) generates every reply |
 | RAG / Tools | Ground answers in documents or actions | Not implemented |
 | Text-to-Speech | Speak the reply | Not implemented |
 
-Today, typing a message in the [`frontend/`](frontend/) app sends it to the Go backend, which persists it and asks the Python `ai-services` LLM for a reply — a real network round trip and a real model, not a simulation. Speech capture/playback and everything upstream/downstream of the LLM stage are still not built.
+Today, tapping the mic and speaking (or typing) sends real audio (or text) to the Go backend, which transcribes it if needed, persists it, and asks the Python `ai-services` LLM for a reply — a real network round trip and real models throughout, not a simulation. Playing the reply back as speech, and everything downstream of the LLM stage, is still not built.
 
 ## Supported languages
 
@@ -111,16 +113,16 @@ Orchestrator
 
 Some of these stages may eventually run concurrently where it's safe to do so. The intent is that each stage communicates through a defined service contract rather than being tightly coupled to a specific model implementation, so an engine can be swapped by changing configuration, not code.
 
-**None of this orchestration exists yet** — there is no orchestrator and no multi-model execution in the repository today; the current system is a single LLM call per turn, no other stage involved. One capability has a selected model so far: `llm`, decided by benchmarking three candidates on real hardware plus a license check, not by reputation ([ADR-008](docs/DECISIONS.md#adr-008---model-selection-is-deferred-and-evidence-based) and [ADR-016](docs/DECISIONS.md) in `docs/DECISIONS.md`). Every other capability's model choice remains undecided.
+**None of this orchestration exists yet** — there is no orchestrator and no multi-model execution in the repository today; the current system is one ASR call (when speaking) followed by one LLM call per turn, no other stage involved. Two capabilities have a selected model so far: `llm` and `asr`, each decided by benchmarking multiple candidates on real hardware plus a license check, not by reputation ([ADR-008](docs/DECISIONS.md#adr-008---model-selection-is-deferred-and-evidence-based), [ADR-016](docs/DECISIONS.md), and [ADR-018](docs/DECISIONS.md) in `docs/DECISIONS.md`). Every other capability's model choice remains undecided.
 
 ## Technology stack
 
 | Layer | Current | Planned |
 |---|---|---|
-| Frontend | Angular 22 (standalone components, zoneless), TypeScript, SCSS | — |
+| Frontend | Angular 22 (standalone components, zoneless), TypeScript, SCSS, browser `MediaRecorder` for mic capture | — |
 | Backend | Go 1.26+, stdlib `net/http`, `pgx`/`sqlc`, `goose` migrations | — |
-| AI / ML | Python 3.12+, FastAPI, `llama-cpp-python` running Llama-3.2-3B-Instruct | STT, TTS, embeddings — not yet built |
-| Database | PostgreSQL (sessions, turns) | `pgvector` for retrieval, once RAG (Phase 7) needs it |
+| AI / ML | Python 3.12+, FastAPI, `llama-cpp-python` running Llama-3.2-3B-Instruct, `faster-whisper` running faster-whisper-large-v3-turbo | TTS, embeddings — not yet built |
+| Database | PostgreSQL (sessions, turns, per-turn script tag) | `pgvector` for retrieval, once RAG (Phase 7) needs it |
 | Infrastructure | `docker-compose.yml` (postgres + backend + ai-services), not yet run end to end in this environment | Signed desktop packaging (Phase 12) |
 
 Everything in this table except the "Planned" column is real, running code, verified live end to end — not just architecture intent. Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -134,19 +136,19 @@ VaaniSetu/
 ├── README.md          # This file
 ├── .gitignore
 ├── docs/              # Persistent project documentation (source of truth — see below)
-├── proto/             # Go<->Python `llm` contract (llm.openapi.yaml)
+├── proto/             # Go<->Python contracts (llm.openapi.yaml, asr.openapi.yaml)
 ├── docker-compose.yml # postgres + backend + ai-services
-├── frontend/          # Angular 22 UI — real backend calls (Phase 1 + Milestone 2b)
-├── backend/           # Go API: chat endpoints, PostgreSQL persistence (Phase 2a)
-└── ai-services/       # Python LLM service: FastAPI + llama-cpp-python (Phase 2b)
+├── frontend/          # Angular 22 UI — real mic capture + backend calls (Phases 1-3)
+├── backend/           # Go API: chat + speech endpoints, PostgreSQL persistence (Phase 2a/3a)
+└── ai-services/       # Python LLM + ASR service: FastAPI + llama-cpp-python + faster-whisper (Phase 2b/3b)
 ```
 
 ## Current implementation
 
-- **Frontend** ([`frontend/`](frontend/)): an Angular 22 app (standalone components, signals, zoneless change detection) with two routes — an assistant/conversation screen and a settings screen. A mic control shows a visible `idle → listening → processing → responding → error` state cycle; a text-input fallback and language selector send real messages to the backend via `HttpClient`.
-- **Backend** ([`backend/`](backend/)): a Go service exposing `POST /api/v1/chat` and `GET /api/v1/chat/history`, persisting every turn to PostgreSQL, and calling the Python LLM service for each reply.
-- **AI service** ([`ai-services/`](ai-services/)): a FastAPI service that loads Llama-3.2-3B-Instruct locally via `llama-cpp-python` and generates a real reply for every request — no canned or hardcoded text.
-- Still not built: speech capture/synthesis, retrieval (RAG), multi-language support beyond Hindi/Hinglish/English, and any orchestration beyond a single LLM call per turn.
+- **Frontend** ([`frontend/`](frontend/)): an Angular 22 app (standalone components, signals, zoneless change detection) with two routes — an assistant/conversation screen and a settings screen. A mic control really records audio (tap to start, tap again to stop) and uploads it for transcription; a text-input fallback and language selector send real messages to the backend via `HttpClient`.
+- **Backend** ([`backend/`](backend/)): a Go service exposing `POST /api/v1/chat`, `GET /api/v1/chat/history`, and `POST /api/v1/speech/transcribe`, persisting every turn to PostgreSQL (with an automatically-computed script tag), and calling the Python service for transcription and replies.
+- **AI service** ([`ai-services/`](ai-services/)): a FastAPI service that loads two real local models — Llama-3.2-3B-Instruct (`llama-cpp-python`) and faster-whisper-large-v3-turbo (`faster-whisper`) — and produces a real reply and a real transcript for every request, no canned or hardcoded text.
+- Still not built: spoken replies (TTS), retrieval (RAG), multi-language support beyond Hindi/Hinglish/English, automatic language detection, and any orchestration beyond a single LLM/ASR call per turn.
 
 Current status is tracked in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
@@ -156,11 +158,13 @@ VaaniSetu is built one approved milestone at a time; the agent/contributor workf
 
 `0` Project Foundation → `1` UI Foundation → `2` Local LLM → `3` Speech-to-Text → `4` Text-to-Speech → `5` End-to-End Voice MVP → `6` Indian Language Support → `7` RAG → `8` Dataset Pipeline → `9` Evaluation & Benchmarking → `10` LoRA/QLoRA Fine-Tuning → `11` Real-Time Streaming → `12` Production Hardening
 
-Phases `0`-`2` are done; everything from `3` onward is not started. Full detail, current phase, and definitions of done: [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
+Phases `0`-`3` are done; everything from `4` onward is not started. Full detail, current phase, and definitions of done: [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
 ## Local development
 
 Three pieces now exist: the frontend, the Go backend, and the Python AI service. Each has its own detailed setup guide; this is the short version.
+
+Once each is set up at least once (models downloaded, `.env` files copied), `scripts/dev.sh start` starts all three together, `scripts/dev.sh stop` stops them, and `scripts/dev.sh restart` does both — safe to run even if some are already up. See `docs/DEVELOPMENT.md` for details. The per-service walkthroughs below are what that script assumes is already done at least once.
 
 **Frontend** — Node.js/npm compatible with Angular 22 (developed against Node 24.x / npm 11.x):
 
@@ -182,11 +186,11 @@ make run                # http://localhost:8080
 ```bash
 cd ai-services
 uv sync
-uv run scripts/download_models.py   # ~2GB, one time
+uv run scripts/download_models.py   # ~5.5GB (both llm and asr candidates), one time
 make run                             # http://localhost:8090
 ```
 
-With all three running (and `backend/.env`'s `VAANISETU_LLM_SERVICE_URL` pointed at the AI service), the frontend's chat is backed by a real, locally-generated reply end to end. Each workspace's own commands (`npm test`/`npm run lint`, `make test`/`make lint` in `backend/` and `ai-services/`) are listed in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+With all three running (and `backend/.env`'s `VAANISETU_LLM_SERVICE_URL`/`VAANISETU_ASR_SERVICE_URL` pointed at the AI service), speaking or typing in the frontend is backed by real transcription and a real, locally-generated reply end to end. Each workspace's own commands (`npm test`/`npm run lint`, `make test`/`make lint` in `backend/` and `ai-services/`) are listed in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 **Troubleshooting: browser console shows `TypeError: Failed to fetch` / `HttpErrorResponse ... status: 0`.**
 This is a browser-level connection failure, not an application error — the
@@ -227,7 +231,7 @@ Angular talks only to the Go backend — never directly to the Python AI service
 
 VaaniSetu is designed with local-first processing and user control over their own data as core architectural principles — every component in the eventual voice loop (speech recognition, language detection, the language model, retrieval, speech synthesis, and the database) is intended to run on the user's own hardware by default, with any cloud model as an explicit, revocable opt-in rather than a silent fallback. Consent for storing history, using data for fine-tuning, or uploading documents is meant to be granular and independently revocable.
 
-The LLM stage already meets this today: replies are generated by a model running locally on the developer's own machine, with no network egress at generation time. Conversation turns are stored in a local PostgreSQL database, not sent anywhere else. Consent toggles for history storage, training use, and document uploads exist in the settings UI as visual previews only — they don't yet gate anything, since there's no persisted-history opt-out, fine-tuning, or document upload to gate. Full detail: [`docs/PROJECT_GOAL.md`](docs/PROJECT_GOAL.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+The LLM and ASR stages already meet this today: replies and transcripts are both produced by models running locally on the developer's own machine, with no network egress at inference time. Recorded audio is discarded once transcribed, never written to disk or the database, matching the "raw audio is discarded after transcription by default" commitment before any retention feature exists to opt into. Conversation turns are stored in a local PostgreSQL database, not sent anywhere else. Consent toggles for history storage, training use, and document uploads exist in the settings UI as visual previews only — they don't yet gate anything, since there's no persisted-history opt-out, fine-tuning, or document upload to gate. Full detail: [`docs/PROJECT_GOAL.md`](docs/PROJECT_GOAL.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## AI / model philosophy
 

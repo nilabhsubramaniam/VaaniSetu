@@ -71,7 +71,13 @@ order.
 - Session lifecycle, local authentication, request routing.
 - The **turn orchestrator**: the state machine that drives a voice turn
   (listen -> transcribe -> detect language -> think -> retrieve -> speak),
-  cancelling downstream work on interruption (later phases).
+  cancelling downstream work on interruption (later phases). This is the
+  full target sequence, not what any single phase builds: "detect
+  language" is the existing manual language selector until Phase 6 adds
+  real detection, "retrieve" doesn't exist before Phase 7, and
+  interruption-driven cancellation needs the VAD model Phase 11 introduces
+  — see `docs/ROADMAP.md` Phase 5's scope for exactly what its orchestrator
+  actually wires together first.
 - Persistence: read and write PostgreSQL.
 - The document ingestion / RAG API (later phases): accept uploads, dispatch
   chunking / embedding jobs to Python, never embed inline in a request.

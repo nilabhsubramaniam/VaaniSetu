@@ -19,6 +19,16 @@ tools that are not actually present.
 - Prefer the smallest setup that works. Add a service or container only when a
   phase needs it.
 
+Running all three services by hand (three terminals, each workspace's own
+`make run`/`npm start`) works but gets old fast, especially when
+restarting one that's already running. `scripts/dev.sh` (repo root)
+wraps that: `start`/`stop`/`restart`/`status` for all three at once,
+freeing each port first so a restart never leaves a stale duplicate
+process behind. It doesn't set anything up (Postgres, `.env` files,
+downloaded models are still per-workspace `SETUP.md` — see §4.1/§5.1);
+it only starts and stops the three processes. Logs land in
+`.dev-logs/<service>.log` (git-ignored).
+
 ## 2. Repository structure
 
 Current:
@@ -59,25 +69,30 @@ VaaniSetu/
     cmd/api/                        entrypoint
     internal/
       api/                          HTTP handlers, DTOs, CORS
-      conversation/                 turn persistence + LLM orchestration
+      conversation/                 turn persistence, LLM call, script tagging
       llm/                          LLMClient interface: Fake + HTTP clients
+      asr/                          ASRClient interface: Fake + HTTP clients
       config/, db/, logging/
     migrations/                     goose SQL, embedded into the binary
     SETUP.md, Makefile, .env.example
   ai-services/                      Python 3.12+, uv, FastAPI + Uvicorn
     app/
-      main.py                      POST /v1/generate, GET /healthz
+      main.py                      POST /v1/generate, /v1/transcribe, GET /healthz
       config.py, registry.py
-      engines/                     LLMEngine interface: llama_cpp implementation
-    scripts/                       download_models.py, benchmark.py
+      engines/                     LLMEngine + llama_cpp implementation
+        asr/                       ASREngine + faster_whisper implementation
+    scripts/                       download_models.py, benchmark.py, benchmark_asr.py,
+                                    generate_audio_fixtures.py (macOS-only, ASR fixtures)
     tests/
+    eval_data/                     asr_fixtures.yaml (committed manifest);
+                                    audio/ (generated, git-ignored)
     models.yaml                    model registry (docs/ARCHITECTURE.md §3.6)
     benchmark_results/             stored phase-scoped benchmark reports
     Makefile, .env.example, Dockerfile
-  proto/                           llm.openapi.yaml (Go<->Python contract)
+  proto/                           llm.openapi.yaml, asr.openapi.yaml (Go<->Python contracts)
   docker-compose.yml               postgres + backend + ai-services
   models/                          local weights, git-ignored (not in git)
-    llm/                           GGUF files ai-services/models.yaml references
+    llm/                           GGUF files; asr/  CTranslate2 model directories
 ```
 
 `docker/` (a directory of standalone Dockerfiles) was superseded in practice
@@ -147,16 +162,19 @@ Run from `frontend/`:
 - Language: Go 1.26 (`backend/go.mod`, matching the toolchain actually used).
   Module path: `github.com/nilabhsubramaniam/VaaniSetu/backend`, matching the
   repository's real remote.
-- Layout: `cmd/api/` the entrypoint; `internal/{api,conversation,llm,config,
-  db,logging}` for Phase 2; `pkg/` still unused — nothing has qualified as a
-  genuinely reusable helper yet. `internal/gateway/`, `internal/orchestrator/`,
-  `internal/auth/`, `internal/documents/` are deliberately not created —
-  they belong to later phases (voice loop, deferred auth, RAG).
+- Layout: `cmd/api/` the entrypoint; `internal/{api,asr,conversation,llm,
+  config,db,logging}` (asr added Phase 3); `pkg/` still unused — nothing
+  has qualified as a genuinely reusable helper yet. `internal/gateway/`,
+  `internal/orchestrator/`, `internal/auth/`, `internal/documents/` are
+  deliberately not created — they belong to later phases (voice loop,
+  deferred auth, RAG).
 - The backend runs no inference and imports no model. `internal/llm.LLMClient`
   is the capability interface; `FakeLLMClient` (no network) and
   `HTTPLLMClient` (calls the Python `llm` service per `proto/llm.openapi.yaml`)
   both implement it, selected by one config value
   (`config.Config.UsesFakeLLM`), never a code change.
+  `internal/asr.ASRClient` (Phase 3) follows the identical shape —
+  `FakeASRClient`/`HTTPASRClient`, selected by `config.Config.UsesFakeASR`.
 - HTTP router: standard library `net/http`, using Go 1.22+'s method+path
   `ServeMux` patterns. No chi/gin — see ADR-013.
 - CORS: a small hand-written middleware in `internal/api` (`Server.withCORS`),
@@ -221,25 +239,38 @@ against any reachable PostgreSQL, as `backend/SETUP.md` demonstrates.
   `uv sync` from `ai-services/` once per checkout/dependency change.
 - One module per capability (`vad`, `asr`, `langid`, `llm`, `tts`, `rag`), each
   exposing its service contract and wrapping a model engine behind an interface.
-  Milestone 2b adds the first: `app.engines` for `llm`
-  (`app/engines/base.py`'s `LLMEngine` interface,
-  `app/engines/llama_cpp_engine.py`'s implementation).
+  Two exist so far: `app.engines` for `llm` (Milestone 2b —
+  `app/engines/base.py`'s `LLMEngine` interface,
+  `app/engines/llama_cpp_engine.py`'s implementation) and
+  `app.engines.asr` for `asr` (Milestone 3b — `app/engines/asr/base.py`'s
+  `ASREngine` interface, `app/engines/asr/faster_whisper_engine.py`'s
+  implementation). Both are hosted in the same FastAPI process
+  (docs/DECISIONS.md ADR-017) — "one module per capability" is a
+  code-organization convention here, not a one-process-per-capability
+  deployment rule.
 - Web framework: FastAPI + Uvicorn (ADR-015), exposing exactly the routes
   each capability's contract in `proto/` defines — `POST /v1/generate` for
-  `llm` — plus an unversioned `/healthz` per capability for the "model
-  warm/ready" check `docs/ARCHITECTURE.md` §3.3 asks for.
-- Inference engine: `llama-cpp-python` (GGUF weights), chosen over an
+  `llm`, `POST /v1/transcribe` for `asr` — plus one unversioned `/healthz`
+  for the "model warm/ready" check `docs/ARCHITECTURE.md` §3.3 asks for.
+- Inference engines: `llama-cpp-python` (GGUF weights) for `llm`,
+  `faster-whisper`/CTranslate2 for `asr`. Both chosen over an
   Apple-Silicon-only engine specifically so the service still runs inside
-  the project's actual Linux-container deployment target — see ADR-015.
+  the project's actual Linux-container deployment target — see
+  ADR-015/ADR-018.
 - Model identity and parameters come from a model-registry config file
-  (`ai-services/models.yaml`), never hardcoded. Application code references
-  a capability, not a model name. Download registry-listed weights with
+  (`ai-services/models.yaml`, one top-level key per capability), never
+  hardcoded. Application code references a capability, not a model name.
+  Download registry-listed weights with
   `ai-services/scripts/download_models.py` into the git-ignored
   `models/<capability>/` directory before starting the service.
 - Offline jobs (dataset prep, evaluation, fine-tuning) live in separate modules,
   never imported by the request path. Phase-scoped benchmarking scripts
-  (`ai-services/scripts/benchmark.py`) are one such offline job.
-- Audio utilities (resampling, framing) live in one shared module.
+  (`ai-services/scripts/benchmark.py` for `llm`,
+  `ai-services/scripts/benchmark_asr.py` for `asr`) are one such offline job.
+- Audio utilities (resampling, framing) live in one shared module — for
+  now, `app/engines/asr/faster_whisper_engine.py` handles this directly
+  (faster-whisper decodes containers itself via `av`); split it out into
+  a shared module if a second capability needs the same logic.
 
 ### 5.1 AI-services setup and commands
 
@@ -252,8 +283,10 @@ service, wiring it into the backend, troubleshooting): see
 |---|---|
 | `uv sync` (or `make sync`) | Install/update dependencies into `.venv` |
 | `uv run uvicorn app.main:app --port 8090` (or `make run`) | Start the service |
-| `uv run scripts/download_models.py` (or `make download-models`) | Download every registry-listed model into `models/<capability>/` |
-| `uv run scripts/benchmark.py` (or `make benchmark`) | Run the phase-scoped latency/memory/quality benchmark |
+| `uv run scripts/download_models.py` (or `make download-models`) | Download every registry-listed model into `models/<capability>/` (`--capability llm\|asr` to filter) |
+| `uv run scripts/benchmark.py` (or `make benchmark`) | Run the `llm` phase-scoped latency/memory/quality benchmark |
+| `uv run scripts/generate_audio_fixtures.py` | macOS-only: synthesize `eval_data/asr_fixtures.yaml`'s text into test WAV files |
+| `uv run scripts/benchmark_asr.py` | Run the `asr` phase-scoped WER/latency/memory benchmark |
 | `uv run pytest` (or `make test`) | Unit + contract tests |
 | `uv run ruff check .` (or `make lint`) | Lint |
 | `uv run ruff format --check .` (or `make fmt-check`) | Formatting check (`make fmt` to fix) |

@@ -1,0 +1,68 @@
+# The Go<->Python `asr` capability contract (docs/ARCHITECTURE.md §5).
+#
+# Unlike proto/llm.openapi.yaml's JSON request, this one carries a binary
+# audio body — OpenAPI describes that with a `format: binary` schema
+# rather than a typed object, and the language hint travels as a query
+# parameter instead of a JSON field. See docs/DECISIONS.md ADR-017.
+#
+# backend/internal/asr.HTTPASRClient is the Go-side implementation of this
+# contract; the Python `asr` capability module (Phase 3 Milestone 3b, not
+# yet built) is the server side, hosted in the same ai-services process as
+# the `llm` capability (docs/DEVELOPMENT.md §5, "one module per
+# capability" — not necessarily one deployable service per capability).
+openapi: 3.0.3
+info:
+  title: VaaniSetu — asr capability contract
+  version: "1.0.0"
+servers:
+  - url: http://ai-services:8090/v1
+
+paths:
+  /transcribe:
+    post:
+      summary: >
+        Transcribe a single recorded utterance. No streaming/partial
+        results in Phase 3 (deferred to Phase 11) and no conversation
+        context — one recording in, one transcript out.
+      parameters:
+        - name: language
+          in: query
+          required: true
+          schema:
+            type: string
+            description: >
+              Same LanguageCode values as docs/openapi/chat.yaml.
+              Validation happens in Go before this call is made; the
+              Python service can assume it is one of the known codes.
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+          audio/wav:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: The recognized transcript.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transcript]
+                properties:
+                  transcript:
+                    type: string
+                    description: >
+                      May be an empty or whitespace-only string if nothing
+                      was recognized (e.g. silence) — Go treats that as a
+                      400, not a 5xx, since the call itself succeeded.
+        "5XX":
+          description: >
+            Any failure (model not loaded, OOM, timeout, unrecognized
+            audio format/codec). Go treats any non-200 response
+            identically — it does not need a typed error envelope from
+            Python for Phase 3, only the HTTP status.

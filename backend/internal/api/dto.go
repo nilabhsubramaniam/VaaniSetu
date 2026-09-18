@@ -24,15 +24,16 @@ func isValidLanguage(code string) bool {
 
 // turnDTO is the wire representation of a turn, matching
 // frontend/src/app/core/models/turn.model.ts's Turn interface field for
-// field. LatencyMs is omitted from the JSON entirely (not null) when unset,
-// matching the TypeScript field's optionality.
+// field. LatencyMs and Script are omitted from the JSON entirely (not
+// null) when unset, matching the TypeScript fields' optionality.
 type turnDTO struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"`
-	Text      string `json:"text"`
-	Language  string `json:"language"`
-	CreatedAt string `json:"createdAt"`
-	LatencyMs *int32 `json:"latencyMs,omitempty"`
+	ID        string  `json:"id"`
+	Role      string  `json:"role"`
+	Text      string  `json:"text"`
+	Language  string  `json:"language"`
+	CreatedAt string  `json:"createdAt"`
+	LatencyMs *int32  `json:"latencyMs,omitempty"`
+	Script    *string `json:"script,omitempty"`
 }
 
 func turnToDTO(t conversation.Turn) turnDTO {
@@ -43,6 +44,7 @@ func turnToDTO(t conversation.Turn) turnDTO {
 		Language:  t.Language,
 		CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339),
 		LatencyMs: t.LatencyMs,
+		Script:    t.Script,
 	}
 }
 
@@ -63,14 +65,24 @@ type historyResponse struct {
 	Turns []turnDTO `json:"turns"`
 }
 
+// transcribeResponse is the POST /api/v1/speech/transcribe 200 response
+// body, per docs/openapi/speech.yaml. It has no persistence side effect —
+// the caller is expected to feed Transcript into POST /api/v1/chat
+// separately, reusing that endpoint's existing turn-persistence path
+// unchanged (docs/DECISIONS.md ADR-017).
+type transcribeResponse struct {
+	Transcript string `json:"transcript"`
+}
+
 // errorResponse is the body returned for every non-2xx response, per
-// docs/openapi/chat.yaml.
+// docs/openapi/chat.yaml and docs/openapi/speech.yaml.
 type errorResponse struct {
 	Error errorBody `json:"error"`
 }
 
 type errorBody struct {
-	// Code is one of "invalid_request", "llm_unavailable", "internal".
+	// Code is one of "invalid_request", "llm_unavailable",
+	// "asr_unavailable", "internal".
 	Code string `json:"code"`
 	// Message is safe to show a user — never the raw underlying error
 	// (docs/DEVELOPMENT.md §11: user-facing errors "do not leak internal

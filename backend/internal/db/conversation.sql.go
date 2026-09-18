@@ -24,9 +24,9 @@ func (q *Queries) CreateSession(ctx context.Context) (Session, error) {
 }
 
 const createTurn = `-- name: CreateTurn :one
-INSERT INTO turns (session_id, role, language, text, latency_ms)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, session_id, role, language, text, latency_ms, created_at
+INSERT INTO turns (session_id, role, language, text, latency_ms, script)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, session_id, role, language, text, latency_ms, created_at, script
 `
 
 type CreateTurnParams struct {
@@ -35,6 +35,7 @@ type CreateTurnParams struct {
 	Language  string      `json:"language"`
 	Text      string      `json:"text"`
 	LatencyMs *int32      `json:"latency_ms"`
+	Script    *string     `json:"script"`
 }
 
 func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, error) {
@@ -44,6 +45,7 @@ func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, e
 		arg.Language,
 		arg.Text,
 		arg.LatencyMs,
+		arg.Script,
 	)
 	var i Turn
 	err := row.Scan(
@@ -54,6 +56,7 @@ func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, e
 		&i.Text,
 		&i.LatencyMs,
 		&i.CreatedAt,
+		&i.Script,
 	)
 	return i, err
 }
@@ -72,7 +75,7 @@ func (q *Queries) GetMostRecentSession(ctx context.Context) (Session, error) {
 }
 
 const listTurnsBySession = `-- name: ListTurnsBySession :many
-SELECT id, session_id, role, language, text, latency_ms, created_at FROM turns
+SELECT id, session_id, role, language, text, latency_ms, created_at, script FROM turns
 WHERE session_id = $1
 ORDER BY created_at ASC
 `
@@ -94,6 +97,7 @@ func (q *Queries) ListTurnsBySession(ctx context.Context, sessionID pgtype.UUID)
 			&i.Text,
 			&i.LatencyMs,
 			&i.CreatedAt,
+			&i.Script,
 		); err != nil {
 			return nil, err
 		}

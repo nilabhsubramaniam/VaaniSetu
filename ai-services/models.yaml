@@ -1,16 +1,17 @@
-# Model registry for the "llm" capability (docs/ARCHITECTURE.md §3.6).
-# Application code (app.main / app.registry) references the "llm"
-# capability only — never a model name — so changing `selected` is a
-# config change, not a code change (ADR-006).
-#
-# `selected` reflects the outcome of the Milestone 2b benchmark recorded
-# in docs/DECISIONS.md ADR-016. All three `candidates` remain listed (not
-# deleted) so the benchmark stays reproducible and any of them can be
-# re-selected by editing this one line.
+# Model registry, one top-level key per capability (docs/ARCHITECTURE.md
+# §3.6). Application code (app.main / app.registry) references a
+# capability by name only — never a model name — so changing `selected`
+# is a config change, not a code change (ADR-006).
 #
 # Weights are not committed (docs/DEVELOPMENT.md §15) — download them with
 # `ai-services/scripts/download_models.py` into the git-ignored
-# `models/llm/` directory before starting this service.
+# `models/<capability>/` directory before starting this service.
+
+# `selected` reflects the outcome of the Milestone 2b benchmark recorded
+# in docs/DECISIONS.md ADR-016. All three `candidates` remain listed (not
+# deleted) so the benchmark stays reproducible and any of them can be
+# re-selected by editing this one line. `filename` names one GGUF file
+# under `models/llm/`.
 llm:
   selected: llama-3.2-3b-instruct
   candidates:
@@ -35,3 +36,29 @@ llm:
       context_length: 4096
       max_tokens: 512
       license: Gemma Terms of Use
+
+# `selected` reflects the outcome of the Milestone 3b benchmark recorded
+# in docs/DECISIONS.md ADR-018. Each candidate is a full CTranslate2 repo
+# snapshot (no single `filename` — see app/registry.py), downloaded as a
+# directory under `models/asr/<key>/`.
+asr:
+  selected: faster-whisper-large-v3-turbo
+  candidates:
+    faster-whisper-small:
+      engine: faster_whisper
+      repo_id: Systran/faster-whisper-small
+      compute_type: int8
+      device: auto
+      license: MIT
+    faster-whisper-medium:
+      engine: faster_whisper
+      repo_id: Systran/faster-whisper-medium
+      compute_type: int8
+      device: auto
+      license: MIT
+    faster-whisper-large-v3-turbo:
+      engine: faster_whisper
+      repo_id: deepdml/faster-whisper-large-v3-turbo-ct2
+      compute_type: int8
+      device: auto
+      license: MIT

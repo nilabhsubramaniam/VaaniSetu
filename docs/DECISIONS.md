@@ -467,6 +467,202 @@ Status**.
   Superseding this ADR only requires re-running the benchmark.
 - **Status:** Accepted.
 
+## ADR-017 - Phase 3 Milestone 3a: audio transport, endpointing, and script tagging
+
+- **Decision:** Five related Milestone 3a choices, recorded together the
+  same way ADR-011/013/015 bundled earlier phases' stacks:
+  1. **Transcription is a separate step, not a `/chat` change.** The
+     frontend uploads audio to a new `POST /api/v1/speech/transcribe`,
+     gets back only a transcript, and feeds that transcript into the
+     existing `ConversationService.sendUserTurn` — the exact same call a
+     typed message makes. `/chat`, `conversation.Service`, and the chat
+     DTOs are unchanged.
+  2. **Audio travels as a raw binary body, not JSON or multipart.**
+     Angular→Go and Go→Python both send the recorded audio as the request
+     body directly, with `Content-Type` naming its encoding and the
+     language passed as a query parameter (`?language=hi`), not a JSON
+     field.
+  3. **One Python process hosts both capabilities.** The `asr` capability
+     is a new module in the existing `ai-services` FastAPI app
+     (`app/engines/asr/`, alongside `app/engines/llm/`), not a second
+     container — matching `docs/DEVELOPMENT.md` §5's "one module per
+     capability" as a code-organization rule, not a one-service-per-capability
+     deployment rule.
+  4. **Endpointing is manual (tap to start, tap to stop), not an automatic
+     VAD model.** The mic button already worked this way in Phase 1's
+     mock; Milestone 3a keeps it, backed by real audio now, with a fixed
+     30-second safety cap in case a user forgets to stop it.
+  5. **`script` is a deterministic Unicode-range classification, computed
+     in Go, not a language-identification model.** `internal/conversation.DetectScript`
+     counts each character's Unicode script block and returns the most
+     frequent one (Devanagari, Latin, Bengali, Gujarati, Gurmukhi, Tamil,
+     Telugu, Kannada, Malayalam, or Oriya), applied uniformly to every
+     turn — typed or spoken, user or assistant — at persist time.
+- **Reason:**
+  1. Reusing `/chat` unchanged is the entire reason Milestone 3a is small:
+     it needed no `conversation.Service` change, no new DTO on the chat
+     path, and no risk to a working, tested feature. `docs/ROADMAP.md`
+     Phase 3's own goal is speaking a turn, not redesigning how turns are
+     answered.
+  2. Audio isn't naturally JSON-shaped; base64-encoding it into a JSON
+     field costs ~33% size for no benefit at this scale, and multipart
+     parsing is unneeded machinery for exactly one file per request — the
+     same "no more machinery than the current need justifies" reasoning
+     ADR-013 already applied to routing.
+  3. Phase 3's own scope is one ASR capability, not new infrastructure;
+     spinning up a second container for it would add an operational
+     surface (a second health check, a second Dockerfile, a second set of
+     resource limits) with no capability gained over a second module in
+     the process that already exists.
+  4. A full VAD model is itself a capability requiring its own model
+     selection, benchmark, and ADR — real scope `docs/ROADMAP.md` Phase
+     3's Definition of Done doesn't actually ask for ("VAD/endpointing
+     **as needed**"). Manual endpointing is strictly simpler and already
+     built.
+  5. Script and language are different problems: "फल" and "phal" are the
+     same word, different scripts, and script is fully determined by
+     which Unicode block the characters fall in — no model needed. Real
+     language identification (telling Hindi apart from other
+     Devanagari-script languages, or detecting a language from purely
+     Latin-script romanized text) is a genuinely harder problem correctly
+     assigned to Phase 6, and this decision keeps it there rather than
+     quietly pulling a piece of it into Phase 3.
+- **Alternatives considered:**
+  - Teaching `POST /chat` to accept either text or audio - rejected: couples
+    two different concerns (turn persistence/reply generation, and
+    transcription) into one endpoint and one request schema for no
+    benefit over composing two calls.
+  - Multipart/form-data or base64-JSON for audio transport - rejected:
+    more parsing machinery (multipart) or wasted size (base64) than one
+    binary body needs.
+  - A second `ai-services`-style container specifically for `asr` -
+    rejected: no capability gained yet over a second module in the
+    existing process; revisit if a future phase's resource isolation or
+    independent-scaling needs actually require it.
+  - An automatic VAD model for hands-free endpointing - rejected for
+    Milestone 3a: real added scope (its own capability, model, benchmark)
+    the phase's Definition of Done doesn't require; revisit if user
+    testing shows manual tap-to-stop is a real usability problem.
+  - Language identification instead of script detection - rejected: a
+    materially harder, model-requiring problem that `docs/ARCHITECTURE.md`
+    already assigns to Phase 6; conflating the two would pull Phase 6
+    scope into Phase 3.
+- **Impact:** `backend/internal/asr` mirrors `internal/llm`'s
+  fake/real-client shape exactly (`FakeASRClient`/`HTTPASRClient`,
+  selected by `VAANISETU_ASR_SERVICE_URL`, ADR-006's "swap by config"
+  mechanism). `turns.script` is an additive, nullable column
+  (migration `0002_add_script.sql`). `proto/asr.openapi.yaml` and
+  `docs/openapi/speech.yaml` are new hand-maintained contracts, following
+  ADR-013's existing convention. Revisit decision 3 (one process, two
+  capabilities) when Phase 4 (TTS) or Phase 7 (RAG/embeddings) add enough
+  capabilities that independent scaling or resource isolation becomes a
+  real operational need, not a hypothetical one.
+- **Status:** Accepted.
+
+## ADR-018 - Phase 3 Milestone 3b: ASR engine, forced-English Hinglish decoding, and model selection
+
+- **Decision:** Four related Milestone 3b choices:
+  1. **Inference engine:** `faster-whisper` (a CTranslate2-optimized
+     Whisper implementation), loading a local CTranslate2 model directory
+     via a new `app/engines/asr/` module mirroring the `llm` capability's
+     shape exactly (an `ASREngine` interface, one implementation).
+  2. **Hinglish is forced to decode as English (`language="en"`), not
+     auto-detected.** `app/engines/asr/faster_whisper_engine.py`'s
+     `_WHISPER_LANGUAGE_HINTS` maps `"hinglish"` to `"en"`.
+  3. **Model selected:** `faster-whisper-large-v3-turbo`
+     (deepdml/faster-whisper-large-v3-turbo-ct2), replacing
+     `asr.FakeASRClient` as the backend's transcription source once
+     `VAANISETU_ASR_SERVICE_URL` is set.
+  4. **Benchmark fixtures are synthetic (TTS-generated via macOS's `say`),
+     not real recordings**, with the fixture manifest committed
+     (`ai-services/eval_data/asr_fixtures.yaml`) and the generated audio
+     git-ignored and regenerable
+     (`ai-services/scripts/generate_audio_fixtures.py`).
+- **Reason:**
+  1. Same reasoning as ADR-015 for `llama-cpp-python`: CTranslate2 ships
+     prebuilt wheels for this platform (no from-source compile) and runs
+     efficiently on CPU — what the actual `docker compose up` deployment
+     target needs — with Metal acceleration here a bonus, not a
+     requirement.
+  2. Measured, not assumed. The first benchmark run left `hinglish`
+     unhinted (auto-detect); on this project's synthetic Hinglish audio
+     (an Indian-English TTS voice reading romanized Hindi-English text),
+     every candidate auto-detected the speech as Hindi and transcribed it
+     into Devanagari script — completely wrong for VaaniSetu's own
+     definition of "hinglish" as Latin-script romanized text (WER 1.0 on
+     every candidate, both Hinglish fixtures). Forcing `"en"` produces
+     Latin-script output by construction regardless of accent, which is a
+     real, measured improvement in script-correctness even though
+     word-level accuracy on Hinglish specifically remains the weakest
+     category for every candidate (see point 4 below and the Alternatives
+     section) — Whisper was not trained on romanized Hindi as a target
+     orthography, so it sometimes produces a plausible English paraphrase
+     rather than a literal phonetic transliteration. This is a genuine,
+     documented limitation of the Whisper family for code-switched Indian
+     languages, not a bug in this integration.
+  3. Full results in `ai-services/benchmark_results/asr_milestone_3b.json`
+     (8 fixtures: 4 Hindi, 2 Hinglish, 2 English; mean WER, latency, and
+     peak memory per candidate, each run in its own subprocess for
+     accurate memory isolation — same method as ADR-016's LLM benchmark).
+     Summary:
+
+     | Candidate | Mean WER | Hindi WER | Hinglish WER | Mean latency | Peak RSS |
+     |---|---|---|---|---|---|
+     | faster-whisper-small | 0.439 | 0.388 | 0.975 | 1.09s | 1.44GB |
+     | faster-whisper-medium | 0.248 | 0.100 | 0.790 | 2.77s | 1.95GB |
+     | faster-whisper-large-v3-turbo | **0.182** | **0.000** | 0.725 | 4.04s | 2.19GB |
+
+     `faster-whisper-large-v3-turbo` transcribed all 4 Hindi fixtures and
+     both English fixtures with zero errors, and had the lowest (best)
+     Hinglish WER of the three despite the shared, genuine Hinglish
+     weakness above. It comfortably meets `docs/EVALUATION.md`'s
+     provisional "< 20% Hindi WER" target (0%); `faster-whisper-medium`
+     also meets it (10%); `faster-whisper-small` does not (38.8%). Its
+     higher latency (~4s mean, ~4.3s max) and memory (2.2GB) are accepted
+     for now — Phase 3 sets no hard latency budget, that arrives with
+     Phase 5's end-to-end target and Phase 11's streaming work — in
+     exchange for a large, decisive quality margin on the two languages
+     that matter most for VaaniSetu's MVP.
+  4. Synthetic fixtures are the only Hindi/Hinglish speech available
+     without either building a TTS capability (explicitly Phase 4, out of
+     scope) or recording real speech (Phase 8's dataset pipeline territory,
+     not built yet). Using a pre-existing OS utility as a one-time
+     dev-tool to bootstrap test audio is not the same as shipping a TTS
+     capability; the manifest states this limitation plainly so results
+     aren't mistaken for a Phase 9-grade measurement.
+- **Alternatives considered:**
+  - `faster-whisper-small`/`-medium` — rejected: `small` fails the
+    Hindi WER target outright; `medium` meets it but with meaningfully
+    worse Hindi and Hinglish accuracy than `large-v3-turbo` for roughly
+    half its latency cost, which isn't yet a binding constraint at this
+    phase.
+  - The original `openai-whisper` (PyTorch) package instead of
+    `faster-whisper` — rejected: slower on CPU, no prebuilt-wheel
+    advantage, no capability gained over CTranslate2 for this project's
+    needs.
+  - An Indic-specific ASR model (e.g. AI4Bharat's IndicWhisper) as a
+    fourth candidate — not attempted this round: no readily available
+    CTranslate2 conversion was confirmed, and Milestone 3b's own scope
+    only calls for 2-3 candidates. Worth a follow-up benchmark
+    specifically targeting the Hinglish weakness identified above, since
+    that is exactly the gap an Indic-specialized model would be expected
+    to close.
+  - Recording real human Hindi/Hinglish speech for the fixture set —
+    preferable in principle, rejected only for this milestone: no
+    recording setup or consented speaker exists yet; revisit before
+    treating any WER number here as more than directional.
+- **Impact:** `ai-services/models.yaml`'s `asr.selected` is
+  `faster-whisper-large-v3-turbo`. `backend/internal/asr.HTTPASRClient`
+  (already built in Milestone 3a) needs only
+  `VAANISETU_ASR_SERVICE_URL` set to switch from `FakeASRClient` — no
+  code change. The known Hinglish weakness is not blocking (Milestone 3a's
+  transport and Milestone 3b's transcription both work correctly; output
+  quality on code-switched input specifically is the open item) and
+  should inform Phase 6 (Indian Language Support), which owns
+  code-switching/language-ID quality more broadly. Superseding this ADR
+  only requires re-running the benchmark.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

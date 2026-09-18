@@ -1,0 +1,282 @@
+{
+  "fixtures": [
+    {
+      "id": "hi-weather",
+      "language": "hi",
+      "text": "आज मौसम कैसा है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-capital",
+      "language": "hi",
+      "text": "भारत की राजधानी क्या है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-story",
+      "language": "hi",
+      "text": "मुझे एक छोटी कहानी सुनाओ",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-greeting",
+      "language": "hi",
+      "text": "नमस्ते, आप कैसे हैं?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hinglish-weather",
+      "language": "hinglish",
+      "text": "kal ka weather kaisa rahega, bata sakte ho",
+      "voice": "Tara"
+    },
+    {
+      "id": "hinglish-joke",
+      "language": "hinglish",
+      "text": "mujhe ek chhoti si joke sunao",
+      "voice": "Rishi"
+    },
+    {
+      "id": "en-learn-hindi",
+      "language": "en",
+      "text": "What's a good way to learn Hindi quickly?",
+      "voice": "Samantha"
+    },
+    {
+      "id": "en-schedule",
+      "language": "en",
+      "text": "What's on my schedule today?",
+      "voice": "Aman"
+    }
+  ],
+  "results": [
+    {
+      "key": "faster-whisper-small",
+      "repo_id": "Systran/faster-whisper-small",
+      "license": "MIT",
+      "load_seconds": 0.392,
+      "mean_wer": 0.4385,
+      "mean_latency_seconds": 1.094,
+      "max_latency_seconds": 2.126,
+      "peak_rss_mb": 1438.0,
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "reference": "आज मौसम कैसा है?",
+          "hypothesis": "अज मोसम कैसा है?",
+          "wer": 0.5,
+          "latency_seconds": 0.995
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "reference": "भारत की राजधानी क्या है?",
+          "hypothesis": "भारत की राज़ानी क्या है?",
+          "wer": 0.2,
+          "latency_seconds": 1.072
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "reference": "मुझे एक छोटी कहानी सुनाओ",
+          "hypothesis": "मुजी एक चोटी कहानी सूनाव",
+          "wer": 0.6,
+          "latency_seconds": 1.094
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "reference": "नमस्ते, आप कैसे हैं?",
+          "hypothesis": "नमस्ते, आप कैसे है?",
+          "wer": 0.25,
+          "latency_seconds": 0.993
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "reference": "kal ka weather kaisa rahega, bata sakte ho",
+          "hypothesis": "that how the weather will be tomorrow. Can you tell?",
+          "wer": 1.125,
+          "latency_seconds": 2.126
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "reference": "mujhe ek chhoti si joke sunao",
+          "hypothesis": "I heard a small joke",
+          "wer": 0.8333,
+          "latency_seconds": 0.793
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "reference": "What's a good way to learn Hindi quickly?",
+          "hypothesis": "What's a good way to learn Hindi quickly?",
+          "wer": 0.0,
+          "latency_seconds": 0.873
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "reference": "What's on my schedule today?",
+          "hypothesis": "What's on my schedule today?",
+          "wer": 0.0,
+          "latency_seconds": 0.808
+        }
+      ]
+    },
+    {
+      "key": "faster-whisper-medium",
+      "repo_id": "Systran/faster-whisper-medium",
+      "license": "MIT",
+      "load_seconds": 0.892,
+      "mean_wer": 0.2479,
+      "mean_latency_seconds": 2.767,
+      "max_latency_seconds": 3.148,
+      "peak_rss_mb": 1945.7,
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "reference": "आज मौसम कैसा है?",
+          "hypothesis": "आज मौसम कैसा है?",
+          "wer": 0.0,
+          "latency_seconds": 2.845
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "reference": "भारत की राजधानी क्या है?",
+          "hypothesis": "भारत की राज़ानी क्या है?",
+          "wer": 0.2,
+          "latency_seconds": 3.071
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "reference": "मुझे एक छोटी कहानी सुनाओ",
+          "hypothesis": "मुझे एक चोटी कहानी सुनाओ",
+          "wer": 0.2,
+          "latency_seconds": 3.148
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "reference": "नमस्ते, आप कैसे हैं?",
+          "hypothesis": "नमस्ते, आप कैसे हैं?",
+          "wer": 0.0,
+          "latency_seconds": 2.905
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "reference": "kal ka weather kaisa rahega, bata sakte ho",
+          "hypothesis": "Can you tell me how the weather will be tomorrow?",
+          "wer": 1.25,
+          "latency_seconds": 2.58
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "reference": "mujhe ek chhoti si joke sunao",
+          "hypothesis": "Majh ek chhoti si joke sunayo",
+          "wer": 0.3333,
+          "latency_seconds": 2.541
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "reference": "What's a good way to learn Hindi quickly?",
+          "hypothesis": "What's a good way to learn Hindi quickly?",
+          "wer": 0.0,
+          "latency_seconds": 2.569
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "reference": "What's on my schedule today?",
+          "hypothesis": "What's on my schedule today?",
+          "wer": 0.0,
+          "latency_seconds": 2.475
+        }
+      ]
+    },
+    {
+      "key": "faster-whisper-large-v3-turbo",
+      "repo_id": "deepdml/faster-whisper-large-v3-turbo-ct2",
+      "license": "MIT",
+      "load_seconds": 0.936,
+      "mean_wer": 0.1823,
+      "mean_latency_seconds": 4.043,
+      "max_latency_seconds": 4.284,
+      "peak_rss_mb": 2194.7,
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "reference": "आज मौसम कैसा है?",
+          "hypothesis": "आज मौसम कैसा है?",
+          "wer": 0.0,
+          "latency_seconds": 3.995
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "reference": "भारत की राजधानी क्या है?",
+          "hypothesis": "भारत की राजधानी क्या है?",
+          "wer": 0.0,
+          "latency_seconds": 4.051
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "reference": "मुझे एक छोटी कहानी सुनाओ",
+          "hypothesis": "मुझे एक छोटी कहानी सुनाओ.",
+          "wer": 0.0,
+          "latency_seconds": 4.127
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "reference": "नमस्ते, आप कैसे हैं?",
+          "hypothesis": "नमस्ते, आप कैसे हैं?",
+          "wer": 0.0,
+          "latency_seconds": 4.034
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "reference": "kal ka weather kaisa rahega, bata sakte ho",
+          "hypothesis": "Kale K weather kaisa rahe ga bata saktete ho?",
+          "wer": 0.625,
+          "latency_seconds": 4.284
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "reference": "mujhe ek chhoti si joke sunao",
+          "hypothesis": "I'll tell you one joke.",
+          "wer": 0.8333,
+          "latency_seconds": 3.955
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "reference": "What's a good way to learn Hindi quickly?",
+          "hypothesis": "What's a good way to learn Hindi quickly?",
+          "wer": 0.0,
+          "latency_seconds": 3.961
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "reference": "What's on my schedule today?",
+          "hypothesis": "What's on my schedule today?",
+          "wer": 0.0,
+          "latency_seconds": 3.937
+        }
+      ]
+    }
+  ]
+}

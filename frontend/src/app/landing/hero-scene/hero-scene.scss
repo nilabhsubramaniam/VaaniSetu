@@ -1,0 +1,17 @@
+// Same layer as the SVG motif it sits above in the DOM (both z-index 0,
+// beneath .hero-content's z-index 1) — see landing.page.scss. Not
+// pointer-events:none like the SVG: this component reads pointer
+// position itself for the parallax tilt, and has no interactive DOM of
+// its own to accidentally shadow, so it's safe to remain hit-testable.
+:host {
+  position: absolute;
+  inset: 0;
+  display: block;
+  z-index: 0;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
