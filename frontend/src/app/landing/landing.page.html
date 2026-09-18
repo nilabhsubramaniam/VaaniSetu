@@ -1,41 +1,88 @@
 <main class="landing">
-  <!-- Hero -->
-  <section class="hero">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <svg class="hero-motif" viewBox="0 0 400 400" aria-hidden="true">
-      <circle cx="200" cy="200" r="150" class="ring ring-1" />
-      <circle cx="200" cy="200" r="118" class="ring ring-2" />
-      <circle cx="200" cy="200" r="86" class="ring ring-3" />
-      @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; track i) {
-        <line
-          x1="200"
-          y1="200"
-          x2="200"
-          y2="46"
-          class="facet"
-          [attr.transform]="'rotate(' + i * 30 + ' 200 200)'"
-        />
+  <!-- Hero + scroll-driven story: a cinematic, deliberately always-dark
+       stage (see .hero-story's --cinema-* tokens in landing.page.scss)
+       walking through listen -> process -> think -> respond as the
+       visitor scrolls. With prefers-reduced-motion, this collapses to a
+       normal short block with every stage's caption stacked and visible
+       at once — see .hero-story--static below and captionOpacity()/
+       storyProgress in landing.page.ts. -->
+  <section class="hero-story" [class.hero-story--static]="prefersReducedMotion" #heroStory>
+    <div class="hero-stage">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <svg class="hero-motif" viewBox="0 0 400 400" aria-hidden="true">
+        <circle cx="200" cy="200" r="150" class="ring ring-1" />
+        <circle cx="200" cy="200" r="118" class="ring ring-2" />
+        <circle cx="200" cy="200" r="86" class="ring ring-3" />
+        <polygon points="200,166 229,183 229,217 200,234 171,217 171,183" class="core" />
+        @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; track i) {
+          <line
+            x1="200"
+            y1="200"
+            x2="200"
+            y2="46"
+            class="facet"
+            [attr.transform]="'rotate(' + i * 30 + ' 200 200)'"
+          />
+        }
+      </svg>
+
+      <!-- Progressive enhancement over the SVG above, not a replacement
+           of it: deferred so it never blocks first paint, and this
+           component itself draws nothing at all when WebGL is
+           unavailable or prefers-reduced-motion is set, leaving the SVG
+           as the complete visual either way (see hero-scene.ts). -->
+      @defer (on idle) {
+        <app-hero-scene [progress]="storyProgress()" />
       }
-    </svg>
 
-    <div class="hero-content">
-      <p class="eyebrow">A local voice bridge for Indian languages</p>
-      <h1>Speak your language. Keep your voice on your own device.</h1>
-      <p class="dek">
-        VaaniSetu is a privacy-first, local-first AI voice assistant built for Hindi, Hinglish, and
-        the languages of India — composed from open-source models instead of one hosted service.
-      </p>
+      <div class="hero-content">
+        <p class="eyebrow">A local voice bridge for Indian languages</p>
+        <h1>Speak your language. Keep your voice on your own device.</h1>
+        <p class="dek">
+          VaaniSetu is a privacy-first, local-first AI voice assistant built for Hindi, Hinglish,
+          and the languages of India — composed from open-source models instead of one hosted
+          service.
+        </p>
 
-      <div class="hero-actions">
-        <a routerLink="/assistant" class="btn btn-primary">Open the assistant</a>
-        <a href="#how-it-works" class="btn btn-secondary">See how it works</a>
+        <div class="hero-actions">
+          <a routerLink="/assistant" class="btn btn-primary">Open the assistant</a>
+        </div>
+
+        <p class="hero-note">
+          Early preview — the assistant workspace currently runs on mock data while the local AI
+          pipeline below is being built.
+        </p>
       </div>
 
-      <p class="hero-note">
-        Early preview — the assistant workspace currently runs on mock data while the local AI
-        pipeline below is being built.
-      </p>
+      @if (!prefersReducedMotion) {
+        <div class="scroll-hint" [style.opacity]="scrollHintOpacity()" aria-hidden="true">
+          <span>Scroll to see how it listens</span>
+          <svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 5v13M6 13l6 6 6-6"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      }
     </div>
+
+    <ol
+      class="hero-captions"
+      [class.hero-captions--static]="prefersReducedMotion"
+      aria-label="How VaaniSetu turns your voice into a reply"
+    >
+      @for (stage of storyStages; track stage.id; let i = $index) {
+        <li class="hero-caption" [style.opacity]="captionOpacity(i)">
+          <span class="hero-caption-index">{{ i + 1 }}</span>
+          <span class="hero-caption-label">{{ stage.label }}</span>
+          <span class="hero-caption-desc">{{ stage.description }}</span>
+        </li>
+      }
+    </ol>
   </section>
 
   <!-- What is VaaniSetu -->
@@ -49,132 +96,6 @@
         into them, and designed so the components that hear, understand, and reply to you run on
         your own hardware by default.
       </p>
-    </div>
-  </section>
-
-  <!-- How it works -->
-  <section class="section section-alt" id="how-it-works">
-    <div class="section-inner">
-      <div class="section-head" appRevealOnScroll>
-        <h2>How it works</h2>
-        <app-status-pill label="Planned architecture — not yet implemented" tone="neutral" />
-      </div>
-
-      <ol class="pipeline">
-        @for (step of pipelineSteps; track step.id; let i = $index) {
-          <li class="pipeline-step" appRevealOnScroll [style.transition-delay.ms]="i * 60">
-            <span class="pipeline-icon" aria-hidden="true">
-              <span class="pipeline-index">{{ i + 1 }}</span>
-              <svg viewBox="0 0 24 24" fill="none">
-                @switch (step.id) {
-                  @case ('mic') {
-                    <path
-                      d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                    />
-                    <path
-                      d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                    />
-                  }
-                  @case ('vad') {
-                    <path
-                      d="M4 12h.01M8 8v8M12 5v14M16 8v8M20 12h.01"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                    />
-                  }
-                  @case ('stt') {
-                    <path
-                      d="M4 6h16v9H9l-3 3v-3H4Z"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M7 10h10M7 13h6"
-                      stroke="currentColor"
-                      stroke-width="1.4"
-                      stroke-linecap="round"
-                    />
-                  }
-                  @case ('lang') {
-                    <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6" />
-                    <path
-                      d="M4 12h16M12 4c2.5 2.5 2.5 13.5 0 16M12 4c-2.5 2.5-2.5 13.5 0 16"
-                      stroke="currentColor"
-                      stroke-width="1.3"
-                    />
-                  }
-                  @case ('ai') {
-                    <rect
-                      x="7"
-                      y="7"
-                      width="10"
-                      height="10"
-                      rx="2"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                    />
-                    <path
-                      d="M9 4v3M15 4v3M9 17v3M15 17v3M4 9h3M4 15h3M17 9h3M17 15h3"
-                      stroke="currentColor"
-                      stroke-width="1.4"
-                      stroke-linecap="round"
-                    />
-                  }
-                  @case ('rag') {
-                    <path
-                      d="M5 5h9a2 2 0 0 1 2 2v12H7a2 2 0 0 1-2-2V5Z"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M16 7h3v12h-3"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linejoin="round"
-                    />
-                  }
-                  @case ('tts') {
-                    <path
-                      d="M5 10v4h3l4 3V7L8 10H5Z"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M16.5 9.5a4 4 0 0 1 0 5M19 8a7 7 0 0 1 0 8"
-                      stroke="currentColor"
-                      stroke-width="1.4"
-                      stroke-linecap="round"
-                    />
-                  }
-                  @case ('response') {
-                    <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.6" />
-                    <path
-                      d="m8.5 12.5 2.5 2.5 4.5-5"
-                      stroke="currentColor"
-                      stroke-width="1.6"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  }
-                }
-              </svg>
-            </span>
-            <span class="pipeline-text">
-              <span class="pipeline-label">{{ step.label }}</span>
-              <span class="pipeline-desc">{{ step.description }}</span>
-            </span>
-          </li>
-        }
-      </ol>
     </div>
   </section>
 
