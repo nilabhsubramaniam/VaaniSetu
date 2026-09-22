@@ -87,6 +87,10 @@ cmd_start() {
   echo "Starting backend on :$BACKEND_PORT (log: $LOG_DIR/backend.log) ..."
   (cd "$ROOT_DIR/backend" && nohup make run >"$LOG_DIR/backend.log" 2>&1 &)
   wait_for_port "$BACKEND_PORT" "backend"
+  if ! is_up "$BACKEND_PORT" && ! pg_isready >/dev/null 2>&1; then
+    echo "  -> likely cause: PostgreSQL isn't reachable (pg_isready failed)." >&2
+    echo "     Start it, e.g.: brew services start postgresql@18 (see backend/SETUP.md)" >&2
+  fi
 
   free_port "$FRONTEND_PORT" "frontend"
   echo "Starting frontend on :$FRONTEND_PORT (log: $LOG_DIR/frontend.log) ..."
@@ -104,6 +108,15 @@ cmd_status() {
       echo "  $name: UP on :$port"
     else
       echo "  $name: down"
+      # backend's most common failure mode by far is "Postgres isn't
+      # running" (a connection-refused at migration time, before the
+      # HTTP port ever opens) — surface that specific, actionable cause
+      # here instead of leaving it to a log file nobody's told to check.
+      if [ "$name" = "backend" ] && ! pg_isready >/dev/null 2>&1; then
+        echo "    -> PostgreSQL isn't reachable (pg_isready failed)." >&2
+        echo "       Start it, e.g.: brew services start postgresql@18" >&2
+        echo "       (see backend/SETUP.md), then: $(basename "$0") restart" >&2
+      fi
     fi
   done
 }
