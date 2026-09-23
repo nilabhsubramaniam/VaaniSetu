@@ -1,89 +1,160 @@
 <main class="landing">
-  <!-- Hero + scroll-driven story: a cinematic, deliberately always-dark
-       stage (see .hero-story's --cinema-* tokens in landing.page.scss)
-       walking through listen -> process -> think -> respond as the
-       visitor scrolls. With prefers-reduced-motion, this collapses to a
-       normal short block with every stage's caption stacked and visible
-       at once — see .hero-story--static below and captionOpacity()/
-       storyProgress in landing.page.ts. -->
-  <section class="hero-story" [class.hero-story--static]="prefersReducedMotion" #heroStory>
-    <div class="hero-stage">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <svg class="hero-motif" viewBox="0 0 400 400" aria-hidden="true">
-        <circle cx="200" cy="200" r="150" class="ring ring-1" />
-        <circle cx="200" cy="200" r="118" class="ring ring-2" />
-        <circle cx="200" cy="200" r="86" class="ring ring-3" />
-        <polygon points="200,166 229,183 229,217 200,234 171,217 171,183" class="core" />
-        @for (i of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; track i) {
-          <line
-            x1="200"
-            y1="200"
-            x2="200"
-            y2="46"
-            class="facet"
-            [attr.transform]="'rotate(' + i * 30 + ' 200 200)'"
-          />
-        }
-      </svg>
-
-      <!-- Progressive enhancement over the SVG above, not a replacement
-           of it: deferred so it never blocks first paint, and this
-           component itself draws nothing at all when WebGL is
-           unavailable or prefers-reduced-motion is set, leaving the SVG
-           as the complete visual either way (see hero-scene.ts). -->
+  <!-- Hero: interactive 3D communication ecosystem -->
+  <section class="hero">
+    <div class="hero-scene-layer">
       @defer (on idle) {
-        <app-hero-scene [progress]="storyProgress()" />
-      }
-
-      <div class="hero-content">
-        <p class="eyebrow">A local voice bridge for Indian languages</p>
-        <h1>Speak your language. Keep your voice on your own device.</h1>
-        <p class="dek">
-          VaaniSetu is a privacy-first, local-first AI voice assistant built for Hindi, Hinglish,
-          and the languages of India — composed from open-source models instead of one hosted
-          service.
-        </p>
-
-        <div class="hero-actions">
-          <a routerLink="/assistant" class="btn btn-primary">Open the assistant</a>
-        </div>
-
-        <p class="hero-note">
-          Early preview — the assistant workspace currently runs on mock data while the local AI
-          pipeline below is being built.
-        </p>
-      </div>
-
-      @if (!prefersReducedMotion) {
-        <div class="scroll-hint" [style.opacity]="scrollHintOpacity()" aria-hidden="true">
-          <span>Scroll to see how it listens</span>
-          <svg viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 5v13M6 13l6 6 6-6"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
+        <app-hero-experience
+          [selectedCode]="selectedDemoLanguage()"
+          (nodeSelected)="selectDemoLanguage($event)"
+        />
+      } @placeholder {
+        <div class="hero-scene-placeholder" aria-hidden="true"></div>
       }
     </div>
 
-    <ol
-      class="hero-captions"
-      [class.hero-captions--static]="prefersReducedMotion"
-      aria-label="How VaaniSetu turns your voice into a reply"
-    >
-      @for (stage of storyStages; track stage.id; let i = $index) {
-        <li class="hero-caption" [style.opacity]="captionOpacity(i)">
-          <span class="hero-caption-index">{{ i + 1 }}</span>
-          <span class="hero-caption-label">{{ stage.label }}</span>
-          <span class="hero-caption-desc">{{ stage.description }}</span>
-        </li>
+    <div class="hero-copy">
+      <p class="eyebrow">{{ copy().hero.eyebrow }}</p>
+      <h1>
+        <span class="title-line"
+          >{{ copy().hero.titleLine1.lead }} <em>{{ copy().hero.titleLine1.accent }}</em></span
+        >
+        <span class="title-line"
+          >{{ copy().hero.titleLine2.lead }} <em>{{ copy().hero.titleLine2.accent }}</em></span
+        >
+      </h1>
+      <p class="dek">{{ copy().hero.description }}</p>
+
+      <a routerLink="/assistant" class="cta-pill">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18">
+          <path
+            d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+            stroke="currentColor"
+            stroke-width="1.8"
+          />
+          <path
+            d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span>{{ copy().hero.cta }}</span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="16" height="16">
+          <path
+            d="M5 12h14M13 6l6 6-6 6"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </a>
+
+      @if (prefersReducedMotion()) {
+        <p class="hero-fallback-description">{{ copy().hero.fallbackDescription }}</p>
       }
-    </ol>
+    </div>
+
+    <div class="mic-pedestal" [class.is-active]="isMicDemoActive()">
+      <span class="mic-waveform mic-waveform--left" aria-hidden="true">
+        @for (bar of waveformBars; track bar) {
+          <span class="bar" [style.--bar]="bar"></span>
+        }
+      </span>
+
+      <button
+        type="button"
+        class="btn-mic"
+        [attr.aria-label]="copy().hero.micLabel"
+        (click)="triggerMicDemo()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22">
+          <path
+            d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+            stroke="currentColor"
+            stroke-width="1.8"
+          />
+          <path
+            d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+
+      <span class="mic-waveform mic-waveform--right" aria-hidden="true">
+        @for (bar of waveformBars; track bar) {
+          <span class="bar" [style.--bar]="bar"></span>
+        }
+      </span>
+
+      <p class="mic-hint">
+        {{ isMicDemoActive() ? copy().hero.micHintListening : copy().hero.micHintIdle }}
+      </p>
+    </div>
+
+    <div class="hero-info-card">{{ copy().hero.infoCard }}</div>
+
+    <button type="button" class="scroll-cue" (click)="scrollToNext()">
+      <span>{{ copy().hero.scrollCue }}</span>
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="16" height="16">
+        <path
+          d="M6 9l6 6 6-6"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
   </section>
+
+  <!-- Accessible, stable language list — the real control; the hero's -->
+  <!-- floating pills are a mouse/touch-only visual enhancement over this. -->
+  <section class="section language-node-section" aria-labelledby="language-node-heading">
+    <div class="section-inner">
+      <h2 id="language-node-heading">{{ copy().languageNodes.heading }}</h2>
+      <p class="section-lede">{{ copy().languageNodes.description }}</p>
+
+      <ul class="language-node-list">
+        @for (node of demoLanguages; track node.code) {
+          <li>
+            <button
+              type="button"
+              class="language-node-button"
+              [class.is-selected]="node.code === selectedDemoLanguage()"
+              (click)="selectDemoLanguage(node.code)"
+            >
+              <span aria-hidden="true">{{ node.flag }}</span>
+              {{ node.label }}
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <app-how-it-works
+    id="how-it-works"
+    [heading]="copy().howItWorks.heading"
+    [steps]="copy().howItWorks.steps"
+  />
+
+  <app-text-transform-demo
+    [heading]="copy().transform.heading"
+    [description]="copy().transform.description"
+  />
+
+  @defer (on viewport) {
+    <app-global-network
+      [heading]="copy().globalNetwork.heading"
+      [description]="copy().globalNetwork.description"
+      [disclaimer]="copy().globalNetwork.disclaimer"
+    />
+  } @placeholder {
+    <div class="global-network-placeholder" aria-hidden="true"></div>
+  }
 
   <!-- What is VaaniSetu -->
   <section class="section" appRevealOnScroll>
@@ -100,7 +171,7 @@
   </section>
 
   <!-- Supported languages -->
-  <section class="section" id="languages" appRevealOnScroll>
+  <section class="section section-alt" id="languages" appRevealOnScroll>
     <div class="section-inner">
       <h2>Built for Indian languages, not just Hindi</h2>
       <p class="section-lede">
@@ -139,7 +210,7 @@
   </section>
 
   <!-- Capabilities -->
-  <section class="section section-alt" id="capabilities" appRevealOnScroll>
+  <section class="section" id="capabilities" appRevealOnScroll>
     <div class="section-inner">
       <h2>What you'll be able to do</h2>
       <ul class="capabilities">
@@ -170,7 +241,7 @@
   </section>
 
   <!-- Privacy -->
-  <section class="section" id="privacy" appRevealOnScroll>
+  <section class="section section-alt" id="privacy" appRevealOnScroll>
     <div class="section-inner narrow">
       <h2>Local-first, by design</h2>
       <p>
@@ -188,7 +259,7 @@
   </section>
 
   <!-- Why VaaniSetu -->
-  <section class="section section-alt" id="why" appRevealOnScroll>
+  <section class="section" id="why" appRevealOnScroll>
     <div class="section-inner narrow">
       <h2>Why VaaniSetu</h2>
       <p>
@@ -201,7 +272,7 @@
   </section>
 
   <!-- Future direction -->
-  <section class="section" id="future" appRevealOnScroll>
+  <section class="section section-alt" id="future" appRevealOnScroll>
     <div class="section-inner">
       <h2>Where this is going</h2>
       <ul class="future-list">

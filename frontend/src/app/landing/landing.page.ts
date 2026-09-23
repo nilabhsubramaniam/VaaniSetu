@@ -1,9 +1,8 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
+  computed,
   inject,
   signal,
   viewChild,
@@ -11,15 +10,14 @@ import {
 import { RouterLink } from '@angular/router';
 import { StatusPill } from '../shared/components/status-pill/status-pill';
 import { RevealOnScroll } from '../shared/directives/reveal-on-scroll.directive';
-import { HeroScene } from './hero-scene/hero-scene';
-import { heroStoryStageWeights } from './hero-story-progress';
 import { LANGUAGE_OPTIONS } from '../core/models/language.model';
-
-interface StoryStage {
-  readonly id: 'listen' | 'process' | 'think' | 'respond';
-  readonly label: string;
-  readonly description: string;
-}
+import { HeroExperience } from './components/hero-experience/hero-experience';
+import { TextTransformDemo } from './components/text-transform-demo/text-transform-demo';
+import { HowItWorks } from './components/how-it-works/how-it-works';
+import { GlobalNetwork } from './components/global-network/global-network';
+import { DEMO_LANGUAGE_NODES, DEFAULT_DEMO_LANGUAGE_CODE } from './models/demo-language.model';
+import { LandingI18nService } from './i18n/landing-i18n.service';
+import { prefersReducedMotion as detectPrefersReducedMotion } from './three/environment-support';
 
 interface Capability {
   readonly label: string;
@@ -28,70 +26,47 @@ interface Capability {
   readonly note?: string;
 }
 
+const MIC_DEMO_HINT_MS = 3000;
+
 /**
- * The public-facing entry point at `/`. Purely presentational — no
- * service injection, no network calls, no mock-data wiring. Its job is
- * to explain the product to a new visitor and hand off to the real (mocked)
- * interaction at `/assistant`, not to demonstrate any functionality itself.
- * The `prefersReducedMotion`/scroll-progress logic below is a leaf UI
- * capability check, the same category `RevealOnScroll` already makes
- * inline — not the kind of service dependency that doc comment is about.
- *
- * Deliberately kept as one component rather than split into per-section
- * components: every section here has exactly one consumer (this page) and
- * no independent logic, so a split would be fragmentation without reuse.
+ * The public-facing entry point at `/`. The hero is a genuinely interactive
+ * 3D communication ecosystem (see `components/hero-experience`); everything
+ * below it — what the product is, supported languages, capabilities,
+ * privacy stance, future direction — is static Phase 1 content, unchanged
+ * by the hero redesign.
  */
 @Component({
   selector: 'app-landing-page',
-  imports: [RouterLink, StatusPill, RevealOnScroll, HeroScene],
+  imports: [
+    RouterLink,
+    StatusPill,
+    RevealOnScroll,
+    HeroExperience,
+    TextTransformDemo,
+    HowItWorks,
+    GlobalNetwork,
+  ],
   templateUrl: './landing.page.html',
   styleUrl: './landing.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LandingPage implements AfterViewInit {
-  private readonly heroStoryRef = viewChild<ElementRef<HTMLElement>>('heroStory');
-  private readonly destroyRef = inject(DestroyRef);
+export class LandingPage {
+  private readonly i18n = inject(LandingI18nService);
 
+  readonly copy = this.i18n.t;
   readonly languages = LANGUAGE_OPTIONS;
+  readonly demoLanguages = DEMO_LANGUAGE_NODES;
 
-  readonly prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  readonly waveformBars: readonly number[] = Array.from({ length: 12 }, (_, i) => i);
+  readonly prefersReducedMotion = computed(() => detectPrefersReducedMotion());
 
-  /** 0..1 across the hero's scroll-driven story — see
-   * hero-story-progress.ts. Stays 0 (and is never updated by a scroll
-   * listener at all) when prefersReducedMotion is true: in that case the
-   * template renders the story as a normal, always-visible stacked list
-   * instead of a scroll-pinned sequence, so there is nothing for this
-   * value to drive. */
-  readonly storyProgress = signal(0);
+  readonly selectedDemoLanguage = signal(DEFAULT_DEMO_LANGUAGE_CODE);
+  readonly isMicDemoActive = signal(false);
 
-  readonly storyStages: readonly StoryStage[] = [
-    {
-      id: 'listen',
-      label: 'Listen',
-      description:
-        'You speak. The microphone and voice-activity detection capture it, on your own device.',
-    },
-    {
-      id: 'process',
-      label: 'Process',
-      description:
-        'Speech becomes text, tagged with its language and script — Hindi, Hinglish, or one of nine more.',
-    },
-    {
-      id: 'think',
-      label: 'Think',
-      description:
-        'A local language model reasons about what you said, optionally grounded in your own documents.',
-    },
-    {
-      id: 'respond',
-      label: 'Respond',
-      description:
-        'The reply is spoken back to you, synthesized locally, never leaving your machine.',
-    },
-  ];
+  readonly heroExperienceRef = viewChild(HeroExperience);
+  private readonly hostEl = inject(ElementRef<HTMLElement>);
+
+  private micDemoHintTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly capabilities: readonly Capability[] = [
     {
@@ -141,52 +116,22 @@ export class LandingPage implements AfterViewInit {
     'Local and private deployments as the default, cloud as an explicit opt-in',
   ];
 
-  ngAfterViewInit(): void {
-    if (this.prefersReducedMotion) {
-      return;
-    }
-
-    const updateProgress = () => {
-      const host = this.heroStoryRef()?.nativeElement;
-      if (!host) {
-        return;
-      }
-      const rect = host.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || 1;
-      const scrollable = rect.height - viewportHeight;
-      const raw = scrollable > 0 ? -rect.top / scrollable : 0;
-      this.storyProgress.set(Math.min(Math.max(raw, 0), 1));
-    };
-
-    window.addEventListener('scroll', updateProgress, { passive: true });
-    updateProgress();
-    this.destroyRef.onDestroy(() => window.removeEventListener('scroll', updateProgress));
+  selectDemoLanguage(code: string): void {
+    this.selectedDemoLanguage.set(code);
   }
 
-  /** Opacity for stage caption `index` — always 1 with reduced motion
-   * (every stage stacked and visible, per the template), otherwise
-   * crossfaded from the same shared weights the 3D scene blends by, so
-   * the visible caption always matches what the scene is doing.
-   *
-   * Rescaled, not used raw: the two interior stages ("process", "think")
-   * always have two neighbors overlapping (see
-   * hero-story-progress.spec.ts), so their weight tops out at 0.75, never
-   * 1 — used directly, their captions would never reach full opacity even
-   * at their own peak. Dividing by that same 0.75 ceiling (and clamping,
-   * since the edge stages' own peak of 1 would otherwise overshoot) makes
-   * every stage's caption reach fully readable at its own peak moment. */
-  captionOpacity(index: number): number {
-    if (this.prefersReducedMotion) {
-      return 1;
-    }
-    const weight = heroStoryStageWeights(this.storyProgress())[index];
-    return Math.min(1, weight / 0.75);
+  triggerMicDemo(): void {
+    this.heroExperienceRef()?.triggerDemo();
+    this.isMicDemoActive.set(true);
+
+    if (this.micDemoHintTimeout) clearTimeout(this.micDemoHintTimeout);
+    this.micDemoHintTimeout = setTimeout(() => {
+      this.isMicDemoActive.set(false);
+    }, MIC_DEMO_HINT_MS);
   }
 
-  /** Fades the "scroll to see how it listens" hint out quickly once the
-   * visitor has actually started scrolling — gone by the end of the
-   * "listen" stage, not lingering through the rest of the story. */
-  scrollHintOpacity(): number {
-    return Math.max(0, 1 - this.storyProgress() * 4);
+  scrollToNext(): void {
+    const target = this.hostEl.nativeElement.querySelector('#how-it-works');
+    target?.scrollIntoView({ behavior: this.prefersReducedMotion() ? 'auto' : 'smooth' });
   }
 }

@@ -1,0 +1,128 @@
+.hero-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 26rem;
+}
+
+.hero-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.language-pills {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.language-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 9px;
+  border: 1px solid rgb(255 255 255 / 80%);
+  border-radius: var(--vs-radius-pill);
+  background: rgb(255 255 255 / 92%);
+  box-shadow:
+    0 1px 2px rgb(40 34 22 / 8%),
+    0 8px 20px -10px rgb(40 34 22 / 22%);
+  color: var(--vs-ink);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+
+  // Defaults to invisible: the hero-runtime positions and reveals each pill
+  // every frame. Without this, a pill that never gets positioned (WebGL
+  // bail-out, reduced motion) piles up unstyled in the top-left corner
+  // instead of simply not appearing.
+  opacity: 0;
+
+  &:hover,
+  &.is-selected {
+    border-color: var(--vs-cyan);
+    background: #ffffff;
+    box-shadow:
+      0 0 0 3px rgb(63 150 176 / 18%),
+      0 8px 20px -10px rgb(40 34 22 / 28%);
+  }
+}
+
+.pill-flag {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.phase-legend {
+  position: absolute;
+  top: var(--vs-space-4);
+  right: var(--vs-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vs-space-2);
+  pointer-events: none;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  padding: 4px 10px;
+  border-radius: var(--vs-radius-pill);
+  background: rgb(255 255 255 / 70%);
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+
+  &:has(.legend-label.is-active) {
+    opacity: 1;
+  }
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+
+  &--voice {
+    background: #3fb56a;
+  }
+
+  &--language {
+    background: #3f96b0;
+  }
+
+  &--translation {
+    background: #7a5fc4;
+  }
+
+  &--connection {
+    background: #b9812e;
+  }
+}
+
+.legend-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--vs-ink-soft);
+}
+
+@media (max-width: 720px) {
+  .language-pills,
+  .phase-legend {
+    display: none;
+  }
+}

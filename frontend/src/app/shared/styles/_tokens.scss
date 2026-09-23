@@ -40,6 +40,23 @@
   --vs-state-responding: #3b6ea5;
   --vs-state-error: #b5502e;
 
+  // Landing page's 3D scenes (hero core) and any section accent that
+  // isn't the primary brand teal (--vs-accent already covers that).
+  // Deliberately restrained — no neon, no heavy saturation — Three.js
+  // lighting and materials carry the visual richness, not the color
+  // values themselves.
+  --vs-deep-blue: #2c4a7c;
+  --vs-violet: #5b4b8a;
+  --vs-cyan: #3f96b0;
+  --vs-gold: #b9812e;
+
+  // Layout
+  // The sticky app-header's own height, made authoritative here (rather
+  // than left implicit) so anything that needs "the rest of the
+  // viewport below the header" — the landing hero's full-height section
+  // — can subtract it reliably instead of guessing.
+  --app-header-height: 4.75rem;
+
   // Spacing scale
   --vs-space-1: 4px;
   --vs-space-2: 8px;
@@ -98,6 +115,11 @@
     --vs-state-responding: #7fb3ee;
     --vs-state-error: #e0895f;
 
+    --vs-deep-blue: #6f93c9;
+    --vs-violet: #a696d6;
+    --vs-cyan: #6fc2da;
+    --vs-gold: #e0b563;
+
     --vs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -14px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
@@ -127,6 +149,11 @@
   --vs-state-processing: #d8c25f;
   --vs-state-responding: #7fb3ee;
   --vs-state-error: #e0895f;
+
+  --vs-deep-blue: #6f93c9;
+  --vs-violet: #a696d6;
+  --vs-cyan: #6fc2da;
+  --vs-gold: #e0b563;
 
   --vs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -14px rgba(0, 0, 0, 0.5);
   color-scheme: dark;

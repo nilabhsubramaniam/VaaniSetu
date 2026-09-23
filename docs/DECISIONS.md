@@ -663,6 +663,85 @@ Status**.
   only requires re-running the benchmark.
 - **Status:** Accepted.
 
+## ADR-019 - Landing page hero: an abstract 3D "communication core", not a photoreal globe or a decorative overlay
+
+- **Decision:** Rebuilt the landing page hero (`frontend/src/app/landing/`)
+  as a genuinely depth-stratified Three.js scene rather than a flat page
+  with a decorative 3D object on top, with these specific choices:
+  1. **The central visual is an abstract "communication core"** — a
+     layered wireframe/lattice/glass-shell construction
+     (`three/core-system.ts`) — not a photoreal Earth. An earlier pass
+     used real NASA imagery on a textured sphere; it was discarded because
+     it read as "a website with a 3D object bolted on" rather than a
+     purpose-built motif, and because shipping literal satellite/Earth
+     imagery for a decorative demo raised unnecessary licensing surface
+     for no product benefit.
+  2. **Depth is real, not implied**: `THREE.Fog` tied to the page's own
+     `--vs-bg` token, explicit foreground/midground/background Z bands
+     (`hero-runtime.ts`), and a camera rig that moves for parallax
+     (`camera.position.lerp`) rather than rotating the whole scene in
+     place.
+  3. **Demo language nodes are real DOM buttons, not 3D pick targets.**
+     `three/project-to-screen.ts` projects world positions to viewport
+     percentages every frame; `hero-experience.ts` writes the resulting
+     `left`/`top`/`transform`/`opacity` directly onto real
+     `<button>` elements, bypassing Angular change detection for
+     per-frame updates. Nodes sit on fixed base angles across a
+     restricted arc with a small idle sway, not a continuous 360°
+     rotation — a full orbit periodically swung nodes behind the hero
+     copy or off-screen at extreme perspective angles.
+  4. **Three language concepts stay separate, on purpose:**
+     `LanguageCode`/`LANGUAGE_OPTIONS` (the real, functional assistant
+     language, owned by `SettingsStore`), `DemoLanguageNode` (the hero's
+     decorative demo set, including languages VaaniSetu doesn't actually
+     support), and `LandingI18nService`'s page-copy locale (derived via
+     `computed()` from `SettingsStore`, never independent state). The
+     header's `app-language-selector` is the single place the real
+     preference is set; the landing page owns no second, competing
+     control.
+  5. **Everything below the hero — what the product is, supported
+     languages, capabilities, privacy stance, future direction — is
+     unchanged static Phase 1 content.** Only the hero and the
+     header/language-selector duplication were in scope.
+  6. **Graceful, complete fallback**: `prefers-reduced-motion` or no WebGL
+     support skips Three.js entirely (no dynamic import even happens) and
+     renders a static description plus a fully functional mic button and
+     accessible language list — not a broken or empty hero.
+- **Reason:** The product-facing ask was consistently "rearchitect the
+  visual composition and theme, don't just add more glow/particles" —
+  i.e. the failure mode to avoid was decorating a fundamentally flat page
+  rather than building genuine spatial depth. Keeping the demo language
+  set and the real language preference as separate types prevents a
+  recurring bug class where selecting a decorative hero node would
+  silently change the assistant's actual language, or where the "coming
+  soon" demo set would need to stay in lockstep with the real, phased
+  `LANGUAGE_OPTIONS` roadmap.
+- **Alternatives considered:**
+  - Raycasting/hit-testing 3D objects directly for language selection —
+    rejected: real DOM buttons get correct keyboard focus, screen-reader
+    semantics, and hit-testing for free; a 3D pick target would need all
+    of that reimplemented by hand for no visual benefit, since the nodes
+    already have to be projected to screen space for their DOM labels
+    anyway.
+  - Photoreal Earth via three.js's public-domain NASA example textures —
+    used during one iteration, ultimately dropped per point 1 above;
+    `public/textures/earth/` was deliberately not repopulated in the
+    final rebuild.
+  - A single shared "language" model for both the real preference and the
+    hero's decorative set — rejected: the demo set intentionally includes
+    unsupported languages (Japanese, Spanish, German) purely for visual
+    global-reach framing, which `LANGUAGE_OPTIONS` must never do since it
+    drives real `enabled`/"coming soon" UI elsewhere in the app.
+- **Impact:** `frontend/src/app/landing/` gained `i18n/`, `models/`,
+  `three/`, and `components/` subdirectories (see
+  `docs/DEVELOPMENT.md`'s repository structure). `three`/`@types/three`
+  remain the only new dependency (pinned exactly, per ADR-011's
+  no-unnecessary-dependencies stance), code-split into its own lazy
+  chunks (`hero-runtime`, `globe-runtime`, `scene-manager`) via
+  `@defer (on idle)`/`@defer (on viewport)`, isolated from the initial
+  bundle and every other route.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

@@ -1,0 +1,34 @@
+.global-network {
+  padding: var(--vs-space-7) var(--vs-space-4);
+  text-align: center;
+}
+
+.network-heading {
+  font-size: var(--vs-font-size-xl);
+  margin: 0 0 var(--vs-space-2);
+}
+
+.network-description {
+  max-width: 34rem;
+  margin: 0 auto var(--vs-space-5);
+  color: var(--vs-ink-soft);
+}
+
+.network-stage {
+  width: 100%;
+  max-width: 28rem;
+  height: 20rem;
+  margin: 0 auto;
+}
+
+.network-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.network-disclaimer {
+  margin: var(--vs-space-3) 0 0;
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}

@@ -1,0 +1,124 @@
+@use '../../../shared/styles/mixins';
+
+.transform-section {
+  padding: var(--vs-space-7) var(--vs-space-4);
+  text-align: center;
+}
+
+.transform-heading {
+  font-size: var(--vs-font-size-xl);
+  margin: 0 0 var(--vs-space-2);
+}
+
+.transform-description {
+  max-width: 34rem;
+  margin: 0 auto var(--vs-space-6);
+  color: var(--vs-ink-soft);
+}
+
+.transform-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vs-space-5);
+  min-height: 4rem;
+}
+
+.transform-word {
+  font-family: var(--vs-font-devanagari);
+  font-size: var(--vs-font-size-xl);
+  font-weight: 700;
+  animation: transform-cycle 4s ease-in-out infinite;
+
+  @include mixins.reduced-motion-off;
+}
+
+.transform-word--source {
+  color: var(--vs-deep-blue);
+  animation-name: dissolve-out;
+}
+
+.transform-word--target {
+  color: var(--vs-accent);
+  animation-name: dissolve-in;
+}
+
+.transform-particles {
+  position: relative;
+  width: 2.5rem;
+  height: 1.5rem;
+}
+
+.particle {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--i, 0) * 16%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--vs-cyan);
+  opacity: 0;
+  animation: particle-drift 4s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.08s);
+
+  @include mixins.reduced-motion-off;
+}
+
+@keyframes dissolve-out {
+  0%,
+  35% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  55%,
+  100% {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+@keyframes dissolve-in {
+  0%,
+  55% {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  75%,
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes particle-drift {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.4);
+  }
+  45%,
+  65% {
+    opacity: 1;
+    transform: translateY(-80%) scale(1);
+  }
+  85%,
+  100% {
+    opacity: 0;
+    transform: translateY(-110%) scale(0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transform-word--source {
+    opacity: 0;
+  }
+
+  .transform-word--target {
+    opacity: 1;
+  }
+
+  .particle {
+    display: none;
+  }
+}

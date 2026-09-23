@@ -1,0 +1,14 @@
+<section class="transform-section">
+  <h2 class="transform-heading">{{ heading() }}</h2>
+  <p class="transform-description">{{ description() }}</p>
+
+  <div class="transform-stage" aria-hidden="true">
+    <span class="transform-word transform-word--source">{{ sourceText() }}</span>
+    <span class="transform-particles">
+      @for (i of [0, 1, 2, 3, 4, 5]; track i) {
+        <span class="particle" [style.--i]="i"></span>
+      }
+    </span>
+    <span class="transform-word transform-word--target">{{ targetText() }}</span>
+  </div>
+</section>

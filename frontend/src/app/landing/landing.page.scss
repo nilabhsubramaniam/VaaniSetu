@@ -1,3 +1,4 @@
+@use 'sass:list';
 @use '../shared/styles/mixins';
 
 // No height:100% here (unlike assistant/settings) — natural page scroll.
@@ -22,18 +23,6 @@
   }
 }
 
-.section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--vs-space-3);
-  margin-bottom: var(--vs-space-5);
-
-  h2 {
-    margin: 0;
-  }
-}
-
 h2 {
   font-size: var(--vs-font-size-xl);
   margin: 0 0 var(--vs-space-3);
@@ -44,284 +33,123 @@ h2 {
   max-width: 46rem;
 }
 
-// ---- hero story (cinematic, scroll-driven) ----
-//
-// Deliberately always dark, regardless of the site's own light/dark
-// theme — a Star-Wars-opening/AI-demonstration feel wants a dark stage,
-// and several premium product sites make exactly this call (hero always
-// dark, rest of the page follows the visitor's theme). These --cinema-*
-// tokens are fixed values, not theme-reactive ones, on purpose — see
-// hero-scene.ts, which reads --cinema-accent/--cinema-accent-soft for the
-// same reason.
-.hero-story {
-  --cinema-bg: #05070a;
-  --cinema-ink: #eef1f0;
-  --cinema-ink-soft: rgb(238 241 240 / 72%);
-  --cinema-ink-faint: rgb(238 241 240 / 50%);
-  --cinema-line: rgb(238 241 240 / 14%);
-  --cinema-accent: #52c0a0;
-  --cinema-accent-soft: #7fb3ee;
-
+// ---- hero ----
+.hero {
   position: relative;
-  height: 420vh; // scroll distance the 4-stage story plays out across
-  background: var(--cinema-bg);
-  color: var(--cinema-ink);
-
-  &.hero-story--static {
-    height: auto;
-  }
-}
-
-.hero-stage {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow: hidden;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-height: calc(100dvh - var(--app-header-height));
+  padding: var(--vs-space-6) var(--vs-space-4);
+  overflow: hidden;
   text-align: center;
-  padding: var(--vs-space-4);
-
-  .hero-story--static & {
-    position: relative;
-    height: auto;
-    min-height: 70vh;
-    padding: clamp(var(--vs-space-7), 10vw, 7rem) var(--vs-space-4) var(--vs-space-6);
-  }
-}
-
-.hero-glow {
-  position: absolute;
-  inset: -20% -10% auto -10%;
-  height: 32rem;
   background:
     radial-gradient(
-      closest-side,
-      color-mix(in srgb, var(--cinema-accent) 26%, transparent),
+      ellipse 60% 50% at 52% 68%,
+      color-mix(in srgb, var(--vs-gold) 16%, transparent),
       transparent
     ),
     radial-gradient(
-        closest-side,
-        color-mix(in srgb, var(--cinema-accent-soft) 18%, transparent),
-        transparent
-      )
-      25% 60% / 55% 55% no-repeat;
-  filter: blur(6px);
-  pointer-events: none;
+      ellipse 55% 45% at 50% 30%,
+      color-mix(in srgb, var(--vs-cyan) 14%, transparent),
+      transparent
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--vs-bg) 40%, transparent), var(--vs-bg) 70%);
 }
 
-.hero-motif {
+// Soft, blurred "cloud" blobs for the reference's hazy golden-hour
+// backdrop — a cheap CSS approximation of tilt-shift softness, since real
+// depth-of-field blur across WebGL geometry isn't worth the render cost
+// here.
+.hero::before,
+.hero::after {
+  content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(70vw, 640px);
-  height: min(70vw, 640px);
-  transform: translate(-50%, -50%);
-  opacity: 0.4;
-  pointer-events: none;
   z-index: 0;
-
-  .ring {
-    fill: none;
-    stroke: var(--cinema-line);
-    stroke-width: 1;
-  }
-
-  .ring-2 {
-    stroke: var(--cinema-accent);
-    opacity: 0.5;
-  }
-
-  .core {
-    fill: none;
-    stroke: var(--cinema-accent);
-    stroke-width: 1.2;
-    opacity: 0.7;
-  }
-
-  .facet {
-    stroke: var(--cinema-line);
-    stroke-width: 1;
-    opacity: 0.6;
-  }
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .hero-motif {
-    animation: hero-spin 90s linear infinite;
-  }
+.hero::before {
+  top: 8%;
+  left: -8%;
+  width: min(26rem, 55vw);
+  height: min(12rem, 22vw);
+  background: color-mix(in srgb, white 70%, var(--vs-gold) 30%);
+  opacity: 0.35;
 }
 
-@keyframes hero-spin {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
+.hero::after {
+  bottom: 4%;
+  right: -10%;
+  width: min(30rem, 60vw);
+  height: min(14rem, 25vw);
+  background: color-mix(in srgb, white 75%, var(--vs-cyan) 25%);
+  opacity: 0.3;
 }
 
-.hero-content {
+.hero-scene-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero-scene-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 42rem;
-  margin: 0 auto;
+  max-width: 38rem;
 }
 
 .eyebrow {
-  font-size: var(--vs-font-size-sm);
-  letter-spacing: 0.06em;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cinema-accent-soft);
+  color: var(--vs-cyan);
   font-weight: 600;
   margin: 0 0 var(--vs-space-3);
 }
 
-.hero-story h1 {
-  font-size: var(--vs-font-size-display);
-  line-height: 1.1;
+.hero-copy h1 {
+  font-size: clamp(2rem, 1.5vw + 1.6rem, 2.85rem);
+  line-height: 1.14;
   margin: 0 0 var(--vs-space-4);
-  color: var(--cinema-ink);
+  color: var(--vs-ink);
+}
+
+.title-line {
+  display: block;
+
+  em {
+    font-style: normal;
+    color: var(--vs-deep-blue);
+  }
 }
 
 .dek {
   font-size: var(--vs-font-size-md);
-  color: var(--cinema-ink-soft);
+  color: var(--vs-ink-soft);
   margin: 0 auto var(--vs-space-5);
 }
 
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--vs-space-3);
-  margin-bottom: var(--vs-space-4);
-}
-
-.hero-note {
-  font-size: var(--vs-font-size-sm);
-  color: var(--cinema-ink-faint);
-  max-width: 34rem;
-  margin: 0 auto;
-}
-
-.scroll-hint {
-  position: absolute;
-  bottom: var(--vs-space-5);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--vs-space-1);
-  font-size: var(--vs-font-size-sm);
-  color: var(--cinema-ink-faint);
-  transition: opacity 0.3s ease;
-
-  svg {
-    width: 18px;
-    height: 18px;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .scroll-hint svg {
-    animation: scroll-hint-bounce 1.8s ease-in-out infinite;
-  }
-}
-
-@keyframes scroll-hint-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(5px);
-  }
-}
-
-// ---- hero captions (the story's text, scroll-crossfaded) ----
-.hero-captions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-// Motion-enabled: all four captions occupy the same spot, crossfaded by
-// opacity as the visitor scrolls (see captionOpacity() in landing.page.ts).
-.hero-story:not(.hero-story--static) .hero-captions {
-  position: absolute;
-  z-index: 1;
-  inset: auto var(--vs-space-4) var(--vs-space-6);
-  max-width: 26rem;
-  margin: 0 auto;
-  text-align: left;
-  pointer-events: none;
-}
-
-.hero-story:not(.hero-story--static) .hero-caption {
-  position: absolute;
-  inset: 0;
-  transition: opacity 0.4s ease;
-}
-
-// Reduced motion: a normal stacked, always-visible list below the static
-// hero visual — no sticky pinning, no scroll-jacked height, nothing here
-// depends on JavaScript to be readable.
-.hero-captions--static {
-  display: grid;
-  gap: var(--vs-space-4);
-  max-width: 46rem;
-  margin: 0 auto;
-  padding: var(--vs-space-6) var(--vs-space-4);
-  text-align: left;
-}
-
-.hero-caption {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: var(--vs-space-3);
-  row-gap: 2px;
-}
-
-.hero-caption-index {
-  grid-row: 1 / 3;
+.cta-pill {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--cinema-line);
-  color: var(--cinema-accent-soft);
-  font-size: var(--vs-font-size-sm);
-  font-weight: 700;
-}
-
-.hero-caption-label {
-  font-weight: 600;
-  color: var(--cinema-ink);
-}
-
-.hero-caption-desc {
-  font-size: var(--vs-font-size-sm);
-  color: var(--cinema-ink-soft);
-}
-
-// ---- buttons ----
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  gap: var(--vs-space-2);
   padding: var(--vs-space-3) var(--vs-space-5);
   border-radius: var(--vs-radius-pill);
-  font-size: var(--vs-font-size-base);
+  background: var(--vs-accent);
+  color: var(--vs-on-accent);
   font-weight: 600;
   text-decoration: none;
-  transition:
-    transform 0.15s ease,
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+  transition: transform 0.15s ease;
 
   @include mixins.focus-ring;
 
@@ -330,9 +158,183 @@ h2 {
   }
 }
 
-.btn-primary {
-  background: var(--vs-accent);
+.hero-fallback-description {
+  margin-top: var(--vs-space-4);
+  color: var(--vs-ink-soft);
+  font-size: var(--vs-font-size-sm);
+  max-width: 32rem;
+}
+
+// ---- mic pedestal ----
+$bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
+
+.mic-pedestal {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: var(--vs-space-4);
+  margin-top: var(--vs-space-6);
+  padding: var(--vs-space-4) var(--vs-space-6);
+}
+
+.mic-waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 2rem;
+
+  &--right {
+    flex-direction: row-reverse;
+  }
+
+  .bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--vs-cyan);
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+
+    @for $i from 1 through list.length($bar-heights) {
+      &:nth-child(#{$i}) {
+        height: list.nth($bar-heights, $i);
+      }
+    }
+  }
+}
+
+.mic-pedestal.is-active .mic-waveform .bar {
+  opacity: 1;
+  background: var(--vs-cyan);
+  box-shadow: 0 0 6px var(--vs-cyan);
+  animation: mic-bar 0.9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--bar) * 60ms);
+
+  @include mixins.reduced-motion-off;
+}
+
+@keyframes mic-bar {
+  from {
+    transform: scaleY(0.6);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.btn-mic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, white 55%, var(--vs-cyan) 45%),
+    var(--vs-accent) 70%
+  );
   color: var(--vs-on-accent);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 40%) inset,
+    0 0 22px -4px var(--vs-cyan);
+
+  @include mixins.focus-ring;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1px solid var(--vs-cyan);
+    opacity: 0.4;
+    animation: mic-pulse 2.4s ease-out infinite;
+
+    @include mixins.reduced-motion-off;
+  }
+}
+
+@keyframes mic-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+.mic-hint {
+  grid-column: 1 / -1;
+  margin: var(--vs-space-2) 0 0;
+  font-size: var(--vs-font-size-sm);
+  color: var(--vs-ink-faint);
+}
+
+.hero-info-card {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--vs-space-5);
+  padding: var(--vs-space-2) var(--vs-space-4);
+  border-radius: var(--vs-radius-pill);
+  background: rgb(255 255 255 / 70%);
+  color: var(--vs-ink-soft);
+  font-size: var(--vs-font-size-sm);
+}
+
+.scroll-cue {
+  position: absolute;
+  bottom: var(--vs-space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  color: var(--vs-ink-faint);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+}
+
+// ---- accessible language node list (the real control) ----
+.language-node-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vs-space-2);
+  list-style: none;
+  margin: var(--vs-space-4) 0 0;
+  padding: 0;
+}
+
+.language-node-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: var(--vs-space-2) var(--vs-space-3);
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-pill);
+  background: var(--vs-surface);
+  color: var(--vs-ink);
+  font-size: var(--vs-font-size-sm);
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+
+  &.is-selected {
+    border-color: var(--vs-cyan);
+    background: var(--vs-accent-soft);
+  }
 }
 
 // ---- languages ----
@@ -426,6 +428,30 @@ h2 {
   margin-bottom: var(--vs-space-4);
 }
 
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--vs-space-3) var(--vs-space-5);
+  border-radius: var(--vs-radius-pill);
+  font-size: var(--vs-font-size-base);
+  font-weight: 600;
+  text-decoration: none;
+  background: var(--vs-accent);
+  color: var(--vs-on-accent);
+  transition: transform 0.15s ease;
+
+  @include mixins.focus-ring;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.global-network-placeholder {
+  min-height: 20rem;
+}
+
 @include mixins.breakpoint-tablet {
   .lang-groups {
     grid-template-columns: 1fr 1fr;
@@ -439,5 +465,16 @@ h2 {
 @include mixins.breakpoint-desktop {
   .section {
     padding: var(--vs-space-7) var(--vs-space-5);
+  }
+}
+
+@media (max-width: 860px) {
+  .hero {
+    flex-direction: column;
+  }
+
+  .hero-info-card,
+  .scroll-cue {
+    display: none;
   }
 }

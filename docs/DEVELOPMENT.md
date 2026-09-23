@@ -62,6 +62,22 @@ VaaniSetu/
                                      SettingsStore (+ their mock impls)
         assistant/                  conversation route (page + 6 components)
         settings/                   settings route (page + 3 components)
+        landing/                    public landing route ("/"): interactive
+                                     3D hero + static Phase 1 marketing sections
+          landing.page.ts/html/scss
+          i18n/                     LandingCopy types + en/hi copy,
+                                     LandingI18nService (derives locale from
+                                     SettingsStore; no independent state)
+          models/                   DemoLanguageNode — hero's decorative demo
+                                     set, deliberately separate from the real
+                                     LanguageCode/LANGUAGE_OPTIONS
+          three/                    Three.js hero + globe runtimes
+                                     (scene-manager, core-system, hero-runtime,
+                                     language-system, globe-runtime, ...),
+                                     lazy-loaded via @defer, never in the
+                                     initial bundle
+          components/               hero-experience, how-it-works,
+                                     text-transform-demo, global-network
         shared/
           components/               app-header, language-selector, status-pill
           styles/                   _tokens.scss, _mixins.scss

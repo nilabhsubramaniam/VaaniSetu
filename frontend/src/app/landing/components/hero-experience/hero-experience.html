@@ -1,0 +1,38 @@
+<div #stageEl class="hero-stage">
+  <canvas #canvasEl class="hero-canvas" aria-hidden="true"></canvas>
+
+  <div class="language-pills" aria-hidden="true">
+    @for (node of demoLanguages; track node.code) {
+      <button
+        #pillEl
+        type="button"
+        class="language-pill"
+        [class.is-selected]="node.code === selectedCode()"
+        tabindex="-1"
+        (click)="selectNode(node.code)"
+      >
+        <span class="pill-flag">{{ node.flag }}</span>
+        <span class="pill-label">{{ node.label }}</span>
+      </button>
+    }
+  </div>
+
+  <ul class="phase-legend" aria-hidden="true">
+    <li class="legend-row" data-phase="voice">
+      <span class="legend-dot legend-dot--voice"></span>
+      <span #hudVoiceEl class="legend-label">{{ legendPhases[0].label }}</span>
+    </li>
+    <li class="legend-row" data-phase="language">
+      <span class="legend-dot legend-dot--language"></span>
+      <span #hudLanguageEl class="legend-label">{{ legendPhases[1].label }}</span>
+    </li>
+    <li class="legend-row" data-phase="translation">
+      <span class="legend-dot legend-dot--translation"></span>
+      <span #hudTranslationEl class="legend-label">{{ legendPhases[2].label }}</span>
+    </li>
+    <li class="legend-row" data-phase="connection">
+      <span class="legend-dot legend-dot--connection"></span>
+      <span #hudConnectionEl class="legend-label">{{ legendPhases[3].label }}</span>
+    </li>
+  </ul>
+</div>

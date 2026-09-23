@@ -1,17 +1,81 @@
 @use '../../styles/mixins';
 
-.selector {
-  display: inline-flex;
+.language-selector {
+  position: relative;
 }
 
-.select {
-  appearance: none;
-  background: var(--vs-surface);
-  border: 1px solid var(--vs-line);
-  border-radius: var(--vs-radius-sm);
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vs-space-2);
   padding: var(--vs-space-1) var(--vs-space-3);
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-pill);
+  background: var(--vs-surface);
+  color: var(--vs-ink);
   font-size: var(--vs-font-size-sm);
   cursor: pointer;
 
   @include mixins.focus-ring;
+
+  &:hover {
+    border-color: var(--vs-line-strong);
+  }
+}
+
+.trigger-caret {
+  color: var(--vs-ink-faint);
+}
+
+.options {
+  position: absolute;
+  top: calc(100% + var(--vs-space-2));
+  right: 0;
+  z-index: 20;
+  min-width: 11rem;
+  margin: 0;
+  padding: var(--vs-space-1);
+  list-style: none;
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-md);
+  background: var(--vs-surface-raised);
+  box-shadow: var(--vs-shadow-1);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vs-space-2);
+  padding: var(--vs-space-2) var(--vs-space-3);
+  border-radius: var(--vs-radius-sm);
+  color: var(--vs-ink);
+  font-size: var(--vs-font-size-sm);
+  cursor: pointer;
+
+  &:hover:not(.is-disabled) {
+    background: var(--vs-accent-soft);
+  }
+
+  &.is-selected {
+    color: var(--vs-accent-ink);
+    background: var(--vs-accent-soft);
+    font-weight: 600;
+  }
+
+  &.is-disabled {
+    color: var(--vs-ink-faint);
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--vs-accent);
+    outline-offset: -2px;
+  }
+}
+
+.option-badge {
+  font-size: 0.7rem;
+  color: var(--vs-ink-faint);
+  white-space: nowrap;
 }
