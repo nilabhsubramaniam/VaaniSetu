@@ -16,7 +16,7 @@ Milestone-based plan for VaaniSetu.
 | 1 | UI Foundation | DONE |
 | 2 | Local LLM | DONE |
 | 3 | Speech-to-Text | DONE |
-| 4 | Text-to-Speech | NOT STARTED |
+| 4 | Text-to-Speech | DONE |
 | 5 | End-to-End Voice MVP | NOT STARTED |
 | 6 | Indian Language Support | NOT STARTED |
 | 7 | RAG | NOT STARTED |
@@ -155,7 +155,22 @@ integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
 
 ## Phase 4 - Text-to-Speech
 
-**Status:** NOT STARTED
+**Status:** DONE — Milestone 4a (Go `tts` capability boundary against
+`FakeTTSClient`, real browser audio playback wired into the conversation
+flow) and Milestone 4b (Python `tts` capability, RTF/proxy-WER benchmark +
+selection ADR, real end-to-end wiring) are both complete; Hindi replies are
+heard as real synthesized speech. **Known gap, not blocking, more severe
+than Phase 3's:** the selected model (`mms-tts-hin-ft-female`, a
+female-voice fine-tune of `facebook/mms-tts-hin` selected per ADR-022)
+cannot produce Hinglish speech **at all** — its vocabulary is
+Devanagari-phoneme only, so Latin-script text fails outright rather than
+sounding merely imperfect. This degrades gracefully to text-only for
+Hinglish replies (Milestone 4a's playback call is fire-and-forget) but is
+a real, unmet part of this phase's "Hindi / Hinglish" expected result —
+flagged for Phase 6 (Indian Language Support) and as the first thing to
+revisit if the one Apache-2.0 candidate (`ai4bharat/indic-parler-tts`,
+gated on Hugging Face, access not yet granted) can be benchmarked. See
+`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022/ADR-023.
 
 - **Objective:** Speak the assistant's reply aloud with a local TTS model.
 - **Scope:** Python TTS service behind a `tts` capability interface; audio

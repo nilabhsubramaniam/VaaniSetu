@@ -22,6 +22,21 @@ func isValidLanguage(code string) bool {
 	return validLanguages[code]
 }
 
+// validVoices mirrors the two voices ai-services' models.yaml `tts`
+// section maps (ADR-023) — both are real, simultaneously-loaded models on
+// the Python side, not hints.
+var validVoices = map[string]bool{
+	"female": true, "male": true,
+}
+
+// isValidVoice reports whether voice is one of the known tts.SynthesizeRequest
+// voice values, or empty (handleSynthesize defaults an empty voice to
+// "female" before this check, so an empty string here would only reach
+// this function if that default logic changes).
+func isValidVoice(voice string) bool {
+	return validVoices[voice]
+}
+
 // turnDTO is the wire representation of a turn, matching
 // frontend/src/app/core/models/turn.model.ts's Turn interface field for
 // field. LatencyMs and Script are omitted from the JSON entirely (not
@@ -74,6 +89,18 @@ type transcribeResponse struct {
 	Transcript string `json:"transcript"`
 }
 
+// synthesizeRequest is the POST /api/v1/speech/synthesize request body,
+// per docs/openapi/speech.yaml. There is no corresponding response DTO —
+// a 200 response is the raw synthesized audio bytes, not JSON (see
+// handleSynthesize).
+type synthesizeRequest struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+	// Voice is optional; empty defaults to "female" (handleSynthesize),
+	// matching proto/tts.openapi.yaml and the Python service's own default.
+	Voice string `json:"voice,omitempty"`
+}
+
 // errorResponse is the body returned for every non-2xx response, per
 // docs/openapi/chat.yaml and docs/openapi/speech.yaml.
 type errorResponse struct {
@@ -82,7 +109,7 @@ type errorResponse struct {
 
 type errorBody struct {
 	// Code is one of "invalid_request", "llm_unavailable",
-	// "asr_unavailable", "internal".
+	// "asr_unavailable", "tts_unavailable", "internal".
 	Code string `json:"code"`
 	// Message is safe to show a user — never the raw underlying error
 	// (docs/DEVELOPMENT.md §11: user-facing errors "do not leak internal

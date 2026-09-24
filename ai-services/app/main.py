@@ -1,6 +1,7 @@
 """VaaniSetu's Python AI service HTTP surface: the `llm` capability
-(proto/llm.openapi.yaml, `POST /v1/generate`) and the `asr` capability
-(proto/asr.openapi.yaml, `POST /v1/transcribe`), hosted in one FastAPI app
+(proto/llm.openapi.yaml, `POST /v1/generate`), the `asr` capability
+(proto/asr.openapi.yaml, `POST /v1/transcribe`), and the `tts` capability
+(proto/tts.openapi.yaml, `POST /v1/synthesize`), hosted in one FastAPI app
 per docs/DECISIONS.md ADR-017 — "one module per capability" is a
 code-organization convention (docs/DEVELOPMENT.md §5), not a
 one-process-per-capability deployment rule. Plus an operational
@@ -18,22 +19,28 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from . import config, registry
 from .engines.asr.base import ASREngine, TranscribeRequest
 from .engines.base import GenerateRequest, LLMEngine
+from .engines.tts.base import SynthesizeRequest, TTSEngine
 
 logger = logging.getLogger("vaanisetu.ai_services")
 
 _cfg = config.load()
 logging.basicConfig(level=_cfg.log_level.upper())
 
+# The two voices `tts.selected` maps in models.yaml (ADR-023) — both are
+# loaded at startup so a per-request `voice` can pick either one, rather
+# than the capability being limited to one fixed voice.
+_TTS_VOICES = ("female", "male")
+
 
 class _AppState:
-    """Holds both loaded engines. A plain object on `app.state`, not a
-    global, so tests can swap either via FastAPI's dependency override
+    """Holds every loaded engine. A plain object on `app.state`, not a
+    global, so tests can swap any of them via FastAPI's dependency override
     instead of monkeypatching module state.
     """
 
@@ -41,6 +48,8 @@ class _AppState:
     llm_model_key: str | None = None
     asr_engine: ASREngine | None = None
     asr_model_key: str | None = None
+    tts_engines: dict[str, TTSEngine] | None = None
+    tts_model_keys: dict[str, str] | None = None
 
 
 @asynccontextmanager
@@ -55,6 +64,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.state.asr_engine = registry.build_engine(asr_entry, _cfg.asr_model_store_dir)
         app.state.state.asr_model_key = asr_entry.key
         logger.info("asr model loaded: %s (%s)", asr_entry.key, asr_entry.repo_id)
+
+        tts_engines: dict[str, TTSEngine] = {}
+        tts_model_keys: dict[str, str] = {}
+        for voice in _TTS_VOICES:
+            tts_entry = registry.load_selected_entry(_cfg.model_registry_path, "tts", voice=voice)
+            tts_engines[voice] = registry.build_engine(tts_entry, _cfg.tts_model_store_dir)
+            tts_model_keys[voice] = tts_entry.key
+            logger.info("tts model loaded (%s): %s (%s)", voice, tts_entry.key, tts_entry.repo_id)
+        app.state.state.tts_engines = tts_engines
+        app.state.state.tts_model_keys = tts_model_keys
     except registry.RegistryError as e:
         # Fail loudly at startup rather than on the first request — an
         # operator finds out immediately that a configured model isn't
@@ -81,6 +100,21 @@ def get_asr_engine() -> ASREngine:
     if engine is None:
         raise HTTPException(status_code=503, detail="asr model not loaded")
     return engine
+
+
+def get_tts_engine(voice: str) -> TTSEngine:
+    """Looks up the loaded engine for `voice` directly (not a `Depends`
+    default, since the caller only knows `voice` once it has parsed the
+    request body — see the `synthesize` handler)."""
+    engines = app.state.state.tts_engines
+    if not engines:
+        raise HTTPException(status_code=503, detail="tts models not loaded")
+    if voice not in engines:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown voice {voice!r}, expected one of {sorted(engines)}",
+        )
+    return engines[voice]
 
 
 class GenerateRequestBody(BaseModel):
@@ -137,11 +171,31 @@ async def transcribe(
     return TranscribeResponseBody(transcript=result.transcript)
 
 
+class SynthesizeRequestBody(BaseModel):
+    text: str
+    language: str
+    voice: str = "female"
+
+
+@app.post("/v1/synthesize")
+def synthesize(body: SynthesizeRequestBody) -> Response:
+    engine = get_tts_engine(body.voice)
+    try:
+        result = engine.synthesize(SynthesizeRequest(text=body.text, language=body.language))
+    except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
+        logger.error("synthesize failed: %s", e)
+        raise HTTPException(status_code=500, detail="synthesis failed") from e
+
+    return Response(content=result.audio, media_type=result.content_type)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, object]:
     state = app.state.state
+    tts_ready = bool(state.tts_engines) and set(state.tts_engines) == set(_TTS_VOICES)
     return {
-        "ready": state.llm_engine is not None and state.asr_engine is not None,
+        "ready": state.llm_engine is not None and state.asr_engine is not None and tts_ready,
         "llm_model": state.llm_model_key,
         "asr_model": state.asr_model_key,
+        "tts_models": state.tts_model_keys or {},
     }

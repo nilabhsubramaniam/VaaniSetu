@@ -1,6 +1,7 @@
 // Command api is the VaaniSetu backend's entrypoint: load configuration,
-// open the database pool, wire the configured LLMClient (fake or real, per
-// config.Config.UsesFakeLLM), and serve the Phase 2 chat API.
+// open the database pool, wire the configured LLM/ASR/TTS clients (each
+// fake or real, per config.Config.UsesFakeLLM/UsesFakeASR/UsesFakeTTS),
+// and serve the chat, transcription, and synthesis API.
 package main
 
 import (
@@ -20,6 +21,7 @@ import (
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/tts"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/migrations"
 )
 
@@ -69,8 +71,16 @@ func run() error {
 		asrClient = asr.NewHTTPASRClient(cfg.ASRServiceURL)
 	}
 
+	var ttsClient tts.TTSClient
+	if cfg.UsesFakeTTS() {
+		logger.Warn("no VAANISETU_TTS_SERVICE_URL set — using FakeTTSClient (Milestone 4a behavior)")
+		ttsClient = tts.NewFakeTTSClient()
+	} else {
+		ttsClient = tts.NewHTTPTTSClient(cfg.TTSServiceURL)
+	}
+
 	convService := conversation.NewService(pool, llmClient)
-	server := api.NewServer(convService, asrClient, logger, cfg.AllowedOrigin)
+	server := api.NewServer(convService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -91,6 +101,7 @@ func run() error {
 		"port", cfg.Port,
 		"usesFakeLLM", cfg.UsesFakeLLM(),
 		"usesFakeASR", cfg.UsesFakeASR(),
+		"usesFakeTTS", cfg.UsesFakeTTS(),
 		"allowedOrigin", cfg.AllowedOrigin,
 	)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

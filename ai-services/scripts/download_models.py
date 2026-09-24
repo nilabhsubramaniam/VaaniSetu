@@ -7,10 +7,11 @@ service or running a benchmark:
     uv run scripts/download_models.py [--only KEY]
 
 `llama_cpp` candidates (the "llm" capability) are a single GGUF file;
-`faster_whisper` candidates (the "asr" capability) are a full repo
-snapshot downloaded as a directory — see app/registry.py for how each is
-resolved back into a model path. Weights are never committed (root
-.gitignore's `/models/`, `*.gguf`).
+`faster_whisper` (the "asr" capability) and `mms_vits`/`parler_tts`/`xtts`
+(the "tts" capability) candidates are each a full repo snapshot downloaded
+as a directory — see app/registry.py for how each is resolved back into a
+model path. Weights are never committed (root .gitignore's `/models/`,
+`*.gguf`).
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ def _download_one(capability: str, key: str, entry: dict, store_dir: str) -> Non
         print(f"[done] {capability}/{key}: {path}")
         return
 
-    if entry["engine"] == "faster_whisper":
+    if entry["engine"] in ("faster_whisper", "mms_vits", "parler_tts", "xtts"):
         dest_dir = os.path.join(store_dir, key)
         if os.path.isdir(dest_dir) and os.listdir(dest_dir):
             print(f"[skip] {capability}/{key}: already present at {dest_dir}")

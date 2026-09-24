@@ -27,6 +27,7 @@ class Config:
     # capability (git-ignored, docs/DEVELOPMENT.md §15; never committed).
     llm_model_store_dir: str
     asr_model_store_dir: str
+    tts_model_store_dir: str
     # One of "debug", "info", "warn", "error" — same levels as the Go
     # backend's internal/logging, for consistency across services.
     log_level: str
@@ -37,11 +38,13 @@ def load() -> Config:
     default_registry_path = os.path.join(here, "..", "models.yaml")
     default_llm_store_dir = os.path.join(here, "..", "..", "models", "llm")
     default_asr_store_dir = os.path.join(here, "..", "..", "models", "asr")
+    default_tts_store_dir = os.path.join(here, "..", "..", "models", "tts")
 
     return Config(
         port=int(os.environ.get("VAANISETU_LLM_PORT", "8090")),
         model_registry_path=os.environ.get("VAANISETU_LLM_MODEL_REGISTRY", default_registry_path),
         llm_model_store_dir=os.environ.get("VAANISETU_LLM_MODEL_STORE", default_llm_store_dir),
         asr_model_store_dir=os.environ.get("VAANISETU_ASR_MODEL_STORE", default_asr_store_dir),
+        tts_model_store_dir=os.environ.get("VAANISETU_TTS_MODEL_STORE", default_tts_store_dir),
         log_level=os.environ.get("VAANISETU_LLM_LOG_LEVEL", "info"),
     )

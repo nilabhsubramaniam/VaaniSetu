@@ -31,6 +31,22 @@ _REGISTRY_YAML = textwrap.dedent(
           compute_type: int8
           device: cpu
           license: MIT
+    tts:
+      selected:
+        female: parler-a
+        male: parler-b
+      candidates:
+        parler-a:
+          engine: parler_tts
+          repo_id: someorg/parler-a
+          license: Apache-2.0
+          voices:
+            hi: "A clear female voice speaks at a moderate pace."
+            hinglish: "A clear female voice speaks at a moderate pace."
+        parler-b:
+          engine: parler_tts
+          repo_id: someorg/parler-b
+          license: Apache-2.0
     """
 )
 
@@ -68,6 +84,46 @@ def test_load_selected_entry_reads_the_selected_asr_candidate(tmp_path) -> None:
     )
 
 
+def test_load_selected_entry_reads_the_selected_tts_candidate_for_the_female_voice(
+    tmp_path,
+) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    entry = load_selected_entry(str(registry_path), "tts", voice="female")
+
+    assert entry == ModelEntry(
+        key="parler-a",
+        engine="parler_tts",
+        repo_id="someorg/parler-a",
+        license="Apache-2.0",
+        voices={
+            "hi": "A clear female voice speaks at a moderate pace.",
+            "hinglish": "A clear female voice speaks at a moderate pace.",
+        },
+    )
+
+
+def test_load_selected_entry_reads_the_selected_tts_candidate_for_the_male_voice(
+    tmp_path,
+) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    entry = load_selected_entry(str(registry_path), "tts", voice="male")
+
+    assert entry.key == "parler-b"
+    assert entry.repo_id == "someorg/parler-b"
+
+
+def test_load_selected_entry_rejects_an_unknown_tts_voice(tmp_path) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    with pytest.raises(RegistryError):
+        load_selected_entry(str(registry_path), "tts", voice="robot")
+
+
 def test_load_selected_entry_applies_defaults_for_optional_fields(tmp_path) -> None:
     registry_path = tmp_path / "models.yaml"
     registry_path.write_text(
@@ -91,6 +147,7 @@ def test_load_selected_entry_applies_defaults_for_optional_fields(tmp_path) -> N
     assert entry.license == "unknown"
     assert entry.compute_type == "int8"
     assert entry.device == "auto"
+    assert entry.voices == {}
 
 
 def test_load_selected_entry_rejects_a_selected_key_with_no_candidate(tmp_path) -> None:
@@ -118,7 +175,7 @@ def test_load_selected_entry_rejects_an_unknown_capability(tmp_path) -> None:
     registry_path.write_text(_REGISTRY_YAML)
 
     with pytest.raises(RegistryError):
-        load_selected_entry(str(registry_path), "tts")
+        load_selected_entry(str(registry_path), "vad")
 
 
 def test_build_engine_raises_when_llama_cpp_model_file_is_missing(tmp_path) -> None:
@@ -140,6 +197,19 @@ def test_build_engine_raises_when_faster_whisper_model_dir_is_missing(tmp_path) 
         engine="faster_whisper",
         repo_id="someorg/whisper-a-ct2",
         license="MIT",
+    )
+
+    with pytest.raises(RegistryError, match="model directory not found"):
+        build_engine(entry, str(tmp_path))
+
+
+@pytest.mark.parametrize("engine_kind", ["mms_vits", "parler_tts", "xtts"])
+def test_build_engine_raises_when_tts_model_dir_is_missing(tmp_path, engine_kind: str) -> None:
+    entry = ModelEntry(
+        key="tts-a",
+        engine=engine_kind,
+        repo_id="someorg/tts-a",
+        license="Apache-2.0",
     )
 
     with pytest.raises(RegistryError, match="model directory not found"):

@@ -62,3 +62,54 @@ asr:
       compute_type: int8
       device: auto
       license: MIT
+
+# `tts` is the one capability where `selected` is a *map* ({voice: key}),
+# not a single string — ADR-023: both a female and a male voice are real,
+# simultaneously-loaded choices (app/main.py loads one engine per map
+# entry at startup), picked per-request by the frontend's voice setting,
+# rather than the capability being limited to one fixed voice.
+# `mms-tts-hin-ft-female`/`mms-tts-hin` reflect ADR-021's benchmark and
+# ADR-022's female-voice finding (facebook/mms-tts-hin's single voice is
+# male — a real, user-reported gap ADR-021 didn't evaluate for). `voices`
+# maps a LanguageCode to an engine-specific voice selector
+# (docs/ARCHITECTURE.md §3.6's "per-language voice configuration") — a
+# natural-language description for parler_tts, a built-in speaker name for
+# xtts; mms_vits is a single voice per checkpoint and needs none (its
+# "voice choice" is which checkpoint, not a per-language config on one).
+#
+# `indic-parler-tts` could NOT be benchmarked this round — its Hugging
+# Face repo is gated and access was denied for the account used (see
+# ADR-021). It stays listed, unselected, as a real candidate worth
+# re-benchmarking once access is granted, since it is the only
+# Apache-2.0-licensed candidate here: every other candidate, including
+# both `mms_vits` checkpoints, is non-commercial-licensed. See
+# ADR-021/ADR-022/ADR-023 for the full reasoning and measured evidence.
+tts:
+  selected:
+    female: mms-tts-hin-ft-female
+    male: mms-tts-hin
+  candidates:
+    mms-tts-hin:
+      engine: mms_vits
+      repo_id: facebook/mms-tts-hin
+      license: CC-BY-NC-4.0
+    mms-tts-hin-ft-female:
+      engine: mms_vits
+      repo_id: Anjan9320/fb-mms-tts-hin-ft-female
+      license: CC-BY-NC-4.0
+    indic-parler-tts:
+      engine: parler_tts
+      repo_id: ai4bharat/indic-parler-tts
+      license: Apache-2.0
+      voices:
+        hi: "A clear Indian female voice speaks in Hindi at a moderate pace with high quality, close-sounding audio."
+        hinglish: "A clear Indian female voice speaks at a moderate pace with high quality, close-sounding audio."
+        en: "A clear Indian-accented female voice speaks in English at a moderate pace with high quality, close-sounding audio."
+    xtts-v2:
+      engine: xtts
+      repo_id: coqui/XTTS-v2
+      license: CPML
+      voices:
+        hi: "Ana Florence"
+        hinglish: "Ana Florence"
+        en: "Andrew Chipper"

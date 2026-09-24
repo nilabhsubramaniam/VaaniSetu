@@ -1,0 +1,78 @@
+# The Go<->Python `tts` capability contract (docs/ARCHITECTURE.md §5).
+#
+# The mirror image of proto/asr.openapi.yaml: there, audio is the request
+# body and JSON is the response; here, JSON (text) is the request body and
+# audio is the response. Text is naturally JSON-shaped, like
+# proto/llm.openapi.yaml's request — only the reply side of this contract
+# needs binary framing. See docs/DECISIONS.md ADR-020.
+#
+# backend/internal/tts.HTTPTTSClient is the Go-side implementation of this
+# contract; the Python `tts` capability module (app/main.py) is the server
+# side, hosted in the same ai-services process as the `llm`/`asr`
+# capabilities (docs/DEVELOPMENT.md §5, "one module per capability" — not
+# necessarily one deployable service per capability).
+openapi: 3.0.3
+info:
+  title: VaaniSetu — tts capability contract
+  version: "1.0.0"
+servers:
+  - url: http://ai-services:8090/v1
+
+paths:
+  /synthesize:
+    post:
+      summary: >
+        Synthesize a single reply's speech. No streaming/sentence-level
+        chunking in Phase 4 (deferred to Phase 11) — one text in, one
+        complete audio clip out.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, language]
+              properties:
+                text:
+                  type: string
+                language:
+                  type: string
+                  description: >
+                    Same LanguageCode values as docs/openapi/chat.yaml.
+                    Selects the per-language voice configuration in the
+                    model registry (docs/ARCHITECTURE.md §3.6), where the
+                    selected engine supports it. Validation happens in Go
+                    before this call is made; the Python service can
+                    assume it is one of the known codes.
+                voice:
+                  type: string
+                  enum: [female, male]
+                  default: female
+                  description: >
+                    Which of the two engines `models.yaml`'s `tts.selected`
+                    map loads at startup to synthesize with
+                    (docs/DECISIONS.md ADR-023) — both are real,
+                    simultaneously-loaded checkpoints, not a hint to one
+                    model. Optional; omitted or empty defaults to
+                    "female". An unrecognized value is a 400, not a
+                    silent fallback.
+      responses:
+        "200":
+          description: The synthesized audio.
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: >
+            `voice` is not one of the loaded voices (ADR-023). Go's own
+            handler already validates `voice` before this call is ever
+            made, so this is a safety net for a direct/malformed call, not
+            a code path the real app exercises.
+        "5XX":
+          description: >
+            Any other failure (model not loaded, OOM, timeout,
+            empty/unsupported text). Go treats every non-200 response
+            identically — it does not need a typed error envelope from
+            Python for Phase 4, only the HTTP status.

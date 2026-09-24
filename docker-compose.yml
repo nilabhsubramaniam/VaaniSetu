@@ -1,4 +1,4 @@
-# Phase 2/3: postgres + backend + ai-services (llm + asr capabilities).
+# Phase 2/3/4: postgres + backend + ai-services (llm + asr + tts capabilities).
 # Model weights are never baked into the ai-services image
 # (docs/ARCHITECTURE.md §6) — run `ai-services/scripts/download_models.py`
 # on the host first; the ./models bind mount below is how the container
@@ -28,13 +28,14 @@ services:
     volumes:
       # Read-only: this container only ever reads weights, never writes
       # them (docs/ARCHITECTURE.md §6 — downloaded on the host, not
-      # inside the container). One mount covers both capabilities'
+      # inside the container). One mount covers all three capabilities'
       # subdirectories.
       - ./models:/app/models:ro
     environment:
       VAANISETU_LLM_PORT: "8090"
       VAANISETU_LLM_MODEL_STORE: "/app/models/llm"
       VAANISETU_ASR_MODEL_STORE: "/app/models/asr"
+      VAANISETU_TTS_MODEL_STORE: "/app/models/tts"
 
   backend:
     build:
@@ -48,12 +49,14 @@ services:
       # Default already matches Angular's dev server; only needs overriding
       # for a differently-configured frontend origin.
       VAANISETU_ALLOWED_ORIGIN: "http://localhost:4200"
-      # Set, as of Milestone 2b/3b: the ai-services container above now
-      # implements both contracts (proto/llm.openapi.yaml,
-      # proto/asr.openapi.yaml), so the backend uses HTTPLLMClient/
-      # HTTPASRClient instead of the fake clients.
+      # Set, as of Milestone 2b/3b/4b: the ai-services container above now
+      # implements all three contracts (proto/llm.openapi.yaml,
+      # proto/asr.openapi.yaml, proto/tts.openapi.yaml), so the backend
+      # uses HTTPLLMClient/HTTPASRClient/HTTPTTSClient instead of the fake
+      # clients.
       VAANISETU_LLM_SERVICE_URL: "http://ai-services:8090"
       VAANISETU_ASR_SERVICE_URL: "http://ai-services:8090"
+      VAANISETU_TTS_SERVICE_URL: "http://ai-services:8090"
     depends_on:
       postgres:
         condition: service_healthy

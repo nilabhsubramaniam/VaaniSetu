@@ -12,6 +12,7 @@ import (
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/asr"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/tts"
 )
 
 // maxAudioBytes bounds a single POST /api/v1/speech/transcribe body.
@@ -36,30 +37,33 @@ type ConversationService interface {
 type Server struct {
 	conversation  ConversationService
 	asrClient     asr.ASRClient
+	ttsClient     tts.TTSClient
 	logger        *slog.Logger
 	allowedOrigin string
 }
 
-// NewServer builds a Server. conv and asrClient do the actual work; logger
-// is used only for operational logging (see internal/logging for the
-// no-transcript-at-info-level enforcement every handler here follows).
-// allowedOrigin is the single origin permitted by CORS (see [Server.Routes])
-// — typically config.Config.AllowedOrigin.
-func NewServer(conv ConversationService, asrClient asr.ASRClient, logger *slog.Logger, allowedOrigin string) *Server {
-	return &Server{conversation: conv, asrClient: asrClient, logger: logger, allowedOrigin: allowedOrigin}
+// NewServer builds a Server. conv, asrClient, and ttsClient do the actual
+// work; logger is used only for operational logging (see internal/logging
+// for the no-transcript-at-info-level enforcement every handler here
+// follows). allowedOrigin is the single origin permitted by CORS (see
+// [Server.Routes]) — typically config.Config.AllowedOrigin.
+func NewServer(conv ConversationService, asrClient asr.ASRClient, ttsClient tts.TTSClient, logger *slog.Logger, allowedOrigin string) *Server {
+	return &Server{conversation: conv, asrClient: asrClient, ttsClient: ttsClient, logger: logger, allowedOrigin: allowedOrigin}
 }
 
 // Routes returns the backend's HTTP surface: the two Phase 2 endpoints in
-// docs/openapi/chat.yaml plus Phase 3's transcription endpoint in
-// docs/openapi/speech.yaml, wrapped in minimal CORS handling so the
-// Angular frontend (a different origin in local development) can call
-// them. Uses the standard library's method+path pattern matching (Go
-// 1.22+) rather than a third-party router — see docs/DECISIONS.md for why.
+// docs/openapi/chat.yaml plus Phase 3's transcription and Phase 4's
+// synthesis endpoints in docs/openapi/speech.yaml, wrapped in minimal CORS
+// handling so the Angular frontend (a different origin in local
+// development) can call them. Uses the standard library's method+path
+// pattern matching (Go 1.22+) rather than a third-party router — see
+// docs/DECISIONS.md for why.
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/chat", s.handleChat)
 	mux.HandleFunc("GET /api/v1/chat/history", s.handleHistory)
 	mux.HandleFunc("POST /api/v1/speech/transcribe", s.handleTranscribe)
+	mux.HandleFunc("POST /api/v1/speech/synthesize", s.handleSynthesize)
 	return s.withCORS(mux)
 }
 
@@ -185,6 +189,63 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, transcribeResponse{Transcript: transcript})
+}
+
+// handleSynthesize implements POST /api/v1/speech/synthesize per
+// docs/openapi/speech.yaml. Unlike every other handler in this file, a
+// successful response is the raw audio bytes, not a JSON body — the
+// caller (the browser's <audio>/Web Audio playback) has no use for a JSON
+// wrapper around binary audio.
+func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
+	var req synthesizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
+		return
+	}
+
+	text := strings.TrimSpace(req.Text)
+	if text == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "text must not be empty")
+		return
+	}
+	if !isValidLanguage(req.Language) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "unknown language code")
+		return
+	}
+
+	voice := req.Voice
+	if voice == "" {
+		voice = "female"
+	}
+	if !isValidVoice(voice) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "unknown voice")
+		return
+	}
+
+	result, err := s.ttsClient.Synthesize(r.Context(), tts.SynthesizeRequest{
+		Text:     text,
+		Language: req.Language,
+		Voice:    voice,
+	})
+	if err != nil {
+		s.logger.Warn("tts synthesize failed",
+			"text", logging.RedactedText(text),
+			"language", req.Language,
+			"voice", voice,
+			"error", err,
+		)
+		writeError(w, http.StatusBadGateway, "tts_unavailable",
+			"speech synthesis is temporarily unavailable, please try again")
+		return
+	}
+
+	contentType := result.ContentType
+	if contentType == "" {
+		contentType = "audio/wav"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(result.Audio)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

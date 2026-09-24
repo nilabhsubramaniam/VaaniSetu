@@ -88,27 +88,32 @@ VaaniSetu/
       conversation/                 turn persistence, LLM call, script tagging
       llm/                          LLMClient interface: Fake + HTTP clients
       asr/                          ASRClient interface: Fake + HTTP clients
+      tts/                          TTSClient interface: Fake + HTTP clients
       config/, db/, logging/
     migrations/                     goose SQL, embedded into the binary
     SETUP.md, Makefile, .env.example
   ai-services/                      Python 3.12+, uv, FastAPI + Uvicorn
     app/
-      main.py                      POST /v1/generate, /v1/transcribe, GET /healthz
+      main.py                      POST /v1/generate, /v1/transcribe, /v1/synthesize, GET /healthz
       config.py, registry.py
       engines/                     LLMEngine + llama_cpp implementation
         asr/                       ASREngine + faster_whisper implementation
+        tts/                       TTSEngine + mms_vits/parler_tts/xtts implementations
     scripts/                       download_models.py, benchmark.py, benchmark_asr.py,
+                                    benchmark_tts.py, wer.py (shared WER calc),
                                     generate_audio_fixtures.py (macOS-only, ASR fixtures)
     tests/
-    eval_data/                     asr_fixtures.yaml (committed manifest);
-                                    audio/ (generated, git-ignored)
+    eval_data/                     asr_fixtures.yaml (committed manifest, reused as the
+                                    TTS benchmark's text prompts too); audio/ (generated,
+                                    git-ignored)
     models.yaml                    model registry (docs/ARCHITECTURE.md §3.6)
     benchmark_results/             stored phase-scoped benchmark reports
     Makefile, .env.example, Dockerfile
-  proto/                           llm.openapi.yaml, asr.openapi.yaml (Go<->Python contracts)
+  proto/                           llm.openapi.yaml, asr.openapi.yaml, tts.openapi.yaml
+                                    (Go<->Python contracts)
   docker-compose.yml               postgres + backend + ai-services
   models/                          local weights, git-ignored (not in git)
-    llm/                           GGUF files; asr/  CTranslate2 model directories
+    llm/                           GGUF files; asr/ and tts/  full repo-snapshot directories
 ```
 
 `docker/` (a directory of standalone Dockerfiles) was superseded in practice

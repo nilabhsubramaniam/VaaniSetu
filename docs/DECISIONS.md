@@ -742,6 +742,340 @@ Status**.
   bundle and every other route.
 - **Status:** Accepted.
 
+## ADR-020 - Phase 4 Milestone 4a: TTS transport shape, fake-tone client, and reply-playback wiring
+
+- **Decision:** Four related Milestone 4a choices, recorded together the
+  same way ADR-017 bundled Phase 3 Milestone 3a's:
+  1. **`internal/tts` mirrors `internal/llm`/`internal/asr`'s
+     fake/real-client shape exactly**: `TTSClient` interface,
+     `FakeTTSClient` (in use now), `HTTPTTSClient` (built now, wired to a
+     real service only in Milestone 4b), selected by
+     `config.Config.UsesFakeTTS` / `VAANISETU_TTS_SERVICE_URL` — the same
+     "swap by config" mechanism as every other capability (ADR-006).
+  2. **Synthesis is a JSON request, binary response** — the mirror image
+     of `internal/asr`'s binary request/JSON response. Text is naturally
+     JSON-shaped (like `internal/llm`'s request); only the audio side of
+     this contract needs binary framing. `POST /api/v1/speech/synthesize`
+     and `proto/tts.openapi.yaml`'s `POST /v1/synthesize` both carry
+     `{text, language}` in and raw `audio/wav` bytes out, with no
+     persistence side effect, matching `/speech/transcribe`'s pattern of
+     staying separate from `/chat`.
+  3. **`FakeTTSClient` returns a real, valid, playable WAV file — a short
+     quiet sine tone — never opaque stub bytes**, generated fresh per call
+     regardless of the input text or language. This lets the Angular
+     playback plumbing (`AudioPlaybackService`, wired into
+     `ConversationRealService`) be built and genuinely exercised — a real
+     `<audio>` element actually receiving and playing a real audio file —
+     before any Python `tts` capability exists, the same role
+     `FakeASRClient`'s canned transcripts played for Milestone 3a.
+  4. **Playback is wired directly into `ConversationRealService`, not a
+     new settings toggle or a `VoiceSessionService` state.** After a chat
+     reply arrives, `ConversationRealService` calls
+     `SpeechService.synthesize` then `AudioPlaybackService.play`,
+     fire-and-forget: a failure is logged but never surfaces as the
+     conversation's `error` state, since the reply already succeeded and
+     is fully readable as text. Voice output is additive to the working
+     text/chat flow, not a required step it can break.
+- **Reason:**
+  1. Reusing the exact `llm`/`asr` shape is why Milestone 4a is small and
+     low-risk: no new architectural pattern, no new capability-wiring
+     mechanism to design, and a reviewer already familiar with
+     `internal/asr` can read `internal/tts` in minutes.
+  2. Text is naturally JSON; base64-encoding the *response* audio into
+     JSON would cost ~33% size for no benefit at this scale (same
+     reasoning ADR-017 applied to the request side for ASR), and the
+     browser's `<audio>`/Web Audio APIs consume a `Blob` directly, so a
+     raw binary HTTP response needs no decoding step on the way in.
+  3. A silent WAV would exercise the transport correctly but leave no way
+     to audibly confirm real playback happened during manual testing; an
+     opaque non-WAV stub would fail to actually play in a real
+     `<audio>` element, testing nothing about the browser-facing half of
+     this milestone. A short, quiet, unmistakably-a-placeholder tone gets
+     genuine end-to-end verification without pretending to be synthesized
+     speech.
+  4. A settings toggle or new voice state is real, unrequested scope this
+     milestone's own goal (transport + playback plumbing) doesn't need;
+     `docs/ROADMAP.md` Phase 4's Definition of Done asks for "reply text
+     -> audio playback works locally," not a way to disable it. Making
+     synthesis failure non-fatal follows the same principle already
+     established for voice input generally: the assistant remains fully
+     usable by text even when a voice-adjacent capability is degraded.
+- **Alternatives considered:**
+  - Multipart/form-data for the synthesize response — rejected: OpenAPI
+    and `HttpClient` both handle a plain binary body with a `Content-Type`
+    header more simply than multipart for exactly one file per response.
+  - A dedicated `VoiceSessionService` state (e.g. `"speaking"`) for
+    playback — rejected for this milestone: no consumer needs to
+    distinguish "the reply arrived" from "the reply is being read aloud"
+    yet; revisit if a future phase's UI actually needs to show that
+    distinction.
+  - Surfacing a synthesis failure as the conversation's `error` state —
+    rejected: would make a working text reply look like a failure to the
+    user over a voice-output problem alone, contradicting "voice is
+    additive."
+  - A second `ai-services`-style container specifically for `tts` —
+    rejected for the same reason ADR-017 rejected it for `asr`: no
+    capability gained yet over a third module in the existing process.
+- **Impact:** `backend/internal/tts`, `proto/tts.openapi.yaml`, and the
+  `/speech/synthesize` path in `docs/openapi/speech.yaml` are new,
+  following ADR-013's hand-maintained-OpenAPI convention.
+  `frontend/src/app/core/services/audio-playback.service.ts` is new,
+  mirroring `AudioCaptureService`'s "no abstract-class + DI-token, exactly
+  one implementation" shape (AGENTS.md §6).
+  `SpeechService` gained a second method (`synthesize`) rather than a
+  second service class, since both calls belong to the same `speech`
+  capability boundary. Milestone 4b (the real Python `tts` engine,
+  benchmark, and model-selection ADR) is unblocked by all of this — only
+  `VAANISETU_TTS_SERVICE_URL` needs to be set once it exists, no other
+  code change.
+- **Status:** Accepted.
+
+## ADR-021 - Phase 4 Milestone 4b: TTS engines, benchmark, and model selection
+
+- **Decision:** Three related Milestone 4b choices:
+  1. **Three candidates built and benchmarked (two actually benchmarked):**
+     `facebook/mms-tts-hin` (VITS, via `transformers`), `coqui/XTTS-v2`
+     (via `coqui-tts`), and `ai4bharat/indic-parler-tts` (via `parler-tts`)
+     each got a real `app/engines/tts/` wrapper implementing the shared
+     `TTSEngine` interface. `indic-parler-tts` could **not** be
+     benchmarked: its Hugging Face repo is gated, and even after a token
+     was created and used, Hugging Face returned "you are not in the
+     authorized list" — this specific account's access request has not
+     been (or will not be) manually approved. It stays fully implemented
+     and listed in `models.yaml`, unselected, ready to benchmark the
+     moment access is granted.
+  2. **Model selected: `facebook/mms-tts-hin`.** Fastest, lightest, and by
+     far the most accurate of the two benchmarked candidates on Hindi —
+     but it has a real, hard limitation, not just a quality gap: its
+     tokenizer vocabulary is Devanagari-phoneme only, so Latin-script text
+     (Hinglish, English) tokenizes to a **literally empty sequence** — it
+     cannot produce any audio for Hinglish input at all.
+     `MmsVitsEngine.synthesize` now raises a descriptive
+     `UnsupportedTextError` for this case instead of letting an empty
+     tensor crash inside `transformers` with an opaque dtype error.
+  3. **Intelligibility measured via the documented proxy** (feeding
+     synthesized audio back through the already-selected
+     `faster-whisper-large-v3-turbo` engine and computing WER against the
+     input text, reusing `eval_data/asr_fixtures.yaml`'s text/language
+     set — no new fixture file). **Pronunciation accuracy and naturalness
+     (MOS) are not measured** — both require a human listener, which
+     doesn't exist in this environment; recorded as an explicit,
+     unmeasured gap in `benchmark_results/tts_milestone_4b.json`, not
+     silently skipped.
+- **Reason:**
+  1. Full results in `ai-services/benchmark_results/tts_milestone_4b.json`
+     (8 fixtures: 4 Hindi, 2 Hinglish, 2 English; each candidate run in its
+     own subprocess for accurate memory isolation, same method as
+     ADR-016/ADR-018). Summary (proxy WER — lower is better; RTF —
+     synthesis time / audio duration):
+
+     | Candidate | License | Hindi WER | Hinglish WER | English WER | Mean RTF | Load | Peak RSS |
+     |---|---|---|---|---|---|---|---|
+     | mms-tts-hin | CC-BY-NC-4.0 | **0.238** | fails (0/2 producible) | 1.00 | **0.166** | **0.96s** | **2.43GB** |
+     | xtts-v2 | CPML | 0.713 | 1.813 (unintelligible) | 0.00 | 0.404 | 14.92s | 5.45GB |
+     | indic-parler-tts | Apache-2.0 | not benchmarked — gated repo access denied | | | | | |
+
+     `mms-tts-hin` is ~3x faster, uses less than half the memory, and is
+     three times more accurate on Hindi than `xtts-v2` — a decisive margin
+     on the language that matters most for the current MVP scope. Neither
+     candidate produces usable Hinglish speech: `mms-tts-hin` cannot
+     attempt it at all (see point 2 above); `xtts-v2` attempts it but the
+     proxy transcript is unintelligible word salad (WER 1.81, worse than
+     the "say nothing" baseline). `xtts-v2`'s only clear win is English
+     (0.00 WER, unsurprising for a model trained heavily on Western
+     languages) — not this project's MVP focus language.
+  2. Both benchmarked candidates carry a non-commercial license
+     (`mms-tts-hin`: CC-BY-NC-4.0; `xtts-v2`: CPML, and Coqui Inc. no
+     longer exists to sell a commercial license). License is therefore not
+     a differentiator between them this round — both are acceptable for
+     local/personal, non-commercial use only, and neither should be part
+     of any future commercial distribution without revisiting this ADR.
+     `indic-parler-tts` (Apache-2.0) is the only candidate here without
+     this constraint, which is exactly why it is worth re-benchmarking
+     once its access request is resolved, rather than dropping it.
+  3. Choosing evidence over convenience: `xtts-v2` "works" on every
+     language without crashing, which could look like the safer choice,
+     but its actual measured Hindi intelligibility is worse than
+     `mms-tts-hin`'s by a wide margin, and its Hinglish output is
+     unintelligible regardless. Selecting the candidate with a narrower
+     but higher-quality, faster, lighter capability — and documenting the
+     Hinglish gap plainly — follows the same principle ADR-018 applied to
+     Whisper's Hinglish weakness: report the real limitation rather than
+     picking a worse-but-technically-broader model to paper over it.
+- **Alternatives considered:**
+  - Waiting indefinitely for `indic-parler-tts` access before selecting
+    anything — rejected: Milestone 4b's Definition of Done needs a real,
+    working `selected` model now; re-benchmarking `indic-parler-tts` later
+    is a small, well-scoped follow-up (the wrapper and registry entry
+    already exist), not a reason to block this milestone.
+  - Selecting `xtts-v2` for its broader language coverage — rejected: its
+    Hindi intelligibility is measurably worse, it is ~15x slower to load
+    and ~2.2x heavier at rest, and its "coverage" of Hinglish is
+    unintelligible in practice, not a genuine capability advantage.
+  - Silently falling back to Hindi phonemes for Hinglish text on
+    `mms-tts-hin` (e.g. transliterating Latin-script input to Devanagari
+    before synthesis) — not attempted this round: transliteration quality
+    is itself an unevaluated variable that would need its own benchmark;
+    worth a real follow-up (Phase 6, Indian Language Support, already owns
+    script/language-ID work) rather than an untested guess bolted on here.
+- **Impact:** `ai-services/models.yaml`'s `tts.selected` is
+  `mms-tts-hin`. `backend/internal/tts.HTTPTTSClient` (already built in
+  Milestone 4a) needs only `VAANISETU_TTS_SERVICE_URL` set to switch from
+  `FakeTTSClient` — no code change. **Known gap, stated plainly: spoken
+  replies to Hinglish input have no real TTS voice yet** — the Go
+  `/speech/synthesize` call will fail (mapped to a 5xx, same as any other
+  engine failure) whenever `language=hinglish` is requested; the frontend's
+  Milestone 4a fire-and-forget playback (ADR-020, point 4) means this
+  degrades gracefully to text-only for Hinglish replies rather than
+  breaking the conversation. This should inform Phase 6 (Indian Language
+  Support) and is the first thing to revisit if `indic-parler-tts` access
+  is granted. The selected model's non-commercial license means the
+  current build must not be distributed commercially without first
+  resolving this ADR.
+- **Status:** Accepted.
+
+## ADR-022 - TTS voice revision: female-voice fine-tune replaces mms-tts-hin's single male voice
+
+- **Decision:** Replaced `tts.selected` in `ai-services/models.yaml` from
+  `mms-tts-hin` (`facebook/mms-tts-hin`) to a new candidate,
+  `mms-tts-hin-ft-female` (`Anjan9320/fb-mms-tts-hin-ft-female`) — a
+  community fine-tune of the exact same VITS architecture and tokenizer,
+  loaded by the same `MmsVitsEngine` with no code change beyond making one
+  error message candidate-agnostic (it previously hardcoded the string
+  `"mms-tts-hin"`, which became wrong the moment a second checkpoint used
+  this engine — now derived from the checkpoint's own directory name).
+- **Reason:** The user reported the selected voice sounded male after
+  actually listening to it. ADR-021's benchmark measured accuracy, speed,
+  and memory but never evaluated voice gender — `facebook/mms-tts-hin`'s
+  config confirms `num_speakers: 1`, i.e. a single, fixed voice with no
+  speaker-ID parameter to switch, so gender could not be fixed by
+  configuration alone. Given the user's choice among three real options
+  (this fine-tune; switching to `xtts-v2`'s already-configured female
+  built-in speaker; or keeping the male voice), a same-architecture
+  female fine-tune was preferred over `xtts-v2` because it preserves
+  ADR-021's speed/accuracy/license profile rather than trading it away.
+  Verified, not assumed, before selecting:
+  - **Same shape:** `num_speakers: 1`, 16kHz, loads through the existing
+    `MmsVitsEngine`/`transformers.VitsModel` path unmodified.
+  - **Comparable intelligibility:** proxy-WER (same method as ADR-021,
+    synthesize → transcribe via `faster-whisper-large-v3-turbo` → WER
+    against input) on the same 4 Hindi fixtures: 0.200 mean, vs. the base
+    checkpoint's 0.238 — not a regression.
+  - **Same speed/footprint:** load 1.05s (vs. 0.96s), mean RTF 0.171 (vs.
+    0.166) — both essentially identical to ADR-021's numbers, as expected
+    for the same architecture/size class.
+  - **Higher, more female-typical pitch:** a rough autocorrelation-based
+    F0 estimate put the base voice's median pitch at ~163-180Hz (the
+    upper edge of a typical male range) and this fine-tune's at
+    ~182-195Hz (solidly in a typical female range) — directionally
+    consistent evidence, not a substitute for a human listener actually
+    confirming it (still unavailable in this environment, same caveat as
+    ADR-021's pronunciation/MOS gap).
+  - **Same license family:** CC-BY-NC-4.0, identical to the base
+    checkpoint — this swap introduces no new licensing constraint beyond
+    what ADR-021 already accepted.
+  - **Same Hinglish limitation:** confirmed this fine-tune still raises
+    `UnsupportedTextError` for Latin-script text — inherits the base
+    checkpoint's Devanagari-only vocabulary, so ADR-021's Hinglish gap is
+    unchanged, not newly introduced.
+- **Alternatives considered:**
+  - `coqui/XTTS-v2` with its already-configured female speaker ("Ana
+    Florence") — rejected: still carries ADR-021's measured 3x-worse
+    Hindi WER, ~15x slower load, and ~2.2x heavier memory footprint; a
+    voice-gender fix should not silently reopen an already-decided
+    quality tradeoff.
+  - Waiting for `ai4bharat/indic-parler-tts` access (Apache-2.0, already
+    configured with a female voice description) — rejected for now, same
+    reasoning as ADR-021: no reason to block a real, user-reported gap on
+    an access request with no ETA; revisit and re-benchmark if/when access
+    is granted.
+- **Impact:** `ai-services/models.yaml` gains the `mms-tts-hin-ft-female`
+  candidate entry and `tts.selected` now points to it;
+  `facebook/mms-tts-hin` remains listed as a candidate (e.g. to revert to,
+  or as a baseline for future comparisons). No Go, Angular, or API-contract
+  change — `HTTPTTSClient`/`proto/tts.openapi.yaml` are unaffected, per
+  the same "swap by config" design ADR-006 established.
+  `app/engines/tts/mms_vits_engine.py`'s error message fix is a genuine
+  correctness fix (a hardcoded checkpoint name that had already become
+  inaccurate), not scope creep. This ADR does not change any of ADR-021's
+  other findings — the Hinglish gap and the non-commercial-license
+  constraint both still stand.
+- **Status:** Accepted.
+
+## ADR-023 - Real, simultaneous male/female TTS voice selection
+
+- **Decision:** Following ADR-022, both `mms-tts-hin-ft-female` (female)
+  and `mms-tts-hin` (male) are now loaded **simultaneously** in
+  `ai-services`, and a per-request `voice` field picks between them, end
+  to end:
+  1. `ai-services/models.yaml`'s `tts.selected` becomes a **map**
+     (`{female: mms-tts-hin-ft-female, male: mms-tts-hin}`) instead of a
+     single string — the one capability where more than one model is
+     simultaneously selected. `llm`/`asr` keep their original
+     single-string `selected` shape; `app/registry.load_selected_entry`
+     takes an optional `voice` param used only when `capability == "tts"`.
+  2. `app/main.py`'s `lifespan` loads one engine per `_TTS_VOICES =
+     ("female", "male")` entry at startup (fails loudly if either is
+     missing, same as every other capability). `POST /v1/synthesize`
+     gains an optional `voice` field (default `"female"`); the handler
+     looks it up in the loaded-engines dict directly (not a FastAPI
+     `Depends`, since the voice key is only known once the body is
+     parsed) and returns 400 for an unrecognized voice.
+  3. `proto/tts.openapi.yaml` / `docs/openapi/speech.yaml` gain the same
+     optional `voice` (`"female" | "male"`, default `"female"`) field.
+     `backend/internal/tts.SynthesizeRequest` gains `Voice string`;
+     `internal/api`'s `handleSynthesize` defaults an empty voice to
+     `"female"` and 400s an unrecognized one, mirroring its existing
+     `isValidLanguage` check.
+  4. Frontend: `SettingsStore` gains a `preferredVoice` signal
+     (`VoiceCode`, `localStorage`-backed), an exact copy of
+     `preferredLanguage`'s existing mechanism. A new `voice-preferences`
+     settings component (a structural copy of `language-preferences`)
+     lets the user pick Female/Male. `ConversationRealService` reads
+     `settings.preferredVoice()` when calling
+     `SpeechService.synthesize(text, language, voice)`.
+- **Reason:** The user asked for a real choice, not a second hardcoded
+  pick. Both voices were already fully verified working checkpoints
+  (ADR-021/ADR-022) on the same architecture, so the only real design
+  question was how `ai-services` — which had only ever loaded **one**
+  model per capability — could serve two simultaneously. Loading both at
+  startup (rather than lazily swapping one in per request) was chosen
+  because: it keeps `/v1/synthesize` request latency uniform regardless of
+  which voice is asked for; it fails loudly at startup if either voice's
+  weights are missing, consistent with every other capability's existing
+  behavior; and the memory cost is small (~2.4GB peak RSS per this
+  architecture, per ADR-021's benchmark) and paid once, not per request.
+  A plain dict lookup (not `Depends`) for engine selection was chosen
+  because FastAPI's dependency-injection only resolves before/alongside
+  parameter binding — the voice key genuinely isn't known until the
+  request body itself is parsed, so forcing it through `Depends` would
+  need an awkward two-pass request read for no benefit.
+- **Alternatives considered:**
+  - Lazily load whichever voice a request asks for, evicting the other —
+    rejected: adds real per-request latency variance (a cold load) for no
+    memory savings large enough to justify it at this model size, and
+    reintroduces exactly the kind of statefulness `docs/ARCHITECTURE.md`
+    §5 tries to keep out of the request path.
+  - A generic N-voice registry shape usable by any future capability, not
+    just `tts` — rejected as speculative: no second capability needs
+    multiple simultaneous selections today (AGENTS.md §6, "no speculative
+    abstraction"); revisit if one does.
+  - Making `voice` a `LanguageCode`-style per-language default instead of
+    an explicit user setting — rejected: gender and language are
+    orthogonal to the user, and `voices` (ADR-021) already covers
+    per-language configuration for engines that need it (parler_tts,
+    xtts); conflating the two would overload one field with two concerns.
+- **Impact:** `ai-services/models.yaml`, `app/registry.py`, `app/main.py`;
+  `proto/tts.openapi.yaml`, `docs/openapi/speech.yaml`;
+  `backend/internal/tts`, `backend/internal/api/dto.go` and `server.go`;
+  `frontend/src/app/core/models/voice.model.ts` (new),
+  `SettingsStore`, `SpeechService`, `ConversationRealService`, and a new
+  `settings/voice-preferences/` component. No change to which models are
+  selected (still ADR-022's two checkpoints) or their license status
+  (still both CC-BY-NC-4.0, non-commercial) — this ADR is about serving
+  both simultaneously, not about model selection itself.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

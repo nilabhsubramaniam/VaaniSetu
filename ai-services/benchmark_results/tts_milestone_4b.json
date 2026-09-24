@@ -1,0 +1,240 @@
+{
+  "fixtures": [
+    {
+      "id": "hi-weather",
+      "language": "hi",
+      "text": "आज मौसम कैसा है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-capital",
+      "language": "hi",
+      "text": "भारत की राजधानी क्या है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-story",
+      "language": "hi",
+      "text": "मुझे एक छोटी कहानी सुनाओ",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-greeting",
+      "language": "hi",
+      "text": "नमस्ते, आप कैसे हैं?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hinglish-weather",
+      "language": "hinglish",
+      "text": "kal ka weather kaisa rahega, bata sakte ho",
+      "voice": "Tara"
+    },
+    {
+      "id": "hinglish-joke",
+      "language": "hinglish",
+      "text": "mujhe ek chhoti si joke sunao",
+      "voice": "Rishi"
+    },
+    {
+      "id": "en-learn-hindi",
+      "language": "en",
+      "text": "What's a good way to learn Hindi quickly?",
+      "voice": "Samantha"
+    },
+    {
+      "id": "en-schedule",
+      "language": "en",
+      "text": "What's on my schedule today?",
+      "voice": "Aman"
+    }
+  ],
+  "results": [
+    {
+      "key": "mms-tts-hin",
+      "repo_id": "facebook/mms-tts-hin",
+      "license": "CC-BY-NC-4.0",
+      "load_seconds": 0.959,
+      "mean_rtf": 0.1657,
+      "max_rtf": 0.4278,
+      "mean_proxy_wer": 0.4917,
+      "failed_fixture_count": 2,
+      "peak_rss_mb": 2430.5,
+      "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
+      "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "proxy_transcript": "हाली मौसम के साहे",
+          "proxy_wer": 0.75,
+          "synthesis_seconds": 0.732,
+          "audio_seconds": 1.712,
+          "rtf": 0.4278
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "proxy_transcript": "भारत की राजहनी क्या है?",
+          "proxy_wer": 0.2,
+          "synthesis_seconds": 0.187,
+          "audio_seconds": 2.384,
+          "rtf": 0.0784
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "proxy_transcript": "मुझे एक छोटी कहानी सुनाओ",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 0.244,
+          "audio_seconds": 2.656,
+          "rtf": 0.0918
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "proxy_transcript": "नमस्ते आप कैसे हैं?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 0.138,
+          "audio_seconds": 1.808,
+          "rtf": 0.0765
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "error": "mms-tts-hin: 'kal ka weather kaisa rahega, bata sakte ho' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "error": "mms-tts-hin: 'mujhe ek chhoti si joke sunao' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "proxy_transcript": "Thank you.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.057,
+          "audio_seconds": 0.368,
+          "rtf": 0.154
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "proxy_transcript": "Thank you.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.056,
+          "audio_seconds": 0.336,
+          "rtf": 0.1659
+        }
+      ]
+    },
+    {
+      "key": "indic-parler-tts",
+      "error": "model directory not found: /Users/nilabhsubramaniam/project/VaaniSetu/ai-services/scripts/../../models/tts/indic-parler-tts"
+    },
+    {
+      "key": "xtts-v2",
+      "repo_id": "coqui/XTTS-v2",
+      "license": "CPML",
+      "load_seconds": 14.924,
+      "mean_rtf": 0.4039,
+      "max_rtf": 0.4604,
+      "mean_proxy_wer": 0.8094,
+      "failed_fixture_count": 0,
+      "peak_rss_mb": 5449.3,
+      "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
+      "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "proxy_transcript": "आज मौसम कैसा है? इलिनान केता दोर तराना नेशा.",
+          "proxy_wer": 1.25,
+          "synthesis_seconds": 3.373,
+          "audio_seconds": 7.327,
+          "rtf": 0.4604
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "proxy_transcript": "भारत की राजधानी क्या है?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 1.406,
+          "audio_seconds": 3.577,
+          "rtf": 0.3931
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "proxy_transcript": "मुझे एक छोटी कहानी सुनाओ, कान नावान काना डॉब्धू, नेन स्यल पकानाई काई,",
+          "proxy_wer": 1.6,
+          "synthesis_seconds": 3.874,
+          "audio_seconds": 9.44,
+          "rtf": 0.4104
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "proxy_transcript": "नमस्ते, आप कैसे हैं?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 1.638,
+          "audio_seconds": 4.192,
+          "rtf": 0.3908
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "proxy_transcript": "Kalka Vedrin Kaisar Raegokana Tithi Hortensi Kishuban Nangma Morndata.",
+          "proxy_wer": 1.125,
+          "synthesis_seconds": 3.774,
+          "audio_seconds": 9.498,
+          "rtf": 0.3974
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "proxy_transcript": "Mujamya Anwaya Nando, Nong Shadha, Tavidhi Bonar Hena, Jinis Sikha Gidha, Kaada Nakane Gita Hai.",
+          "proxy_wer": 2.5,
+          "synthesis_seconds": 4.136,
+          "audio_seconds": 10.357,
+          "rtf": 0.3993
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "proxy_transcript": "What's a good way to learn Hindi quickly?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 1.228,
+          "audio_seconds": 3.182,
+          "rtf": 0.3861
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "proxy_transcript": "What's on my schedule today?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 0.874,
+          "audio_seconds": 2.218,
+          "rtf": 0.394
+        }
+      ]
+    }
+  ]
+}

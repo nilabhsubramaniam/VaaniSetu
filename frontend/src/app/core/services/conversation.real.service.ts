@@ -4,7 +4,10 @@ import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { LanguageCode } from '../models/language.model';
 import type { Turn, TurnRole } from '../models/turn.model';
+import { AudioPlaybackService } from './audio-playback.service';
 import { ConversationService } from './conversation.service';
+import { SettingsStore } from './settings.store';
+import { SpeechService } from './speech.service';
 import { VoiceSessionService } from './voice-session.service';
 
 /** How long the reply stays in `responding` before settling to `idle` — same
@@ -48,6 +51,9 @@ function makeLocalId(): string {
 export class ConversationRealService implements ConversationService {
   private readonly http = inject(HttpClient);
   private readonly voiceSession = inject(VoiceSessionService);
+  private readonly speech = inject(SpeechService);
+  private readonly audioPlayback = inject(AudioPlaybackService);
+  private readonly settings = inject(SettingsStore);
 
   private readonly _turns = signal<readonly Turn[]>([]);
   readonly turns = this._turns.asReadonly();
@@ -99,6 +105,7 @@ export class ConversationRealService implements ConversationService {
 
           this.appendTurn(turnFromWire(res.assistantTurn));
           this.voiceSession.setState('responding');
+          this.speakReply(res.assistantTurn.text, res.assistantTurn.language);
 
           setTimeout(() => {
             if (mySequence === this.sequence) {
@@ -124,6 +131,18 @@ export class ConversationRealService implements ConversationService {
 
   private appendTurn(turn: Turn): void {
     this._turns.update((turns) => [...turns, turn]);
+  }
+
+  /** Synthesizes and plays an assistant reply's speech. Fire-and-forget by
+   * design: a synthesis/playback failure is logged but never surfaces as
+   * the conversation's `error` state — the reply already succeeded and is
+   * fully readable as text, so voice output is additive, not required
+   * (docs/DECISIONS.md ADR-020). */
+  private speakReply(text: string, language: LanguageCode): void {
+    this.speech
+      .synthesize(text, language, this.settings.preferredVoice())
+      .then((audio) => this.audioPlayback.play(audio))
+      .catch((err: unknown) => console.error('speech synthesis/playback failed', err));
   }
 }
 
