@@ -124,8 +124,12 @@ Hinglish (code-switched) transcription accuracy is meaningfully below
 `docs/EVALUATION.md`'s "within +10pts of monolingual Hindi WER" target for
 every benchmarked candidate — a genuine Whisper-family limitation, not an
 integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
-(Indian Language Support), which owns code-switching quality. See
-`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-017/ADR-018.
+(Indian Language Support), which owns code-switching quality. ADR-017's
+manual endpointing (tap to start, tap to stop) later gained a non-ML
+silence-timeout auto-stop layered on top (ADR-025) — still not the real
+VAD model this phase deferred to Phase 11, just a UX heuristic; manual
+tap-to-stop remains the fallback. See `docs/CURRENT_STATE.md` and
+`docs/DECISIONS.md` ADR-017/ADR-018/ADR-025.
 
 - **Objective:** Add microphone capture and local transcription so a user can
   **speak** their turn.

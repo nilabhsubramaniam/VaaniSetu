@@ -1205,6 +1205,64 @@ Status**.
   decision this ADR deliberately does not make).
 - **Status:** Accepted.
 
+## ADR-025 - Silence-timeout auto-stop for the mic button (not a VAD model)
+
+- **Decision:** The user asked for the mic to stop automatically once
+  they finish speaking, instead of requiring a second tap. A real,
+  benchmarked VAD model is explicitly Phase 11's scope
+  (`docs/ROADMAP.md`; ADR-017 chose manual endpointing for Phase 3
+  specifically because "a full VAD model is itself a capability requiring
+  its own model selection, benchmark, and ADR" — real scope Phase 3's
+  Definition of Done didn't ask for). Flagged as a conflict; the user
+  chose a narrower alternative instead of jumping ahead to Phase 11:
+  `AudioCaptureService.start()` gains an optional `onAutoStop` callback.
+  When given, it additionally builds a small Web Audio graph
+  (`AudioContext` -> `MediaStreamAudioSourceNode` -> `AnalyserNode`) and
+  polls the live audio level every 100ms. Once real speech has been seen
+  for at least 300ms and the level has then stayed below a fixed
+  threshold for 1500ms continuously, the callback fires once.
+  `mic-button.ts` wires it to the exact same `stopListeningAndSend()`
+  path manual tap and the existing 30s max-duration timer already use.
+- **Reason:** This is a coarse amplitude heuristic (mean absolute
+  deviation from the time-domain midpoint), not speech/non-speech
+  classification — no model, no training data, no benchmark, no
+  model-registry entry. It genuinely is not the capability ADR-017 and
+  Phase 11 mean by "VAD," so building it now doesn't reopen either
+  decision; it's a UX change to audio capture Phase 3 already owns
+  (`docs/ARCHITECTURE.md` §3.1, "capture microphone audio... in the
+  browser"). Feature-detected rather than required: if `AudioContext`
+  doesn't exist (or building the graph throws for any reason),
+  `start()` still resolves and recording still works via `MediaRecorder`
+  exactly as before — manual tap-to-stop is the permanent fallback, not
+  a temporary gap. Reusing the existing `stopListeningAndSend()` path for
+  the new trigger (rather than adding a second "how a turn ends" code
+  path) means the manual-tap, max-duration, and now silence-triggered
+  stops all funnel through the one already-tested handler, including its
+  existing "ignore if not currently listening" guard against double-stops.
+- **Alternatives considered:**
+  - A real, benchmarked VAD model now — rejected: exactly the capability
+    ADR-017 deferred to Phase 11, for the same reasoning given there; no
+    new evidence changes that calculus today.
+  - Press-and-hold instead of tap-to-toggle (hold the button while
+    speaking, release when done) — a real, simpler alternative the user
+    was offered; not chosen. Still available to revisit if the silence
+    heuristic proves unreliable in practice (e.g. noisy environments
+    triggering false stops, or soft speech never crossing the threshold).
+  - Doing the analysis in `mic-button.ts` instead of
+    `AudioCaptureService` — rejected: the component has no access to the
+    live `MediaStream`, which the capture service already owns
+    end-to-end; splitting stream ownership across two places for this
+    would be a worse shape than one optional callback parameter.
+- **Impact:** `frontend/src/app/core/services/audio-capture.service.ts`
+  (`start`'s new optional parameter, the watcher and its teardown in
+  `stop`/`cancel`), `mic-button.ts` (one call-site change). All four
+  tunable constants (check interval, silence duration, minimum
+  speech-before-eligible, and the level threshold) are named and
+  commented in one place — expected to need real-world tuning; not a
+  claim that these exact numbers are correct, only that they're
+  isolated and easy to change if they're not.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

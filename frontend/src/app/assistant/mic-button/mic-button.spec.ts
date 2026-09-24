@@ -93,6 +93,22 @@ describe('MicButton', () => {
     expect(sendVoiceTurn).toHaveBeenCalledTimes(1);
   });
 
+  it('sends the voice turn when AudioCaptureService reports silence (docs/DECISIONS.md ADR-025)', async () => {
+    const fixture = TestBed.createComponent(MicButton);
+    fixture.detectChanges();
+    (fixture.nativeElement as HTMLElement).querySelector('button')!.click();
+    await flushMicrotasks();
+
+    expect(audioStart).toHaveBeenCalledTimes(1);
+    const onAutoStop = audioStart.mock.calls[0][0] as () => void;
+
+    onAutoStop();
+    await flushMicrotasks();
+
+    expect(sendVoiceTurn).toHaveBeenCalledTimes(1);
+    expect(sendVoiceTurn).toHaveBeenCalledWith(fakeRecording.blob, 'hi', 'female');
+  });
+
   it('goes to the error state if starting the recording fails', async () => {
     audioStart.mockRejectedValue(new MicrophoneUnavailableError('denied'));
     const fixture = TestBed.createComponent(MicButton);

@@ -52,7 +52,11 @@ export class MicButton {
     this.voiceSession.setState('listening');
 
     try {
-      await this.audioCapture.start();
+      // Auto-stops on silence after real speech (docs/DECISIONS.md
+      // ADR-025) — feeds the same stop path manual tap and the
+      // max-duration timer below already use, so there's exactly one
+      // "what happens when a turn ends" handler regardless of trigger.
+      await this.audioCapture.start(() => void this.stopListeningAndSend());
     } catch (err) {
       console.error('failed to start recording', err);
       this.voiceSession.setState('error');

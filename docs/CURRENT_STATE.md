@@ -13,29 +13,23 @@ project moves between milestones or a phase's status changes.
 - **Current focus:** none active — awaiting the user's decision to start
   Phase 6 (Indian Language Support); see `AGENTS.md` §5, "never advance to
   the next milestone automatically".
-- **Last updated:** 2026-09-24 (Phase 5: a real Go turn orchestrator
-  (`backend/internal/orchestrator`, `POST /api/v1/voice/turn`) now
-  sequences transcribe -> think -> speak server-side — moved out of
-  Angular, where that sequencing decision used to live in
-  `mic-button.ts`/`ConversationRealService`, violating
-  `docs/ARCHITECTURE.md` §4. The mic flow makes one call instead of
-  three. Verified live end to end against real recorded audio (all 8
-  `eval_data/asr_fixtures.yaml` fixtures): real transcript -> real
-  LLM reply -> real synthesized audio, with a Hinglish request correctly
-  degrading to text-only (`synthesisFailed: true`) rather than failing.
-  **Known gap:** measured p50 latency is 5.09s against the "< 3s
-  non-streaming MVP" target — `faster-whisper-large-v3-turbo`
-  transcription alone takes ~4s per request, already exceeding the whole
-  budget. Not fixed here — doing so means reopening ADR-018's
-  accuracy/latency tradeoff with new evidence. See `docs/DECISIONS.md`
-  ADR-024 for the full measured breakdown and `docs/ROADMAP.md` Phase 5.
-  Earlier the same day: ADR-023 gave the assistant's voice a real
-  Female/Male choice (`SettingsStore.preferredVoice`), and ADR-022 fixed
-  the selected TTS voice from an unconfigurable male to a female
-  fine-tune. See `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022/ADR-023 and
-  `docs/ROADMAP.md` Phase 4 for that history, including the still-open
-  Hinglish TTS gap and the still-gated `ai4bharat/indic-parler-tts`
-  candidate)
+- **Last updated:** 2026-09-25 (ADR-025: the mic button now auto-stops on
+  silence — the user asked for it to detect automatically when they've
+  finished speaking. A real, benchmarked VAD model is Phase 11's scope
+  (ADR-017), so this is deliberately narrower: a coarse client-side
+  amplitude heuristic in `AudioCaptureService` (Web Audio API, no model),
+  wired into the same `stopListeningAndSend()` path manual tap and the
+  30s max-duration timer already use. Feature-detected — falls back to
+  manual tap-to-stop if the browser has no usable Web Audio API. The day
+  before (2026-09-24): Phase 5 landed a real Go turn orchestrator
+  (`backend/internal/orchestrator`, `POST /api/v1/voice/turn`), verified
+  live end to end against real recorded audio, with a known,
+  documented latency gap (measured p50 5.09s against a <3s target —
+  see `docs/DECISIONS.md` ADR-024); Phase 4 gained a real Female/Male
+  voice choice (ADR-022/ADR-023). See `docs/DECISIONS.md`
+  ADR-020 through ADR-025 and `docs/ROADMAP.md` Phases 4/5 for that full
+  history, including the still-open Hinglish TTS gap and the still-gated
+  `ai4bharat/indic-parler-tts` candidate)
 
 ## Completed
 
@@ -394,6 +388,19 @@ project moves between milestones or a phase's status changes.
     closing it means reopening ADR-018's accuracy-vs-latency tradeoff
     with new evidence, which this phase deliberately does not do.
     Flagged for a future phase (most likely Phase 11's streaming work).
+- **Silence-based mic auto-stop (ADR-025):** `AudioCaptureService.start()`
+  gained an optional `onAutoStop` callback — a coarse, non-ML amplitude
+  heuristic (Web Audio API `AnalyserNode`, no model), not the real VAD
+  model Phase 11 owns. Fires once, at most, when real speech has been
+  heard followed by ~1.5s of continued silence, wired into
+  `mic-button.ts`'s existing `stopListeningAndSend()` path — the same
+  handler manual tap and the 30s max-duration timer already use.
+  Feature-detected: falls back to manual tap-to-stop only, with no
+  behavior change, when the browser has no usable Web Audio API. 6 new
+  tests in `audio-capture.service.spec.ts` (fires after
+  speech-then-silence; never fires on silence alone; fires at most once;
+  torn down by `stop()`/`cancel()`; still works with no `AudioContext`)
+  plus 1 in `mic-button.spec.ts`. `ng lint`/`test`/`build` all clean.
 
 ## Next
 
@@ -421,12 +428,14 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean (128 tests). Its
+- `frontend/` builds, lints, and tests clean (135 tests). Its
   `ConversationService` runs against the real backend
   (`ConversationRealService`); `MicButton` now records audio and sends
   the whole spoken turn through `ConversationService.sendVoiceTurn` in
   one call (Phase 5, ADR-024) — it no longer depends on `SpeechService`
-  directly. A voice turn's reply plays back synthesized speech via
+  directly — and auto-stops recording on detected silence (ADR-025),
+  falling back to manual tap-to-stop where that's unsupported. A voice
+  turn's reply plays back synthesized speech via
   `AudioPlaybackService`, in the user's chosen voice
   (`SettingsStore.preferredVoice`, ADR-023); only `VoiceSessionService`
   still uses a mock (see above).

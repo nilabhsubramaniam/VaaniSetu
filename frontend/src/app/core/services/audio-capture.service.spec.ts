@@ -28,6 +28,39 @@ function fakeStream(): MediaStream {
   return { getTracks: () => [{ stop }] } as unknown as MediaStream;
 }
 
+/** A minimal fake AnalyserNode whose reported level is controlled directly
+ * by the test, rather than actually analyzing anything. */
+class FakeAnalyserNode {
+  fftSize = 512;
+  /** 128 = silence (no deviation from the time-domain midpoint); anything
+   * >= 128 + SPEECH_LEVEL_THRESHOLD counts as speech. */
+  level = 128;
+
+  getByteTimeDomainData(array: Uint8Array): void {
+    array.fill(this.level);
+  }
+}
+
+/** A minimal fake AudioContext/graph — jsdom has no Web Audio API at all,
+ * same "stub the global" pattern as FakeMediaRecorder above. */
+class FakeAudioContext {
+  readonly analyser = new FakeAnalyserNode();
+  closed = false;
+
+  createMediaStreamSource(): { connect: () => void } {
+    return { connect: vi.fn() };
+  }
+
+  createAnalyser(): FakeAnalyserNode {
+    return this.analyser;
+  }
+
+  close(): Promise<void> {
+    this.closed = true;
+    return Promise.resolve();
+  }
+}
+
 describe('AudioCaptureService', () => {
   let service: AudioCaptureService;
 
@@ -106,5 +139,103 @@ describe('AudioCaptureService', () => {
 
   it('cancel() is a no-op when nothing is recording', () => {
     expect(() => service.cancel()).not.toThrow();
+  });
+
+  describe('silence-based auto-stop (docs/DECISIONS.md ADR-025)', () => {
+    let fakeAudioContext: FakeAudioContext;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+      fakeAudioContext = new FakeAudioContext();
+      // A plain function that returns the shared fake instance — not
+      // `vi.fn()`, which vitest refuses to invoke with `new`.
+      vi.stubGlobal('AudioContext', function AudioContextStub() {
+        return fakeAudioContext;
+      } as unknown as typeof AudioContext);
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: vi.fn().mockResolvedValue(fakeStream()) },
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('fires onAutoStop after real speech followed by enough silence', async () => {
+      const onAutoStop = vi.fn();
+      await service.start(onAutoStop);
+
+      fakeAudioContext.analyser.level = 200; // speech
+      await vi.advanceTimersByTimeAsync(300);
+      expect(onAutoStop).not.toHaveBeenCalled();
+
+      fakeAudioContext.analyser.level = 128; // silence
+      await vi.advanceTimersByTimeAsync(1400);
+      expect(onAutoStop).not.toHaveBeenCalled(); // not quite long enough yet
+
+      await vi.advanceTimersByTimeAsync(200);
+      expect(onAutoStop).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire on silence alone, without any speech first', async () => {
+      const onAutoStop = vi.fn();
+      await service.start(onAutoStop);
+
+      fakeAudioContext.analyser.level = 128; // silence throughout
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(onAutoStop).not.toHaveBeenCalled();
+    });
+
+    it('fires at most once', async () => {
+      const onAutoStop = vi.fn();
+      await service.start(onAutoStop);
+
+      fakeAudioContext.analyser.level = 200;
+      await vi.advanceTimersByTimeAsync(300);
+      fakeAudioContext.analyser.level = 128;
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(onAutoStop).toHaveBeenCalledTimes(1);
+    });
+
+    it('tears down the watcher on stop(), so it cannot fire afterwards', async () => {
+      const onAutoStop = vi.fn();
+      await service.start(onAutoStop);
+      fakeAudioContext.analyser.level = 200;
+      await vi.advanceTimersByTimeAsync(300);
+
+      await service.stop();
+
+      expect(fakeAudioContext.closed).toBe(true);
+      fakeAudioContext.analyser.level = 128;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(onAutoStop).not.toHaveBeenCalled();
+    });
+
+    it('tears down the watcher on cancel()', async () => {
+      const onAutoStop = vi.fn();
+      await service.start(onAutoStop);
+
+      service.cancel();
+
+      expect(fakeAudioContext.closed).toBe(true);
+    });
+
+    it('still starts recording normally when AudioContext does not exist at all', async () => {
+      vi.unstubAllGlobals();
+      vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: vi.fn().mockResolvedValue(fakeStream()) },
+      });
+
+      const onAutoStop = vi.fn();
+      await expect(service.start(onAutoStop)).resolves.toBeUndefined();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(onAutoStop).not.toHaveBeenCalled();
+    });
   });
 });
