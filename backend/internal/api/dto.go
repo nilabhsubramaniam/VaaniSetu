@@ -74,6 +74,15 @@ type transcribeResponse struct {
 	Transcript string `json:"transcript"`
 }
 
+// synthesizeRequest is the POST /api/v1/speech/synthesize request body,
+// per docs/openapi/speech.yaml. There is no corresponding response DTO —
+// a 200 response is the raw synthesized audio bytes, not JSON (see
+// handleSynthesize).
+type synthesizeRequest struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+}
+
 // errorResponse is the body returned for every non-2xx response, per
 // docs/openapi/chat.yaml and docs/openapi/speech.yaml.
 type errorResponse struct {
@@ -82,7 +91,7 @@ type errorResponse struct {
 
 type errorBody struct {
 	// Code is one of "invalid_request", "llm_unavailable",
-	// "asr_unavailable", "internal".
+	// "asr_unavailable", "tts_unavailable", "internal".
 	Code string `json:"code"`
 	// Message is safe to show a user — never the raw underlying error
 	// (docs/DEVELOPMENT.md §11: user-facing errors "do not leak internal

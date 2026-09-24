@@ -9,16 +9,18 @@ interface TranscribeResponseWire {
 }
 
 /**
- * The `speech` capability's HTTP boundary: one call, no ongoing state, so
- * a plain injectable rather than the abstract-class + DI-token pattern
- * `ConversationService`/`VoiceSessionService` use for genuinely swappable,
- * stateful services (docs/DECISIONS.md ADR-009, ADR-017). There is exactly
- * one implementation and no second one is anticipated (AGENTS.md §6).
+ * The `speech` capability's HTTP boundary: two calls (transcribe, and now
+ * synthesize), no ongoing state, so a plain injectable rather than the
+ * abstract-class + DI-token pattern `ConversationService`/`VoiceSessionService`
+ * use for genuinely swappable, stateful services (docs/DECISIONS.md ADR-009,
+ * ADR-017). There is exactly one implementation and no second one is
+ * anticipated (AGENTS.md §6).
  *
  * Deliberately has no persistence side effect and knows nothing about
- * turns — the caller is expected to feed the returned transcript into the
+ * turns — the caller is expected to feed a transcribed turn into the
  * existing `ConversationService.sendUserTurn`, unchanged
- * (docs/DECISIONS.md ADR-017).
+ * (docs/DECISIONS.md ADR-017), and to hand a synthesized reply's audio to
+ * `AudioPlaybackService` itself.
  */
 @Injectable({ providedIn: 'root' })
 export class SpeechService {
@@ -36,5 +38,15 @@ export class SpeechService {
       }),
     );
     return response.transcript;
+  }
+
+  /** Requests spoken audio for `text` and resolves with the synthesized
+   * clip. Throws (via the returned promise) on any network or server
+   * failure — callers treat a synthesis failure as non-fatal to the
+   * surrounding text/chat flow (docs/DECISIONS.md ADR-020), unlike a
+   * transcription failure. */
+  async synthesize(text: string, language: LanguageCode): Promise<Blob> {
+    const url = `${environment.apiBaseUrl}/v1/speech/synthesize`;
+    return firstValueFrom(this.http.post(url, { text, language }, { responseType: 'blob' }));
   }
 }

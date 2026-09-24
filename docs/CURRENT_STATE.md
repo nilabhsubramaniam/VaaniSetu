@@ -6,13 +6,15 @@ project moves between milestones or a phase's status changes.
 ---
 
 - **Current phase:** Phase 2 - Local LLM, **DONE**. Phase 3 - Speech-to-Text,
-  **DONE** (Milestones 3a and 3b both complete).
-- **Current focus:** none active — awaiting the user's decision on the next
-  phase (`docs/ROADMAP.md` Phase 4, Text-to-Speech, is next in order; see
-  `AGENTS.md` §5, "never advance to the next milestone automatically").
-- **Last updated:** 2026-09-17 (Milestone 3b: Python `asr` capability
-  built, benchmarked, wired to the backend, and verified live end to end —
-  a real recording now produces a real transcript and a real reply)
+  **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
+  **IN PROGRESS** (Milestone 4a complete; Milestone 4b not started).
+- **Current focus:** none active — awaiting the user's decision to start
+  Milestone 4b (Python `tts` capability, model benchmark, real wiring); see
+  `AGENTS.md` §5, "never advance to the next milestone automatically".
+- **Last updated:** 2026-09-24 (Milestone 4a: Go `tts` capability boundary
+  built against `FakeTTSClient`, and real browser audio playback wired
+  into the conversation flow — an assistant reply now plays back a real,
+  audible WAV clip end to end, though not yet real synthesized speech)
 
 ## Completed
 

@@ -742,6 +742,94 @@ Status**.
   bundle and every other route.
 - **Status:** Accepted.
 
+## ADR-020 - Phase 4 Milestone 4a: TTS transport shape, fake-tone client, and reply-playback wiring
+
+- **Decision:** Four related Milestone 4a choices, recorded together the
+  same way ADR-017 bundled Phase 3 Milestone 3a's:
+  1. **`internal/tts` mirrors `internal/llm`/`internal/asr`'s
+     fake/real-client shape exactly**: `TTSClient` interface,
+     `FakeTTSClient` (in use now), `HTTPTTSClient` (built now, wired to a
+     real service only in Milestone 4b), selected by
+     `config.Config.UsesFakeTTS` / `VAANISETU_TTS_SERVICE_URL` — the same
+     "swap by config" mechanism as every other capability (ADR-006).
+  2. **Synthesis is a JSON request, binary response** — the mirror image
+     of `internal/asr`'s binary request/JSON response. Text is naturally
+     JSON-shaped (like `internal/llm`'s request); only the audio side of
+     this contract needs binary framing. `POST /api/v1/speech/synthesize`
+     and `proto/tts.openapi.yaml`'s `POST /v1/synthesize` both carry
+     `{text, language}` in and raw `audio/wav` bytes out, with no
+     persistence side effect, matching `/speech/transcribe`'s pattern of
+     staying separate from `/chat`.
+  3. **`FakeTTSClient` returns a real, valid, playable WAV file — a short
+     quiet sine tone — never opaque stub bytes**, generated fresh per call
+     regardless of the input text or language. This lets the Angular
+     playback plumbing (`AudioPlaybackService`, wired into
+     `ConversationRealService`) be built and genuinely exercised — a real
+     `<audio>` element actually receiving and playing a real audio file —
+     before any Python `tts` capability exists, the same role
+     `FakeASRClient`'s canned transcripts played for Milestone 3a.
+  4. **Playback is wired directly into `ConversationRealService`, not a
+     new settings toggle or a `VoiceSessionService` state.** After a chat
+     reply arrives, `ConversationRealService` calls
+     `SpeechService.synthesize` then `AudioPlaybackService.play`,
+     fire-and-forget: a failure is logged but never surfaces as the
+     conversation's `error` state, since the reply already succeeded and
+     is fully readable as text. Voice output is additive to the working
+     text/chat flow, not a required step it can break.
+- **Reason:**
+  1. Reusing the exact `llm`/`asr` shape is why Milestone 4a is small and
+     low-risk: no new architectural pattern, no new capability-wiring
+     mechanism to design, and a reviewer already familiar with
+     `internal/asr` can read `internal/tts` in minutes.
+  2. Text is naturally JSON; base64-encoding the *response* audio into
+     JSON would cost ~33% size for no benefit at this scale (same
+     reasoning ADR-017 applied to the request side for ASR), and the
+     browser's `<audio>`/Web Audio APIs consume a `Blob` directly, so a
+     raw binary HTTP response needs no decoding step on the way in.
+  3. A silent WAV would exercise the transport correctly but leave no way
+     to audibly confirm real playback happened during manual testing; an
+     opaque non-WAV stub would fail to actually play in a real
+     `<audio>` element, testing nothing about the browser-facing half of
+     this milestone. A short, quiet, unmistakably-a-placeholder tone gets
+     genuine end-to-end verification without pretending to be synthesized
+     speech.
+  4. A settings toggle or new voice state is real, unrequested scope this
+     milestone's own goal (transport + playback plumbing) doesn't need;
+     `docs/ROADMAP.md` Phase 4's Definition of Done asks for "reply text
+     -> audio playback works locally," not a way to disable it. Making
+     synthesis failure non-fatal follows the same principle already
+     established for voice input generally: the assistant remains fully
+     usable by text even when a voice-adjacent capability is degraded.
+- **Alternatives considered:**
+  - Multipart/form-data for the synthesize response — rejected: OpenAPI
+    and `HttpClient` both handle a plain binary body with a `Content-Type`
+    header more simply than multipart for exactly one file per response.
+  - A dedicated `VoiceSessionService` state (e.g. `"speaking"`) for
+    playback — rejected for this milestone: no consumer needs to
+    distinguish "the reply arrived" from "the reply is being read aloud"
+    yet; revisit if a future phase's UI actually needs to show that
+    distinction.
+  - Surfacing a synthesis failure as the conversation's `error` state —
+    rejected: would make a working text reply look like a failure to the
+    user over a voice-output problem alone, contradicting "voice is
+    additive."
+  - A second `ai-services`-style container specifically for `tts` —
+    rejected for the same reason ADR-017 rejected it for `asr`: no
+    capability gained yet over a third module in the existing process.
+- **Impact:** `backend/internal/tts`, `proto/tts.openapi.yaml`, and the
+  `/speech/synthesize` path in `docs/openapi/speech.yaml` are new,
+  following ADR-013's hand-maintained-OpenAPI convention.
+  `frontend/src/app/core/services/audio-playback.service.ts` is new,
+  mirroring `AudioCaptureService`'s "no abstract-class + DI-token, exactly
+  one implementation" shape (AGENTS.md §6).
+  `SpeechService` gained a second method (`synthesize`) rather than a
+  second service class, since both calls belong to the same `speech`
+  capability boundary. Milestone 4b (the real Python `tts` engine,
+  benchmark, and model-selection ADR) is unblocked by all of this — only
+  `VAANISETU_TTS_SERVICE_URL` needs to be set once it exists, no other
+  code change.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

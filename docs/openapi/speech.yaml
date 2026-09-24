@@ -1,15 +1,17 @@
 openapi: 3.0.3
 info:
   title: VaaniSetu Backend — Speech API
-  version: "1.0.0"
+  version: "1.1.0"
   description: >
-    Phase 3 (Speech-to-Text) transcription surface. Hand-maintained, same
-    convention as docs/openapi/chat.yaml — see that file's description for
-    why. This endpoint has no persistence side effect: it only returns
-    text. The caller feeds the transcript into POST /chat separately
-    (docs/openapi/chat.yaml), reusing that endpoint's existing
-    turn-persistence path unchanged (docs/DECISIONS.md ADR-017). CORS:
-    same policy as the chat API — see docs/openapi/chat.yaml.
+    Phase 3 (Speech-to-Text) transcription and Phase 4 (Text-to-Speech)
+    synthesis surfaces. Hand-maintained, same convention as
+    docs/openapi/chat.yaml — see that file's description for why. Neither
+    endpoint has a persistence side effect: transcribe only returns text,
+    synthesize only returns audio. The caller feeds a transcript into
+    POST /chat separately (docs/openapi/chat.yaml), reusing that
+    endpoint's existing turn-persistence path unchanged
+    (docs/DECISIONS.md ADR-017/ADR-020). CORS: same policy as the chat
+    API — see docs/openapi/chat.yaml.
 servers:
   - url: http://localhost:8080/api/v1
 
@@ -71,3 +73,58 @@ paths:
                 error:
                   code: asr_unavailable
                   message: "speech recognition is temporarily unavailable, please try again or type instead"
+
+  /speech/synthesize:
+    post:
+      summary: >
+        Synthesize a reply's speech. Audio is generated fresh per call and
+        never persisted or retained (docs/PROJECT_GOAL.md). A successful
+        response is the raw audio bytes, not a JSON envelope — there is
+        nothing else the caller needs beyond the audio itself.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, language]
+              properties:
+                text:
+                  type: string
+                language:
+                  $ref: "./chat.yaml#/components/schemas/LanguageCode"
+              example:
+                text: "आज मौसम अच्छा है।"
+                language: hi
+      responses:
+        "200":
+          description: The synthesized audio.
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: >
+            Missing/unrecognized language code, malformed JSON body, or
+            empty/whitespace-only text.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: invalid_request
+                  message: "text must not be empty"
+        "502":
+          description: >
+            The TTS capability (Phase 4 Milestone 4b's Python module) is
+            unreachable or failed.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: tts_unavailable
+                  message: "speech synthesis is temporarily unavailable, please try again"

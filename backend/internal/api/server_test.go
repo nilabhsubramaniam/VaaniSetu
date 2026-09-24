@@ -13,6 +13,7 @@ import (
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/asr"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/tts"
 )
 
 // fakeConversationService lets handler tests exercise internal/api without
@@ -51,6 +52,26 @@ func defaultFakeASR() *fakeASRClient {
 	}
 }
 
+// fakeTTSClient lets handler tests exercise internal/api without a real
+// Python TTS service, mirroring fakeASRClient's shape.
+type fakeTTSClient struct {
+	synthesizeFunc func(ctx context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error)
+}
+
+func (f *fakeTTSClient) Synthesize(ctx context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+	return f.synthesizeFunc(ctx, req)
+}
+
+// defaultFakeTTS is a harmless stand-in for tests that exercise the chat
+// or transcription endpoints and never call synthesis at all.
+func defaultFakeTTS() *fakeTTSClient {
+	return &fakeTTSClient{
+		synthesizeFunc: func(context.Context, tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			return tts.SynthesizeResponse{Audio: []byte("unused"), ContentType: "audio/wav"}, nil
+		},
+	}
+}
+
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
@@ -67,7 +88,7 @@ func TestHandleChat_Success(t *testing.T) {
 				nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(chatRequest{Text: "आज मौसम कैसा है?", Language: "hi"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
@@ -92,7 +113,7 @@ func TestHandleChat_Success(t *testing.T) {
 }
 
 func TestHandleChat_EmptyText(t *testing.T) {
-	server := NewServer(&fakeConversationService{}, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(chatRequest{Text: "   ", Language: "hi"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
@@ -103,7 +124,7 @@ func TestHandleChat_EmptyText(t *testing.T) {
 }
 
 func TestHandleChat_UnknownLanguage(t *testing.T) {
-	server := NewServer(&fakeConversationService{}, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(chatRequest{Text: "hello", Language: "fr"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
@@ -114,7 +135,7 @@ func TestHandleChat_UnknownLanguage(t *testing.T) {
 }
 
 func TestHandleChat_MalformedJSON(t *testing.T) {
-	server := NewServer(&fakeConversationService{}, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader([]byte("not json")))
 	rec := httptest.NewRecorder()
@@ -129,7 +150,7 @@ func TestHandleChat_LLMUnavailable(t *testing.T) {
 			return conversation.Turn{}, conversation.Turn{}, conversation.ErrGenerateFailed
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(chatRequest{Text: "hello", Language: "en"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
@@ -145,7 +166,7 @@ func TestHandleChat_InternalError(t *testing.T) {
 			return conversation.Turn{}, conversation.Turn{}, errUnexpected
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(chatRequest{Text: "hello", Language: "en"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
@@ -161,7 +182,7 @@ func TestHandleHistory_ReturnsTurns(t *testing.T) {
 			return []conversation.Turn{{ID: "u1", Role: "user", Text: "hi", Language: "en"}}, nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/chat/history", nil)
 	rec := httptest.NewRecorder()
@@ -185,7 +206,7 @@ func TestHandleHistory_EmptySession(t *testing.T) {
 			return []conversation.Turn{}, nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/chat/history", nil)
 	rec := httptest.NewRecorder()
@@ -223,7 +244,7 @@ func TestRoutes_CORS_AllowsConfiguredOriginOnRealResponses(t *testing.T) {
 			return []conversation.Turn{}, nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/chat/history", nil)
 	req.Header.Set("Origin", testOrigin)
@@ -244,7 +265,7 @@ func TestRoutes_CORS_NeverUsesWildcard(t *testing.T) {
 			return []conversation.Turn{}, nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/chat/history", nil)
 	rec := httptest.NewRecorder()
@@ -262,7 +283,7 @@ func TestRoutes_CORS_PreflightAnsweredWithoutReachingHandler(t *testing.T) {
 			return conversation.Turn{}, conversation.Turn{}, nil
 		},
 	}
-	server := NewServer(fake, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/chat", nil)
 	req.Header.Set("Origin", testOrigin)
@@ -292,7 +313,7 @@ func TestHandleTranscribe_Success(t *testing.T) {
 			return asr.TranscribeResponse{Transcript: "आज मौसम कैसा है?"}, nil
 		},
 	}
-	server := NewServer(&fakeConversationService{}, asrFake, testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, asrFake, defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=hi", bytes.NewReader([]byte("fake audio bytes")))
 	req.Header.Set("Content-Type", "audio/webm")
@@ -312,7 +333,7 @@ func TestHandleTranscribe_Success(t *testing.T) {
 }
 
 func TestHandleTranscribe_MissingLanguage(t *testing.T) {
-	server := NewServer(&fakeConversationService{}, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe", bytes.NewReader([]byte("audio")))
 	rec := httptest.NewRecorder()
@@ -322,7 +343,7 @@ func TestHandleTranscribe_MissingLanguage(t *testing.T) {
 }
 
 func TestHandleTranscribe_EmptyAudioBody(t *testing.T) {
-	server := NewServer(&fakeConversationService{}, defaultFakeASR(), testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=en", bytes.NewReader(nil))
 	rec := httptest.NewRecorder()
@@ -337,7 +358,7 @@ func TestHandleTranscribe_ASRUnavailable(t *testing.T) {
 			return asr.TranscribeResponse{}, errUnexpected
 		},
 	}
-	server := NewServer(&fakeConversationService{}, asrFake, testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, asrFake, defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=en", bytes.NewReader([]byte("audio")))
 	rec := httptest.NewRecorder()
@@ -352,13 +373,92 @@ func TestHandleTranscribe_EmptyTranscriptResult(t *testing.T) {
 			return asr.TranscribeResponse{Transcript: "   "}, nil
 		},
 	}
-	server := NewServer(&fakeConversationService{}, asrFake, testLogger(), testOrigin)
+	server := NewServer(&fakeConversationService{}, asrFake, defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=en", bytes.NewReader([]byte("audio")))
 	rec := httptest.NewRecorder()
 	server.Routes().ServeHTTP(rec, req)
 
 	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleSynthesize_Success(t *testing.T) {
+	wantAudio := []byte("fake wav bytes")
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(_ context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			if req.Text != "आज मौसम अच्छा है" {
+				t.Errorf("Text = %q, want the request text", req.Text)
+			}
+			if req.Language != "hi" {
+				t.Errorf("Language = %q, want hi", req.Language)
+			}
+			return tts.SynthesizeResponse{Audio: wantAudio, ContentType: "audio/wav"}, nil
+		},
+	}
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "आज मौसम अच्छा है", Language: "hi"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Type"); got != "audio/wav" {
+		t.Errorf("Content-Type = %q, want audio/wav", got)
+	}
+	if rec.Body.String() != string(wantAudio) {
+		t.Errorf("body = %q, want the TTS client's audio bytes", rec.Body.String())
+	}
+}
+
+func TestHandleSynthesize_EmptyText(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "   ", Language: "en"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleSynthesize_UnknownLanguage(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "fr"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleSynthesize_MalformedJSON(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader([]byte("not json")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleSynthesize_TTSUnavailable(t *testing.T) {
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(context.Context, tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			return tts.SynthesizeResponse{}, errUnexpected
+		},
+	}
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "en"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadGateway, "tts_unavailable")
 }
 
 var errUnexpected = &testError{"boom"}

@@ -16,7 +16,7 @@ Milestone-based plan for VaaniSetu.
 | 1 | UI Foundation | DONE |
 | 2 | Local LLM | DONE |
 | 3 | Speech-to-Text | DONE |
-| 4 | Text-to-Speech | NOT STARTED |
+| 4 | Text-to-Speech | IN PROGRESS |
 | 5 | End-to-End Voice MVP | NOT STARTED |
 | 6 | Indian Language Support | NOT STARTED |
 | 7 | RAG | NOT STARTED |
@@ -155,7 +155,11 @@ integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
 
 ## Phase 4 - Text-to-Speech
 
-**Status:** NOT STARTED
+**Status:** IN PROGRESS — Milestone 4a (Go `tts` capability boundary
+against `FakeTTSClient`, real browser audio playback wired into the
+conversation flow) is complete. Milestone 4b (Python `tts` capability,
+model benchmark + selection ADR, real end-to-end wiring) has not started.
+See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-020.
 
 - **Objective:** Speak the assistant's reply aloud with a local TTS model.
 - **Scope:** Python TTS service behind a `tts` capability interface; audio

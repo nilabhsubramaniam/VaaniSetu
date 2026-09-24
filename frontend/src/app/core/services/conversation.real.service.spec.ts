@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { ConversationRealService } from './conversation.real.service';
 import { VoiceSessionService } from './voice-session.service';
+import { SpeechService } from './speech.service';
+import { AudioPlaybackService } from './audio-playback.service';
 import { environment } from '../../../environments/environment';
 import type { VoiceState } from '../models/voice-state.model';
 
@@ -11,6 +13,8 @@ describe('ConversationRealService', () => {
   const voiceState = signal<VoiceState>('idle');
   let httpMock: HttpTestingController;
   let service: ConversationRealService;
+  let speechFake: { transcribe: ReturnType<typeof vi.fn>; synthesize: ReturnType<typeof vi.fn> };
+  let audioPlaybackFake: { play: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
 
   const historyUrl = `${environment.apiBaseUrl}/v1/chat/history`;
   const chatUrl = `${environment.apiBaseUrl}/v1/chat`;
@@ -18,6 +22,11 @@ describe('ConversationRealService', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     voiceState.set('idle');
+    speechFake = {
+      transcribe: vi.fn(),
+      synthesize: vi.fn().mockResolvedValue(new Blob(['fake audio'])),
+    };
+    audioPlaybackFake = { play: vi.fn().mockResolvedValue(undefined), stop: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -27,6 +36,8 @@ describe('ConversationRealService', () => {
           provide: VoiceSessionService,
           useValue: { state: voiceState, setState: (s: VoiceState) => voiceState.set(s) },
         },
+        { provide: SpeechService, useValue: speechFake },
+        { provide: AudioPlaybackService, useValue: audioPlaybackFake },
       ],
     });
 
@@ -175,6 +186,63 @@ describe('ConversationRealService', () => {
 
     vi.advanceTimersByTime(700);
     expect(voiceState()).toBe('idle');
+  });
+
+  it('synthesizes and plays the assistant reply on success', async () => {
+    service.sendUserTurn('Hello', 'en');
+    httpMock.expectOne(chatUrl).flush({
+      userTurn: {
+        id: 'u1',
+        role: 'user',
+        text: 'Hello',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      assistantTurn: {
+        id: 'a1',
+        role: 'assistant',
+        text: 'Hi there',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(speechFake.synthesize).toHaveBeenCalledWith('Hi there', 'en');
+    expect(audioPlaybackFake.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('a synthesis failure is logged but does not affect the conversation state', async () => {
+    speechFake.synthesize.mockRejectedValueOnce(new Error('tts_unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    service.sendUserTurn('Hello', 'en');
+    httpMock.expectOne(chatUrl).flush({
+      userTurn: {
+        id: 'u1',
+        role: 'user',
+        text: 'Hello',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      assistantTurn: {
+        id: 'a1',
+        role: 'assistant',
+        text: 'Hi there',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(voiceState()).toBe('responding');
+    expect(service.turns()).toHaveLength(2);
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it('sets the error state on an HTTP failure and does not add a reply', () => {

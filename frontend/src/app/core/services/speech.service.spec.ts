@@ -54,4 +54,29 @@ describe('SpeechService', () => {
 
     await expect(resultPromise).rejects.toBeTruthy();
   });
+
+  it('posts text and language as JSON to the synthesize endpoint and resolves with the audio blob', async () => {
+    const resultPromise = service.synthesize('आज मौसम अच्छा है', 'hi');
+
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/v1/speech/synthesize`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ text: 'आज मौसम अच्छा है', language: 'hi' });
+    expect(req.request.responseType).toBe('blob');
+
+    const audioBlob = new Blob(['fake wav bytes'], { type: 'audio/wav' });
+    req.flush(audioBlob);
+
+    await expect(resultPromise).resolves.toBe(audioBlob);
+  });
+
+  it('synthesize() rejects when the backend returns an error', async () => {
+    const resultPromise = service.synthesize('hello', 'en');
+
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/v1/speech/synthesize`);
+    // A blob-responseType request needs a Blob body on error too — a plain
+    // string trips Angular's test-harness auto-conversion to Blob.
+    req.flush(new Blob(['boom']), { status: 502, statusText: 'Bad Gateway' });
+
+    await expect(resultPromise).rejects.toBeTruthy();
+  });
 });
