@@ -1,5 +1,6 @@
 """Loads the model registry (docs/ARCHITECTURE.md §3.6) and builds the
-engine it currently selects for a given capability ("llm" or "asr").
+engine it currently selects for a given capability ("llm", "asr", or
+"tts").
 
 Application code (app.main) references a capability by name only; which
 concrete model backs it is entirely a `models.yaml` edit — never a code
@@ -47,20 +48,32 @@ class RegistryError(Exception):
     pass
 
 
-def load_selected_entry(registry_path: str, capability: str) -> ModelEntry:
+def load_selected_entry(
+    registry_path: str, capability: str, voice: str | None = None
+) -> ModelEntry:
     """Reads `registry_path` and returns the entry `capability`
     (e.g. "llm" or "asr") currently selects.
+
+    `tts` is the one capability with more than one simultaneously-selected
+    model — `selected` is a `{voice: key}` map instead of a single string
+    (ADR-023), so a per-request voice choice can load a different, already
+    real checkpoint rather than the capability being limited to one fixed
+    voice. `voice` picks which map entry to use and is required (and only
+    meaningful) for `capability == "tts"`; `llm`/`asr` keep their original
+    single-string `selected` shape unchanged.
     """
     with open(registry_path, encoding="utf-8") as f:
         doc = yaml.safe_load(f)
 
     try:
         section = doc[capability]
-        selected_key = section["selected"]
+        selected = section["selected"]
+        selected_key = selected[voice] if capability == "tts" else selected
         candidate = section["candidates"][selected_key]
     except (KeyError, TypeError) as e:
         raise RegistryError(
-            f"registry: malformed {registry_path} for capability {capability!r}: {e}"
+            f"registry: malformed {registry_path} for capability {capability!r} "
+            f"(voice={voice!r}): {e}"
         ) from e
 
     return ModelEntry(

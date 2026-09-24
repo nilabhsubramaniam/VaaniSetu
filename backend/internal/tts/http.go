@@ -18,6 +18,7 @@ import (
 type synthesizeWireRequest struct {
 	Text     string `json:"text"`
 	Language string `json:"language"`
+	Voice    string `json:"voice,omitempty"`
 }
 
 // HTTPTTSClient implements [TTSClient] by calling the real Python `tts`

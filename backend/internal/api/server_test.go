@@ -413,6 +413,59 @@ func TestHandleSynthesize_Success(t *testing.T) {
 	}
 }
 
+func TestHandleSynthesize_DefaultsVoiceToFemale(t *testing.T) {
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(_ context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			if req.Voice != "female" {
+				t.Errorf("Voice = %q, want female (the default)", req.Voice)
+			}
+			return tts.SynthesizeResponse{Audio: []byte("x"), ContentType: "audio/wav"}, nil
+		},
+	}
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "en"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleSynthesize_PassesThroughAnExplicitVoice(t *testing.T) {
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(_ context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			if req.Voice != "male" {
+				t.Errorf("Voice = %q, want male", req.Voice)
+			}
+			return tts.SynthesizeResponse{Audio: []byte("x"), ContentType: "audio/wav"}, nil
+		},
+	}
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "en", Voice: "male"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleSynthesize_UnknownVoice(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "en", Voice: "robot"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
 func TestHandleSynthesize_EmptyText(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 

@@ -213,14 +213,25 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	voice := req.Voice
+	if voice == "" {
+		voice = "female"
+	}
+	if !isValidVoice(voice) {
+		writeError(w, http.StatusBadRequest, "invalid_request", "unknown voice")
+		return
+	}
+
 	result, err := s.ttsClient.Synthesize(r.Context(), tts.SynthesizeRequest{
 		Text:     text,
 		Language: req.Language,
+		Voice:    voice,
 	})
 	if err != nil {
 		s.logger.Warn("tts synthesize failed",
 			"text", logging.RedactedText(text),
 			"language", req.Language,
+			"voice", voice,
 			"error", err,
 		)
 		writeError(w, http.StatusBadGateway, "tts_unavailable",

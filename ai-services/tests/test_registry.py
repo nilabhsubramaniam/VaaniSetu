@@ -32,7 +32,9 @@ _REGISTRY_YAML = textwrap.dedent(
           device: cpu
           license: MIT
     tts:
-      selected: parler-a
+      selected:
+        female: parler-a
+        male: parler-b
       candidates:
         parler-a:
           engine: parler_tts
@@ -41,6 +43,10 @@ _REGISTRY_YAML = textwrap.dedent(
           voices:
             hi: "A clear female voice speaks at a moderate pace."
             hinglish: "A clear female voice speaks at a moderate pace."
+        parler-b:
+          engine: parler_tts
+          repo_id: someorg/parler-b
+          license: Apache-2.0
     """
 )
 
@@ -78,11 +84,13 @@ def test_load_selected_entry_reads_the_selected_asr_candidate(tmp_path) -> None:
     )
 
 
-def test_load_selected_entry_reads_the_selected_tts_candidate(tmp_path) -> None:
+def test_load_selected_entry_reads_the_selected_tts_candidate_for_the_female_voice(
+    tmp_path,
+) -> None:
     registry_path = tmp_path / "models.yaml"
     registry_path.write_text(_REGISTRY_YAML)
 
-    entry = load_selected_entry(str(registry_path), "tts")
+    entry = load_selected_entry(str(registry_path), "tts", voice="female")
 
     assert entry == ModelEntry(
         key="parler-a",
@@ -94,6 +102,26 @@ def test_load_selected_entry_reads_the_selected_tts_candidate(tmp_path) -> None:
             "hinglish": "A clear female voice speaks at a moderate pace.",
         },
     )
+
+
+def test_load_selected_entry_reads_the_selected_tts_candidate_for_the_male_voice(
+    tmp_path,
+) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    entry = load_selected_entry(str(registry_path), "tts", voice="male")
+
+    assert entry.key == "parler-b"
+    assert entry.repo_id == "someorg/parler-b"
+
+
+def test_load_selected_entry_rejects_an_unknown_tts_voice(tmp_path) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    with pytest.raises(RegistryError):
+        load_selected_entry(str(registry_path), "tts", voice="robot")
 
 
 def test_load_selected_entry_applies_defaults_for_optional_fields(tmp_path) -> None:

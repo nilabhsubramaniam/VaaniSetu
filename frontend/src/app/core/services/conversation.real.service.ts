@@ -6,6 +6,7 @@ import type { LanguageCode } from '../models/language.model';
 import type { Turn, TurnRole } from '../models/turn.model';
 import { AudioPlaybackService } from './audio-playback.service';
 import { ConversationService } from './conversation.service';
+import { SettingsStore } from './settings.store';
 import { SpeechService } from './speech.service';
 import { VoiceSessionService } from './voice-session.service';
 
@@ -52,6 +53,7 @@ export class ConversationRealService implements ConversationService {
   private readonly voiceSession = inject(VoiceSessionService);
   private readonly speech = inject(SpeechService);
   private readonly audioPlayback = inject(AudioPlaybackService);
+  private readonly settings = inject(SettingsStore);
 
   private readonly _turns = signal<readonly Turn[]>([]);
   readonly turns = this._turns.asReadonly();
@@ -138,7 +140,7 @@ export class ConversationRealService implements ConversationService {
    * (docs/DECISIONS.md ADR-020). */
   private speakReply(text: string, language: LanguageCode): void {
     this.speech
-      .synthesize(text, language)
+      .synthesize(text, language, this.settings.preferredVoice())
       .then((audio) => this.audioPlayback.play(audio))
       .catch((err: unknown) => console.error('speech synthesis/playback failed', err));
   }

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { LanguageCode } from '../models/language.model';
+import type { VoiceCode } from '../models/voice.model';
 
 interface TranscribeResponseWire {
   readonly transcript: string;
@@ -40,13 +41,15 @@ export class SpeechService {
     return response.transcript;
   }
 
-  /** Requests spoken audio for `text` and resolves with the synthesized
-   * clip. Throws (via the returned promise) on any network or server
-   * failure — callers treat a synthesis failure as non-fatal to the
-   * surrounding text/chat flow (docs/DECISIONS.md ADR-020), unlike a
-   * transcription failure. */
-  async synthesize(text: string, language: LanguageCode): Promise<Blob> {
+  /** Requests spoken audio for `text` in `voice` and resolves with the
+   * synthesized clip. `voice` is optional; omitted defaults to "female"
+   * (docs/DECISIONS.md ADR-023), matching the backend's own default so
+   * callers that don't care about voice can omit it. Throws (via the
+   * returned promise) on any network or server failure — callers treat a
+   * synthesis failure as non-fatal to the surrounding text/chat flow
+   * (docs/DECISIONS.md ADR-020), unlike a transcription failure. */
+  async synthesize(text: string, language: LanguageCode, voice?: VoiceCode): Promise<Blob> {
     const url = `${environment.apiBaseUrl}/v1/speech/synthesize`;
-    return firstValueFrom(this.http.post(url, { text, language }, { responseType: 'blob' }));
+    return firstValueFrom(this.http.post(url, { text, language, voice }, { responseType: 'blob' }));
   }
 }

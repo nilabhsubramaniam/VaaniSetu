@@ -12,19 +12,19 @@ project moves between milestones or a phase's status changes.
 - **Current focus:** none active — awaiting the user's decision to start
   Phase 5 (End-to-End Voice MVP); see `AGENTS.md` §5, "never advance to the
   next milestone automatically".
-- **Last updated:** 2026-09-24 (ADR-022: `tts.selected` moved from
-  `mms-tts-hin` to `mms-tts-hin-ft-female` — the base checkpoint is a
-  single, fixed male voice (`num_speakers: 1`, no way to configure it),
-  which the user caught by actually listening to it. Swapped to a
-  same-architecture, same-license, community female-voice fine-tune
-  instead of paying ADR-021's already-decided XTTS-v2 quality tradeoff;
-  verified comparable intelligibility/speed and a measurably higher,
-  more female-typical pitch before selecting it. Milestone 4b itself
-  (Python `tts` capability built and wired for real, RTF/proxy-WER
-  benchmark, real end-to-end verified) landed earlier the same day — see
-  `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022 and `docs/ROADMAP.md`
-  Phase 4 for the full history, including the still-open Hinglish gap and
-  the still-gated `ai4bharat/indic-parler-tts` candidate)
+- **Last updated:** 2026-09-24 (ADR-023: the assistant's spoken reply now
+  has a real, user-facing Female/Male voice choice — `ai-services` loads
+  *both* ADR-022 checkpoints simultaneously at startup, `/v1/synthesize`
+  gains a `voice` field to pick between them, and a new Settings section
+  (`SettingsStore.preferredVoice`, `localStorage`-backed, same mechanism
+  as the language preference) lets the user set it. Earlier the same day:
+  ADR-022 moved `tts.selected` from `mms-tts-hin` to
+  `mms-tts-hin-ft-female` after the user caught the base checkpoint's
+  single, fixed male voice by actually listening to it, and Milestone 4b
+  landed the Python `tts` capability itself. See `docs/DECISIONS.md`
+  ADR-020/ADR-021/ADR-022/ADR-023 and `docs/ROADMAP.md` Phase 4 for the
+  full history, including the still-open Hinglish gap and the still-gated
+  `ai4bharat/indic-parler-tts` candidate)
 
 ## Completed
 
@@ -352,11 +352,12 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean (117 tests). Its
+- `frontend/` builds, lints, and tests clean (124 tests). Its
   `ConversationService` runs against the real backend
   (`ConversationRealService`); `MicButton` now really records audio via
   `AudioCaptureService`/`SpeechService`; a chat reply now really plays
-  back synthesized speech via `AudioPlaybackService`; only
+  back synthesized speech via `AudioPlaybackService`, in the user's
+  chosen voice (`SettingsStore.preferredVoice`, ADR-023); only
   `VoiceSessionService` still uses a mock (see above).
 - `backend/` builds, vets, lints (`golangci-lint`), and tests clean, and has
   now been run for real against a live, native PostgreSQL and a live,
@@ -369,7 +370,7 @@ project moves between milestones or a phase's status changes.
 - `ai-services/` builds its dependencies (`uv sync` — `llama-cpp-python`
   compiles from source; `faster-whisper`/`ctranslate2`, `torch`,
   `transformers`, and `coqui-tts` use prebuilt wheels; `parler-tts`
-  installs from GitHub, no PyPI release), tests (53), lints, and formats
+  installs from GitHub, no PyPI release), tests (59), lints, and formats
   clean. Its `.venv` targets Python 3.12 specifically, not this machine's
   default 3.14 — `tokenizers` has no cp314 wheel yet and its sdist fails
   to build (see `ai-services/SETUP.md` Troubleshooting). Its own tests
@@ -385,9 +386,11 @@ project moves between milestones or a phase's status changes.
   respect.
 - Three capabilities' models are selected: `llm`
   (`llama-3.2-3b-instruct`, ADR-016), `asr`
-  (`faster-whisper-large-v3-turbo`, ADR-018), and `tts`
-  (`mms-tts-hin-ft-female`, ADR-021/ADR-022 — with the Hinglish gap noted
-  above). Every other capability's model choice is still `TBD` (see
+  (`faster-whisper-large-v3-turbo`, ADR-018), and `tts` — uniquely, *two*
+  simultaneously-loaded models, one per voice
+  (`female: mms-tts-hin-ft-female`, `male: mms-tts-hin`,
+  ADR-021/ADR-022/ADR-023 — with the Hinglish gap noted above). Every
+  other capability's model choice is still `TBD` (see
   ADR-008).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
   Postgres data, `/models/` (downloaded weights), and

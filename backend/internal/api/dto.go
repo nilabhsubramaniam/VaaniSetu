@@ -22,6 +22,21 @@ func isValidLanguage(code string) bool {
 	return validLanguages[code]
 }
 
+// validVoices mirrors the two voices ai-services' models.yaml `tts`
+// section maps (ADR-023) — both are real, simultaneously-loaded models on
+// the Python side, not hints.
+var validVoices = map[string]bool{
+	"female": true, "male": true,
+}
+
+// isValidVoice reports whether voice is one of the known tts.SynthesizeRequest
+// voice values, or empty (handleSynthesize defaults an empty voice to
+// "female" before this check, so an empty string here would only reach
+// this function if that default logic changes).
+func isValidVoice(voice string) bool {
+	return validVoices[voice]
+}
+
 // turnDTO is the wire representation of a turn, matching
 // frontend/src/app/core/models/turn.model.ts's Turn interface field for
 // field. LatencyMs and Script are omitted from the JSON entirely (not
@@ -81,6 +96,9 @@ type transcribeResponse struct {
 type synthesizeRequest struct {
 	Text     string `json:"text"`
 	Language string `json:"language"`
+	// Voice is optional; empty defaults to "female" (handleSynthesize),
+	// matching proto/tts.openapi.yaml and the Python service's own default.
+	Voice string `json:"voice,omitempty"`
 }
 
 // errorResponse is the body returned for every non-2xx response, per

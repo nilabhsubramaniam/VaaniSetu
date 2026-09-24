@@ -16,7 +16,7 @@ from app.engines.asr.base import TranscribeRequest as ASRTranscribeRequest
 from app.engines.asr.base import TranscribeResponse as ASRTranscribeResponse
 from app.engines.base import GenerateRequest, GenerateResponse, LLMEngine
 from app.engines.tts.base import SynthesizeRequest, SynthesizeResponse, TTSEngine
-from app.main import app, get_asr_engine, get_llm_engine, get_tts_engine
+from app.main import app, get_asr_engine, get_llm_engine
 
 
 class FakeLLM(LLMEngine):
@@ -68,13 +68,20 @@ def _client_with_asr(engine: ASREngine) -> TestClient:
     return TestClient(app)
 
 
-def _client_with_tts(engine: TTSEngine) -> TestClient:
-    app.dependency_overrides[get_tts_engine] = lambda: engine
+def _client_with_tts(engines: dict[str, TTSEngine]) -> TestClient:
+    # get_tts_engine looks up app.state.state.tts_engines directly (not a
+    # FastAPI Depends) since the voice key is only known once the request
+    # body is parsed — dependency_overrides can't intercept it, so tests
+    # set app state directly instead, same as test_healthz's approach.
+    app.state.state.tts_engines = engines
+    app.state.state.tts_model_keys = dict.fromkeys(engines, "fake-checkpoint")
     return TestClient(app)
 
 
 def teardown_function() -> None:
     app.dependency_overrides.clear()
+    app.state.state.tts_engines = None
+    app.state.state.tts_model_keys = None
 
 
 def test_generate_returns_the_engines_reply() -> None:
@@ -180,21 +187,51 @@ def test_transcribe_can_return_an_empty_transcript_without_erroring() -> None:
     assert resp.json() == {"transcript": ""}
 
 
-def test_synthesize_returns_the_engines_audio_as_wav() -> None:
-    fake = FakeTTS(audio=b"RIFF....WAVEfmt ")
-    client = _client_with_tts(fake)
+def test_synthesize_defaults_to_the_female_voice() -> None:
+    female = FakeTTS(audio=b"RIFF....female...")
+    male = FakeTTS(audio=b"RIFF....male.....")
+    client = _client_with_tts({"female": female, "male": male})
 
     resp = client.post("/v1/synthesize", json={"text": "नमस्ते", "language": "hi"})
 
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "audio/wav"
-    assert resp.content == b"RIFF....WAVEfmt "
-    assert fake.last_request == SynthesizeRequest(text="नमस्ते", language="hi")
+    assert resp.content == b"RIFF....female..."
+    assert female.last_request == SynthesizeRequest(text="नमस्ते", language="hi")
+    assert male.last_request is None
+
+
+def test_synthesize_dispatches_to_the_requested_voice() -> None:
+    female = FakeTTS(audio=b"RIFF....female...")
+    male = FakeTTS(audio=b"RIFF....male.....")
+    client = _client_with_tts({"female": female, "male": male})
+
+    resp = client.post("/v1/synthesize", json={"text": "नमस्ते", "language": "hi", "voice": "male"})
+
+    assert resp.status_code == 200
+    assert resp.content == b"RIFF....male....."
+    assert male.last_request == SynthesizeRequest(text="नमस्ते", language="hi")
+    assert female.last_request is None
+
+
+def test_synthesize_rejects_an_unknown_voice() -> None:
+    client = _client_with_tts({"female": FakeTTS()})
+
+    resp = client.post("/v1/synthesize", json={"text": "hello", "language": "en", "voice": "robot"})
+
+    assert resp.status_code == 400
+
+
+def test_synthesize_returns_503_when_no_tts_voices_loaded() -> None:
+    client = _client_with_tts({})
+
+    resp = client.post("/v1/synthesize", json={"text": "hello", "language": "en"})
+
+    assert resp.status_code == 503
 
 
 def test_synthesize_rejects_a_malformed_body() -> None:
-    fake = FakeTTS()
-    client = _client_with_tts(fake)
+    client = _client_with_tts({"female": FakeTTS()})
 
     resp = client.post("/v1/synthesize", json={"text": "hello"})  # missing "language"
 
@@ -203,7 +240,7 @@ def test_synthesize_rejects_a_malformed_body() -> None:
 
 def test_synthesize_maps_engine_failure_to_5xx() -> None:
     fake = FakeTTS(fail=True)
-    client = _client_with_tts(fake)
+    client = _client_with_tts({"female": fake})
 
     resp = client.post("/v1/synthesize", json={"text": "hello", "language": "en"})
 
@@ -226,5 +263,15 @@ def test_healthz_reports_not_ready_when_no_engines_loaded() -> None:
         "ready": False,
         "llm_model": None,
         "asr_model": None,
-        "tts_model": None,
+        "tts_models": {},
     }
+
+
+def test_healthz_reports_tts_models_per_voice_when_both_are_loaded() -> None:
+    client = _client_with_tts({"female": FakeTTS(), "male": FakeTTS()})
+
+    resp = client.get("/healthz")
+
+    assert resp.json()["tts_models"] == {"female": "fake-checkpoint", "male": "fake-checkpoint"}
+    # llm/asr are still unloaded in this test, so overall readiness is still False.
+    assert resp.json()["ready"] is False

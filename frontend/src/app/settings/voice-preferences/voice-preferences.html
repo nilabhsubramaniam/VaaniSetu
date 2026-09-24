@@ -1,0 +1,21 @@
+<fieldset class="card">
+  <legend>Voice</legend>
+  <p class="hint">Which voice reads the assistant's spoken replies aloud.</p>
+
+  <ul class="list" role="radiogroup" aria-label="Preferred voice">
+    @for (option of options; track option.code) {
+      <li>
+        <button
+          type="button"
+          class="option"
+          role="radio"
+          [attr.aria-checked]="preferredVoice() === option.code"
+          [attr.data-selected]="preferredVoice() === option.code"
+          (click)="select(option.code)"
+        >
+          {{ option.label }}
+        </button>
+      </li>
+    }
+  </ul>
+</fieldset>

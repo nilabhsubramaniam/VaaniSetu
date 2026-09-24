@@ -16,7 +16,7 @@ Milestone-based plan for VaaniSetu.
 | 1 | UI Foundation | DONE |
 | 2 | Local LLM | DONE |
 | 3 | Speech-to-Text | DONE |
-| 4 | Text-to-Speech | IN PROGRESS |
+| 4 | Text-to-Speech | DONE |
 | 5 | End-to-End Voice MVP | NOT STARTED |
 | 6 | Indian Language Support | NOT STARTED |
 | 7 | RAG | NOT STARTED |
@@ -170,7 +170,7 @@ a real, unmet part of this phase's "Hindi / Hinglish" expected result —
 flagged for Phase 6 (Indian Language Support) and as the first thing to
 revisit if the one Apache-2.0 candidate (`ai4bharat/indic-parler-tts`,
 gated on Hugging Face, access not yet granted) can be benchmarked. See
-`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022.
+`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022/ADR-023.
 
 - **Objective:** Speak the assistant's reply aloud with a local TTS model.
 - **Scope:** Python TTS service behind a `tts` capability interface; audio

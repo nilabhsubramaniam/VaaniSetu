@@ -69,6 +69,16 @@ describe('SpeechService', () => {
     await expect(resultPromise).resolves.toBe(audioBlob);
   });
 
+  it('includes voice in the request body when provided', async () => {
+    const resultPromise = service.synthesize('hello', 'en', 'male');
+
+    const req = httpMock.expectOne(`${environment.apiBaseUrl}/v1/speech/synthesize`);
+    expect(req.request.body).toEqual({ text: 'hello', language: 'en', voice: 'male' });
+
+    req.flush(new Blob(['audio'], { type: 'audio/wav' }));
+    await resultPromise;
+  });
+
   it('synthesize() rejects when the backend returns an error', async () => {
     const resultPromise = service.synthesize('hello', 'en');
 

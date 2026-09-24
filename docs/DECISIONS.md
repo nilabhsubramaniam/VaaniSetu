@@ -1002,6 +1002,80 @@ Status**.
   constraint both still stand.
 - **Status:** Accepted.
 
+## ADR-023 - Real, simultaneous male/female TTS voice selection
+
+- **Decision:** Following ADR-022, both `mms-tts-hin-ft-female` (female)
+  and `mms-tts-hin` (male) are now loaded **simultaneously** in
+  `ai-services`, and a per-request `voice` field picks between them, end
+  to end:
+  1. `ai-services/models.yaml`'s `tts.selected` becomes a **map**
+     (`{female: mms-tts-hin-ft-female, male: mms-tts-hin}`) instead of a
+     single string — the one capability where more than one model is
+     simultaneously selected. `llm`/`asr` keep their original
+     single-string `selected` shape; `app/registry.load_selected_entry`
+     takes an optional `voice` param used only when `capability == "tts"`.
+  2. `app/main.py`'s `lifespan` loads one engine per `_TTS_VOICES =
+     ("female", "male")` entry at startup (fails loudly if either is
+     missing, same as every other capability). `POST /v1/synthesize`
+     gains an optional `voice` field (default `"female"`); the handler
+     looks it up in the loaded-engines dict directly (not a FastAPI
+     `Depends`, since the voice key is only known once the body is
+     parsed) and returns 400 for an unrecognized voice.
+  3. `proto/tts.openapi.yaml` / `docs/openapi/speech.yaml` gain the same
+     optional `voice` (`"female" | "male"`, default `"female"`) field.
+     `backend/internal/tts.SynthesizeRequest` gains `Voice string`;
+     `internal/api`'s `handleSynthesize` defaults an empty voice to
+     `"female"` and 400s an unrecognized one, mirroring its existing
+     `isValidLanguage` check.
+  4. Frontend: `SettingsStore` gains a `preferredVoice` signal
+     (`VoiceCode`, `localStorage`-backed), an exact copy of
+     `preferredLanguage`'s existing mechanism. A new `voice-preferences`
+     settings component (a structural copy of `language-preferences`)
+     lets the user pick Female/Male. `ConversationRealService` reads
+     `settings.preferredVoice()` when calling
+     `SpeechService.synthesize(text, language, voice)`.
+- **Reason:** The user asked for a real choice, not a second hardcoded
+  pick. Both voices were already fully verified working checkpoints
+  (ADR-021/ADR-022) on the same architecture, so the only real design
+  question was how `ai-services` — which had only ever loaded **one**
+  model per capability — could serve two simultaneously. Loading both at
+  startup (rather than lazily swapping one in per request) was chosen
+  because: it keeps `/v1/synthesize` request latency uniform regardless of
+  which voice is asked for; it fails loudly at startup if either voice's
+  weights are missing, consistent with every other capability's existing
+  behavior; and the memory cost is small (~2.4GB peak RSS per this
+  architecture, per ADR-021's benchmark) and paid once, not per request.
+  A plain dict lookup (not `Depends`) for engine selection was chosen
+  because FastAPI's dependency-injection only resolves before/alongside
+  parameter binding — the voice key genuinely isn't known until the
+  request body itself is parsed, so forcing it through `Depends` would
+  need an awkward two-pass request read for no benefit.
+- **Alternatives considered:**
+  - Lazily load whichever voice a request asks for, evicting the other —
+    rejected: adds real per-request latency variance (a cold load) for no
+    memory savings large enough to justify it at this model size, and
+    reintroduces exactly the kind of statefulness `docs/ARCHITECTURE.md`
+    §5 tries to keep out of the request path.
+  - A generic N-voice registry shape usable by any future capability, not
+    just `tts` — rejected as speculative: no second capability needs
+    multiple simultaneous selections today (AGENTS.md §6, "no speculative
+    abstraction"); revisit if one does.
+  - Making `voice` a `LanguageCode`-style per-language default instead of
+    an explicit user setting — rejected: gender and language are
+    orthogonal to the user, and `voices` (ADR-021) already covers
+    per-language configuration for engines that need it (parler_tts,
+    xtts); conflating the two would overload one field with two concerns.
+- **Impact:** `ai-services/models.yaml`, `app/registry.py`, `app/main.py`;
+  `proto/tts.openapi.yaml`, `docs/openapi/speech.yaml`;
+  `backend/internal/tts`, `backend/internal/api/dto.go` and `server.go`;
+  `frontend/src/app/core/models/voice.model.ts` (new),
+  `SettingsStore`, `SpeechService`, `ConversationRealService`, and a new
+  `settings/voice-preferences/` component. No change to which models are
+  selected (still ADR-022's two checkpoints) or their license status
+  (still both CC-BY-NC-4.0, non-commercial) — this ADR is about serving
+  both simultaneously, not about model selection itself.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

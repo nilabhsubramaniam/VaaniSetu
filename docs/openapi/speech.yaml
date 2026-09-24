@@ -93,9 +93,18 @@ paths:
                   type: string
                 language:
                   $ref: "./chat.yaml#/components/schemas/LanguageCode"
+                voice:
+                  type: string
+                  enum: [female, male]
+                  default: female
+                  description: >
+                    Which of the two simultaneously-loaded voices to speak
+                    with (docs/DECISIONS.md ADR-023). Optional; omitted or
+                    empty defaults to "female".
               example:
                 text: "आज मौसम अच्छा है।"
                 language: hi
+                voice: female
       responses:
         "200":
           description: The synthesized audio.
@@ -106,8 +115,8 @@ paths:
                 format: binary
         "400":
           description: >
-            Missing/unrecognized language code, malformed JSON body, or
-            empty/whitespace-only text.
+            Missing/unrecognized language code, unknown voice, malformed
+            JSON body, or empty/whitespace-only text.
           content:
             application/json:
               schema:

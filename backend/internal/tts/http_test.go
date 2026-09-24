@@ -49,6 +49,29 @@ func TestHTTPTTSClient_Synthesize_Success(t *testing.T) {
 	}
 }
 
+func TestHTTPTTSClient_Synthesize_PassesThroughVoice(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req synthesizeWireRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if req.Voice != "male" {
+			t.Errorf("Voice = %q, want male", req.Voice)
+		}
+		w.Header().Set("Content-Type", "audio/wav")
+		_, _ = w.Write([]byte("audio"))
+	}))
+	defer server.Close()
+
+	client := NewHTTPTTSClient(server.URL)
+	_, err := client.Synthesize(context.Background(), SynthesizeRequest{
+		Text: "hi", Language: "en", Voice: "male",
+	})
+	if err != nil {
+		t.Fatalf("Synthesize() error = %v", err)
+	}
+}
+
 func TestHTTPTTSClient_Synthesize_NonOKStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

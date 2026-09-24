@@ -26,6 +26,11 @@ type SynthesizeRequest struct {
 	// same values used throughout
 	// (frontend/src/app/core/models/language.model.ts).
 	Language string
+	// Voice is one of "female" or "male" (ADR-023) — both are real,
+	// simultaneously-loaded voices on the Python side, not a hint. Empty
+	// defaults to "female", matching proto/tts.openapi.yaml and the
+	// Python service's own default.
+	Voice string
 }
 
 // SynthesizeResponse is the TTS capability's answer to a
