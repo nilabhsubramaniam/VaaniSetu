@@ -65,6 +65,7 @@ class _FakeVitsModel:
 def _engine_with_fakes(model: _FakeVitsModel, tokenizer: _FakeTokenizer) -> MmsVitsEngine:
     engine = MmsVitsEngine.__new__(MmsVitsEngine)
     engine._torch = SimpleNamespace(no_grad=contextlib.nullcontext)  # noqa: SLF001
+    engine._name = "fake-checkpoint"  # noqa: SLF001
     engine._model = model  # noqa: SLF001
     engine._tokenizer = tokenizer  # noqa: SLF001
     return engine
@@ -87,7 +88,7 @@ def test_synthesize_raises_a_clear_error_for_text_the_vocabulary_cannot_represen
     model = _FakeVitsModel(np.array([0.0]))
     engine = _engine_with_fakes(model, _FakeTokenizer(input_id_count=0))
 
-    with pytest.raises(UnsupportedTextError):
+    with pytest.raises(UnsupportedTextError, match="fake-checkpoint"):
         engine.synthesize(SynthesizeRequest(text="kaisa hai", language="hinglish"))
 
     assert model.calls == []  # never reaches the model

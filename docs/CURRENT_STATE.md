@@ -12,16 +12,19 @@ project moves between milestones or a phase's status changes.
 - **Current focus:** none active — awaiting the user's decision to start
   Phase 5 (End-to-End Voice MVP); see `AGENTS.md` §5, "never advance to the
   next milestone automatically".
-- **Last updated:** 2026-09-24 (Milestone 4b: Python `tts` capability
-  built and wired for real — `facebook/mms-tts-hin` selected after a
-  real RTF/proxy-WER benchmark against `coqui/XTTS-v2`; a third,
-  Apache-2.0-licensed candidate, `ai4bharat/indic-parler-tts`, is fully
-  implemented but could not be benchmarked because Hugging Face denied
-  gated-repo access. An assistant reply in Hindi now plays back real,
-  audible, freshly synthesized speech end to end through the real Go and
-  Python services — verified live, not just unit-tested. Known gap:
-  the selected model cannot produce Hinglish speech at all, only Hindi;
-  see `docs/DECISIONS.md` ADR-021 and `docs/ROADMAP.md` Phase 4)
+- **Last updated:** 2026-09-24 (ADR-022: `tts.selected` moved from
+  `mms-tts-hin` to `mms-tts-hin-ft-female` — the base checkpoint is a
+  single, fixed male voice (`num_speakers: 1`, no way to configure it),
+  which the user caught by actually listening to it. Swapped to a
+  same-architecture, same-license, community female-voice fine-tune
+  instead of paying ADR-021's already-decided XTTS-v2 quality tradeoff;
+  verified comparable intelligibility/speed and a measurably higher,
+  more female-typical pitch before selecting it. Milestone 4b itself
+  (Python `tts` capability built and wired for real, RTF/proxy-WER
+  benchmark, real end-to-end verified) landed earlier the same day — see
+  `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022 and `docs/ROADMAP.md`
+  Phase 4 for the full history, including the still-open Hinglish gap and
+  the still-gated `ai4bharat/indic-parler-tts` candidate)
 
 ## Completed
 
@@ -383,8 +386,9 @@ project moves between milestones or a phase's status changes.
 - Three capabilities' models are selected: `llm`
   (`llama-3.2-3b-instruct`, ADR-016), `asr`
   (`faster-whisper-large-v3-turbo`, ADR-018), and `tts`
-  (`facebook/mms-tts-hin`, ADR-021 — with the Hinglish gap noted above).
-  Every other capability's model choice is still `TBD` (see ADR-008).
+  (`mms-tts-hin-ft-female`, ADR-021/ADR-022 — with the Hinglish gap noted
+  above). Every other capability's model choice is still `TBD` (see
+  ADR-008).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
   Postgres data, `/models/` (downloaded weights), and
   `ai-services/eval_data/audio/` (generated ASR test fixtures) are all

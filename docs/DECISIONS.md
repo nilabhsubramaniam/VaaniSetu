@@ -934,6 +934,74 @@ Status**.
   resolving this ADR.
 - **Status:** Accepted.
 
+## ADR-022 - TTS voice revision: female-voice fine-tune replaces mms-tts-hin's single male voice
+
+- **Decision:** Replaced `tts.selected` in `ai-services/models.yaml` from
+  `mms-tts-hin` (`facebook/mms-tts-hin`) to a new candidate,
+  `mms-tts-hin-ft-female` (`Anjan9320/fb-mms-tts-hin-ft-female`) — a
+  community fine-tune of the exact same VITS architecture and tokenizer,
+  loaded by the same `MmsVitsEngine` with no code change beyond making one
+  error message candidate-agnostic (it previously hardcoded the string
+  `"mms-tts-hin"`, which became wrong the moment a second checkpoint used
+  this engine — now derived from the checkpoint's own directory name).
+- **Reason:** The user reported the selected voice sounded male after
+  actually listening to it. ADR-021's benchmark measured accuracy, speed,
+  and memory but never evaluated voice gender — `facebook/mms-tts-hin`'s
+  config confirms `num_speakers: 1`, i.e. a single, fixed voice with no
+  speaker-ID parameter to switch, so gender could not be fixed by
+  configuration alone. Given the user's choice among three real options
+  (this fine-tune; switching to `xtts-v2`'s already-configured female
+  built-in speaker; or keeping the male voice), a same-architecture
+  female fine-tune was preferred over `xtts-v2` because it preserves
+  ADR-021's speed/accuracy/license profile rather than trading it away.
+  Verified, not assumed, before selecting:
+  - **Same shape:** `num_speakers: 1`, 16kHz, loads through the existing
+    `MmsVitsEngine`/`transformers.VitsModel` path unmodified.
+  - **Comparable intelligibility:** proxy-WER (same method as ADR-021,
+    synthesize → transcribe via `faster-whisper-large-v3-turbo` → WER
+    against input) on the same 4 Hindi fixtures: 0.200 mean, vs. the base
+    checkpoint's 0.238 — not a regression.
+  - **Same speed/footprint:** load 1.05s (vs. 0.96s), mean RTF 0.171 (vs.
+    0.166) — both essentially identical to ADR-021's numbers, as expected
+    for the same architecture/size class.
+  - **Higher, more female-typical pitch:** a rough autocorrelation-based
+    F0 estimate put the base voice's median pitch at ~163-180Hz (the
+    upper edge of a typical male range) and this fine-tune's at
+    ~182-195Hz (solidly in a typical female range) — directionally
+    consistent evidence, not a substitute for a human listener actually
+    confirming it (still unavailable in this environment, same caveat as
+    ADR-021's pronunciation/MOS gap).
+  - **Same license family:** CC-BY-NC-4.0, identical to the base
+    checkpoint — this swap introduces no new licensing constraint beyond
+    what ADR-021 already accepted.
+  - **Same Hinglish limitation:** confirmed this fine-tune still raises
+    `UnsupportedTextError` for Latin-script text — inherits the base
+    checkpoint's Devanagari-only vocabulary, so ADR-021's Hinglish gap is
+    unchanged, not newly introduced.
+- **Alternatives considered:**
+  - `coqui/XTTS-v2` with its already-configured female speaker ("Ana
+    Florence") — rejected: still carries ADR-021's measured 3x-worse
+    Hindi WER, ~15x slower load, and ~2.2x heavier memory footprint; a
+    voice-gender fix should not silently reopen an already-decided
+    quality tradeoff.
+  - Waiting for `ai4bharat/indic-parler-tts` access (Apache-2.0, already
+    configured with a female voice description) — rejected for now, same
+    reasoning as ADR-021: no reason to block a real, user-reported gap on
+    an access request with no ETA; revisit and re-benchmark if/when access
+    is granted.
+- **Impact:** `ai-services/models.yaml` gains the `mms-tts-hin-ft-female`
+  candidate entry and `tts.selected` now points to it;
+  `facebook/mms-tts-hin` remains listed as a candidate (e.g. to revert to,
+  or as a baseline for future comparisons). No Go, Angular, or API-contract
+  change — `HTTPTTSClient`/`proto/tts.openapi.yaml` are unaffected, per
+  the same "swap by config" design ADR-006 established.
+  `app/engines/tts/mms_vits_engine.py`'s error message fix is a genuine
+  correctness fix (a hardcoded checkpoint name that had already become
+  inaccurate), not scope creep. This ADR does not change any of ADR-021's
+  other findings — the Hinglish gap and the non-commercial-license
+  constraint both still stand.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```
