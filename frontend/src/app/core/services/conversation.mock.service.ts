@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { LanguageCode } from '../models/language.model';
 import type { Turn } from '../models/turn.model';
+import type { VoiceCode } from '../models/voice.model';
 import { ConversationService } from './conversation.service';
 import { VoiceSessionService } from './voice-session.service';
 
@@ -91,6 +92,17 @@ export class ConversationMockService implements ConversationService {
         this.voiceSession.setState('idle');
       }, RESPONDING_DELAY_MS);
     }, PROCESSING_DELAY_MS);
+  }
+
+  /** This mock has no ASR — Phase 5's real transcription only exists in
+   * ConversationRealService. Exists solely so ConversationService's
+   * abstract contract compiles; treats the recording as a fixed
+   * placeholder and reuses sendUserTurn's exact canned-reply flow
+   * (real audio understanding was never this mock's job — Phase 1's
+   * scope predates real audio capture entirely). */
+  sendVoiceTurn(_audio: Blob, language: LanguageCode, voice: VoiceCode): void {
+    void voice; // no per-voice behavior in this mock; kept for signature parity
+    this.sendUserTurn('(voice message)', language);
   }
 
   simulateError(): void {

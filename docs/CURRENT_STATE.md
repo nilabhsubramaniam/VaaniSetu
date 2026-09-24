@@ -8,23 +8,34 @@ project moves between milestones or a phase's status changes.
 - **Current phase:** Phase 2 - Local LLM, **DONE**. Phase 3 - Speech-to-Text,
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
   **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap —
-  see below).
+  see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
+  latency gap — see below).
 - **Current focus:** none active — awaiting the user's decision to start
-  Phase 5 (End-to-End Voice MVP); see `AGENTS.md` §5, "never advance to the
-  next milestone automatically".
-- **Last updated:** 2026-09-24 (ADR-023: the assistant's spoken reply now
-  has a real, user-facing Female/Male voice choice — `ai-services` loads
-  *both* ADR-022 checkpoints simultaneously at startup, `/v1/synthesize`
-  gains a `voice` field to pick between them, and a new Settings section
-  (`SettingsStore.preferredVoice`, `localStorage`-backed, same mechanism
-  as the language preference) lets the user set it. Earlier the same day:
-  ADR-022 moved `tts.selected` from `mms-tts-hin` to
-  `mms-tts-hin-ft-female` after the user caught the base checkpoint's
-  single, fixed male voice by actually listening to it, and Milestone 4b
-  landed the Python `tts` capability itself. See `docs/DECISIONS.md`
-  ADR-020/ADR-021/ADR-022/ADR-023 and `docs/ROADMAP.md` Phase 4 for the
-  full history, including the still-open Hinglish gap and the still-gated
-  `ai4bharat/indic-parler-tts` candidate)
+  Phase 6 (Indian Language Support); see `AGENTS.md` §5, "never advance to
+  the next milestone automatically".
+- **Last updated:** 2026-09-24 (Phase 5: a real Go turn orchestrator
+  (`backend/internal/orchestrator`, `POST /api/v1/voice/turn`) now
+  sequences transcribe -> think -> speak server-side — moved out of
+  Angular, where that sequencing decision used to live in
+  `mic-button.ts`/`ConversationRealService`, violating
+  `docs/ARCHITECTURE.md` §4. The mic flow makes one call instead of
+  three. Verified live end to end against real recorded audio (all 8
+  `eval_data/asr_fixtures.yaml` fixtures): real transcript -> real
+  LLM reply -> real synthesized audio, with a Hinglish request correctly
+  degrading to text-only (`synthesisFailed: true`) rather than failing.
+  **Known gap:** measured p50 latency is 5.09s against the "< 3s
+  non-streaming MVP" target — `faster-whisper-large-v3-turbo`
+  transcription alone takes ~4s per request, already exceeding the whole
+  budget. Not fixed here — doing so means reopening ADR-018's
+  accuracy/latency tradeoff with new evidence. See `docs/DECISIONS.md`
+  ADR-024 for the full measured breakdown and `docs/ROADMAP.md` Phase 5.
+  Earlier the same day: ADR-023 gave the assistant's voice a real
+  Female/Male choice (`SettingsStore.preferredVoice`), and ADR-022 fixed
+  the selected TTS voice from an unconfigurable male to a female
+  fine-tune. See `docs/DECISIONS.md` ADR-020/ADR-021/ADR-022/ADR-023 and
+  `docs/ROADMAP.md` Phase 4 for that history, including the still-open
+  Hinglish TTS gap and the still-gated `ai4bharat/indic-parler-tts`
+  candidate)
 
 ## Completed
 
@@ -325,21 +336,79 @@ project moves between milestones or a phase's status changes.
     Python 3.14 in the absence of a prebuilt wheel; 3.12 has wheels for
     every dependency this milestone added. `ai-services/SETUP.md` and
     `docs/DEVELOPMENT.md` §5/§5.1 updated accordingly.
+- **Phase 5 — Go turn orchestrator, End-to-End Voice MVP:**
+  - `backend/internal/orchestrator` (new package): `Orchestrator.RunTurn`
+    composes the three already-existing capability clients
+    (`asr.ASRClient`, `ConversationService`, `tts.TTSClient`) into one
+    transcribe -> think -> speak sequence — no new capability, pure
+    composition. A synthesis failure is non-fatal (`SynthesisFailed`
+    flag, `Audio` stays nil) — ADR-020's "voice is additive" rule, moved
+    from Angular into Go. Per-stage wall-clock latency
+    (`TranscribeMs`/`ThinkMs`/`SpeakMs`) is captured and returned.
+  - `POST /api/v1/voice/turn` (`docs/openapi/voice.yaml`, new): raw audio
+    body + `language`/`voice` query params in, one JSON response —
+    `{userTurn, assistantTurn, audio: {contentType, base64} | null}` —
+    out. Chosen over multipart or a second follow-up call so the whole
+    turn stays one HTTP round trip (docs/DECISIONS.md ADR-024). The
+    existing `/chat`, `/speech/transcribe`, `/speech/synthesize`
+    endpoints are unchanged and still used elsewhere.
+  - Frontend: `mic-button.ts` now calls
+    `ConversationService.sendVoiceTurn(blob, language, voice)` — one
+    call, replacing the transcribe-then-sendUserTurn sequence that used
+    to live in the component itself
+    (`docs/ARCHITECTURE.md` §4 forbids orchestration logic in Angular).
+    `SpeechService` is no longer a `MicButton` dependency.
+    `ConversationRealService` decodes the returned base64 audio and
+    plays it; `ConversationMockService` gained a trivial stub (no real
+    ASR) purely so the abstract `ConversationService` contract compiles.
+  - `docker-compose.yml`: `ai-services` gained a `/healthz`-based
+    healthcheck (it had none, despite exposing the endpoint); `backend`'s
+    `depends_on.ai-services` condition changed from `service_started` to
+    `service_healthy`, so backend can no longer come up before models
+    finish loading. Not run for real — Docker remains unavailable in this
+    environment; fixed and verified by code review only.
+  - Tests: 6 new Go tests in `internal/orchestrator` (happy path, ASR
+    failure, no-speech, LLM failure, non-fatal TTS failure, latency
+    fields) plus 8 new `internal/api` handler tests for
+    `/api/v1/voice/turn`; 4 new frontend tests
+    (`ConversationRealService.sendVoiceTurn` success/no-audio/failure,
+    `MicButton`'s single-call flow). All pass; `go build/vet/test`,
+    `gofmt`, `golangci-lint`, `ng test/lint/build` all clean.
+  - **Verified live, end to end, against real recorded audio** (all 8
+    `ai-services/eval_data/asr_fixtures.yaml` fixtures, not simulated): a
+    real Hindi utterance produces a real transcript, a real
+    context-appropriate LLM reply, and real synthesized audio, in one
+    call; a Hinglish request correctly returns 200 with
+    `synthesisFailed: true` and no audio, degrading to text-only rather
+    than failing — the same known gap ADR-021 already documented,
+    reconfirmed here rather than newly discovered.
+  - **Known gap, not blocking (see `docs/DECISIONS.md` ADR-024 for the
+    full measured breakdown):** real p50 end-to-end latency across those
+    8 live calls is **5.09s** (mean 5.50s, p95 ~8.85s) against
+    `docs/EVALUATION.md`'s "p50 < 3s non-streaming MVP" target — not met.
+    Per-request stage timing shows `faster-whisper-large-v3-turbo`
+    transcription alone takes ~4.0-4.3s, already exceeding the whole
+    budget before the LLM (0.28-2.77s) or TTS (0-1.9s) stage runs. This
+    is ADR-018's already-known ASR latency, now shown for the first time
+    to be the dominant bottleneck against a real end-to-end target;
+    closing it means reopening ADR-018's accuracy-vs-latency tradeoff
+    with new evidence, which this phase deliberately does not do.
+    Flagged for a future phase (most likely Phase 11's streaming work).
 
 ## Next
 
 - No milestone is currently approved to start. `docs/ROADMAP.md` names
-  Phase 5 (End-to-End Voice MVP) as next in order; per `AGENTS.md` §5,
+  Phase 6 (Indian Language Support) as next in order; per `AGENTS.md` §5,
   work does not begin on it until the user decides to move the project
-  there. Two smaller, well-scoped follow-ups are also open whenever the
-  user wants them: re-benchmarking `ai4bharat/indic-parler-tts` once its
-  Hugging Face gated-repo access is granted (ADR-021), and a hands-on
-  browser/microphone/speaker smoke test (still not performed by the agent
-  in any phase so far — no interactive browser available).
+  there. Open follow-ups, none blocking, whenever the user wants them:
+  re-benchmarking `ai4bharat/indic-parler-tts` once its Hugging Face
+  gated-repo access is granted (ADR-021); closing the Phase 5 latency gap
+  (ADR-024), most likely as part of Phase 11's streaming work; and a
+  hands-on browser/microphone/speaker smoke test (still not performed by
+  the agent in any phase so far — no interactive browser available).
 
 ## Not started
 
-- End-to-end voice loop
 - Indian language breadth (beyond Hindi / Hinglish scope)
 - RAG
 - Dataset pipeline
@@ -352,21 +421,27 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean (124 tests). Its
+- `frontend/` builds, lints, and tests clean (128 tests). Its
   `ConversationService` runs against the real backend
-  (`ConversationRealService`); `MicButton` now really records audio via
-  `AudioCaptureService`/`SpeechService`; a chat reply now really plays
-  back synthesized speech via `AudioPlaybackService`, in the user's
-  chosen voice (`SettingsStore.preferredVoice`, ADR-023); only
-  `VoiceSessionService` still uses a mock (see above).
-- `backend/` builds, vets, lints (`golangci-lint`), and tests clean, and has
-  now been run for real against a live, native PostgreSQL and a live,
-  native `ai-services` instance (see above) — a developer following
+  (`ConversationRealService`); `MicButton` now records audio and sends
+  the whole spoken turn through `ConversationService.sendVoiceTurn` in
+  one call (Phase 5, ADR-024) — it no longer depends on `SpeechService`
+  directly. A voice turn's reply plays back synthesized speech via
+  `AudioPlaybackService`, in the user's chosen voice
+  (`SettingsStore.preferredVoice`, ADR-023); only `VoiceSessionService`
+  still uses a mock (see above).
+- `backend/` builds, vets, lints (`golangci-lint`), and tests clean (now
+  including `internal/orchestrator`, Phase 5's new package), and has been
+  run for real against a live, native PostgreSQL and a live, native
+  `ai-services` instance (see above) — a developer following
   `backend/SETUP.md` and `ai-services/SETUP.md` on this machine can
   reproduce both. Its `testcontainers-go`-based Postgres integration tests
   specifically still require a Docker daemon, which remains unavailable in
   this environment — they skip themselves cleanly rather than failing, and
-  have not been run for real against a container.
+  have not been run for real against a container. `docker-compose.yml`
+  itself was fixed (ai-services healthcheck, backend's `depends_on`
+  condition — see ADR-024) but likewise not run for real, same Docker
+  constraint.
 - `ai-services/` builds its dependencies (`uv sync` — `llama-cpp-python`
   compiles from source; `faster-whisper`/`ctranslate2`, `torch`,
   `transformers`, and `coqui-tts` use prebuilt wheels; `parler-tts`
@@ -396,3 +471,8 @@ project moves between milestones or a phase's status changes.
   Postgres data, `/models/` (downloaded weights), and
   `ai-services/eval_data/audio/` (generated ASR test fixtures) are all
   git-ignored via the repository's single root `.gitignore`.
+- Phase 5's no-egress check was verified by code review, not by an actual
+  network capture inside a running container (Docker unavailable here):
+  `ai-services` makes no outbound HTTP calls at request time in any
+  capability's code path — the only network code (`huggingface_hub`) is
+  in dev-only download/benchmark scripts, never imported by `app/main.py`.

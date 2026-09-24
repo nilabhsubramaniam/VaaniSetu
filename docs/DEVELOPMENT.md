@@ -89,6 +89,8 @@ VaaniSetu/
       llm/                          LLMClient interface: Fake + HTTP clients
       asr/                          ASRClient interface: Fake + HTTP clients
       tts/                          TTSClient interface: Fake + HTTP clients
+      orchestrator/                 Phase 5 turn orchestrator: composes
+                                     asr/llm/tts into one voice turn
       config/, db/, logging/
     migrations/                     goose SQL, embedded into the binary
     SETUP.md, Makefile, .env.example

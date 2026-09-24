@@ -1076,6 +1076,135 @@ Status**.
   both simultaneously, not about model selection itself.
 - **Status:** Accepted.
 
+## ADR-024 - Phase 5: Go turn orchestrator and the voice/turn response shape
+
+- **Decision:** Two related Phase 5 choices:
+  1. **A new `backend/internal/orchestrator` package** implements
+     `docs/ARCHITECTURE.md` §3.2's "turn orchestrator" for real: one
+     `Orchestrator.RunTurn(ctx, audio, contentType, language, voice)`
+     method sequencing transcribe (`asr.ASRClient`) -> think
+     (`ConversationService.SendMessage`, the same call `handleChat`
+     already makes) -> speak (`tts.TTSClient`), composing three
+     interfaces every caller already depended on individually — no new
+     capability. Exposed as `POST /api/v1/voice/turn`
+     (`docs/openapi/voice.yaml`), reusing `handleTranscribe`'s existing
+     request shape (raw audio body + query params) and `handleChat`'s
+     existing error-code conventions (`asr_unavailable`,
+     `llm_unavailable`).
+  2. **A speech-synthesis failure inside `RunTurn` is not fatal to the
+     turn** — `TurnResult.SynthesisFailed` is set and `Audio` stays nil,
+     but the transcript and reply are still returned with a 200. This
+     moves ADR-020's "voice is additive" rule from Angular (where it
+     lived as a client-side `.catch()` around a second HTTP call) into
+     Go, where `docs/ARCHITECTURE.md` says orchestration belongs.
+  3. **The endpoint's response is one JSON body** —
+     `{userTurn, assistantTurn, audio: {contentType, base64} | null}` —
+     not multipart, and not a second "now fetch the audio" call.
+- **Reason:**
+  1. Confirmed by reading the actual code before writing any of this
+     (not assumed): the sequencing decisions "after transcribe, call
+     chat" and "after the reply arrives, speak it" lived in
+     `frontend/src/app/assistant/mic-button/mic-button.ts` and
+     `ConversationRealService` respectively — exactly the pattern
+     `docs/ARCHITECTURE.md` §4 lists as forbidden ("Turn orchestration |
+     Go | Orchestration logic in Python or Angular"). Composing the
+     three existing capability interfaces in one new Go package is the
+     smallest change that fixes this: no new capability, no change to
+     `internal/asr`/`internal/tts`/`internal/conversation`, and the
+     existing `/chat`, `/speech/transcribe`, `/speech/synthesize`
+     endpoints are untouched and still used elsewhere (typed text still
+     calls `/chat` directly).
+  2. A synthesis failure was already known to be non-fatal (ADR-020) —
+     this only relocates where that decision is made, from a client-side
+     try/catch to the one place that now actually owns turn sequencing.
+     Getting this right in Go rather than leaving it in Angular matters
+     because Angular no longer decides *whether* to synthesize at all
+     after this change — it only renders what Go already decided.
+  3. One reply clip at this project's scale is small (tens of KB, per
+     Milestone 4b's real measurements) — base64's ~33% overhead is
+     negligible, and it keeps the client contract to exactly one HTTP
+     call per spoken turn. A second "now fetch the audio" call would
+     reintroduce a client-side sequencing decision ("now that I have the
+     reply, go get its audio"), undoing the entire point of this ADR;
+     multipart would avoid the encoding overhead but adds real complexity
+     to both the Go response-writing side and the Angular parsing side
+     for a savings that doesn't matter at this payload size.
+- **Alternatives considered:**
+  - Multipart/mixed response (JSON part + binary audio part) — rejected:
+    meaningfully more code on both ends (Go multipart writer, Angular
+    multipart response parsing, neither of which this codebase has any
+    existing pattern for) to save an overhead that's irrelevant at a few
+    tens of KB per reply.
+  - A second endpoint call from Angular once the turn's text is known —
+    rejected: puts the "now speak it" decision back in the client,
+    exactly what this phase exists to remove.
+  - Returning `202 Accepted` immediately and polling/streaming
+    partial results — rejected as out of scope: `docs/ROADMAP.md` Phase 5
+    is explicitly the **non-streaming** MVP; streaming is Phase 11.
+  - A `WebSocket`-based orchestrator instead of a single request/response
+    call — rejected for the same reason: nothing in Phase 5's scope needs
+    a persistent connection or partial/incremental results; a plain HTTP
+    call is the smallest change that satisfies "one call in, one turn out."
+- **Measured, not assumed — real end-to-end latency against
+  `docs/EVALUATION.md` §6's "p50 < 3s non-streaming MVP" target:** eight
+  live `POST /api/v1/voice/turn` calls against real recorded audio
+  (`ai-services/eval_data/audio/`, all 8 fixtures: 4 Hindi, 2 Hinglish, 2
+  English), through the actual running Go + Python services, not
+  simulated:
+
+  | Metric | Measured | Target |
+  |---|---|---|
+  | p50 | **5.09s** | < 3s |
+  | p95 (approx, n=8) | **8.85s** | — |
+  | mean | 5.50s | — |
+
+  **This target is not met.** Per-stage timing (logged on every request —
+  `transcribeMs`/`thinkMs`/`speakMs`) shows why: transcription alone took
+  ~4.0-4.3s on **every single request**, already exceeding the entire p50
+  budget before the LLM (0.28-2.77s) or TTS (0-1.9s) stage even ran. This
+  is not a new regression from this phase's own code — it is
+  `faster-whisper-large-v3-turbo`'s already-measured latency from
+  ADR-018 (there: "~4s mean, ~4.3s max... accepted for now — Phase 3 sets
+  no hard latency budget, that arrives with Phase 5's end-to-end target"),
+  now shown, for the first time, to be the dominant bottleneck against a
+  real budget. ADR-018's own benchmark already recorded faster
+  alternatives with much worse Hindi accuracy (`faster-whisper-small`:
+  1.09s mean latency but 38.8% WER; `-medium`: 2.77s but 10% WER) — closing
+  this gap means re-opening that accuracy/latency tradeoff, which this ADR
+  does **not** do; it only measures and records the conflict for a future
+  phase to resolve with its own evidence, rather than silently trading
+  away either the latency target or ADR-018's accuracy decision to make a
+  number look better.
+
+  Also verified live in the same run: a Hinglish request correctly
+  returns 200 with `synthesisFailed: true`/`speakMs: 0` — the known
+  Hinglish TTS gap (ADR-021) fails fast and degrades to text-only exactly
+  as designed, not as a new discovery.
+- **Impact:** `backend/internal/orchestrator` (new), `internal/api/server.go`
+  (`Server.orchestrator` field, `POST /api/v1/voice/turn`), `internal/api/dto.go`
+  (`voiceTurnResponse`/`voiceTurnAudioDTO`), `docs/openapi/voice.yaml` (new).
+  Frontend: `ConversationService` (abstract `sendVoiceTurn`),
+  `ConversationRealService` (real implementation),
+  `ConversationMockService` (a trivial stub — this mock has no ASR, so it
+  reuses `sendUserTurn`'s canned-reply flow with a placeholder transcript;
+  it exists only so the abstract contract compiles, not as a maintained
+  second implementation), and `mic-button.ts` (now makes exactly one call
+  instead of two sequenced ones; no longer depends on `SpeechService` at
+  all). `docker-compose.yml`'s `ai-services` healthcheck and `backend`'s
+  `depends_on` condition were also fixed as part of this phase's "docker
+  compose up brings up the whole stack" Definition of Done item — see
+  `docs/CURRENT_STATE.md` for what was and wasn't actually verified
+  (Docker itself remains unavailable in this development environment).
+  **Known gap, not blocking (same honesty precedent as ADR-018's Hinglish
+  WER and ADR-021's Hinglish TTS gaps):** end-to-end latency does not meet
+  `docs/EVALUATION.md`'s provisional target — see the measured evidence
+  above. Flagged for whichever future phase actually owns latency
+  optimization (Phase 11's streaming work is the most likely candidate,
+  since it changes the latency model entirely; a standalone faster-ASR
+  re-benchmark is also possible sooner, but is a real model-selection
+  decision this ADR deliberately does not make).
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

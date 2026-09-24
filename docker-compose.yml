@@ -1,4 +1,4 @@
-# Phase 2/3/4: postgres + backend + ai-services (llm + asr + tts capabilities).
+# Phase 2/3/4/5: postgres + backend + ai-services (llm + asr + tts capabilities).
 # Model weights are never baked into the ai-services image
 # (docs/ARCHITECTURE.md §6) — run `ai-services/scripts/download_models.py`
 # on the host first; the ./models bind mount below is how the container
@@ -36,6 +36,24 @@ services:
       VAANISETU_LLM_MODEL_STORE: "/app/models/llm"
       VAANISETU_ASR_MODEL_STORE: "/app/models/asr"
       VAANISETU_TTS_MODEL_STORE: "/app/models/tts"
+    healthcheck:
+      # /healthz always returns HTTP 200 even before models finish
+      # loading (app/main.py) — it reports readiness in the JSON body
+      # ("ready": true/false), so a plain HTTP-status check isn't enough;
+      # this parses the body with the interpreter already in the image
+      # (python:3.12-slim), no extra tool needed. Generous timing: three
+      # models (llm+asr+tts, Phase 4/5) can take real time to load.
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import json,sys,urllib.request; sys.exit(0 if json.load(urllib.request.urlopen('http://localhost:8090/healthz')).get('ready') else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   backend:
     build:
@@ -61,7 +79,12 @@ services:
       postgres:
         condition: service_healthy
       ai-services:
-        condition: service_started
+        # Was service_started (Phase 4): backend could come up and start
+        # serving traffic before ai-services finished loading its models,
+        # so an early request would hit a real, if temporary,
+        # llm/asr/tts_unavailable — service_healthy (Phase 5) waits for
+        # the healthcheck above to report actually ready first.
+        condition: service_healthy
 
 volumes:
   postgres-data:

@@ -324,4 +324,83 @@ describe('ConversationRealService', () => {
     service.simulateError();
     expect(voiceState()).toBe('error');
   });
+
+  describe('sendVoiceTurn', () => {
+    const voiceTurnUrl = `${environment.apiBaseUrl}/v1/voice/turn?language=hi&voice=female`;
+    const audioBlob = new Blob(['recorded audio']);
+
+    it('posts the audio to the orchestrator endpoint with language/voice as query params', () => {
+      service.sendVoiceTurn(audioBlob, 'hi', 'female');
+
+      const req = httpMock.expectOne(voiceTurnUrl);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toBe(audioBlob);
+    });
+
+    it('appends both turns and plays the returned audio on success', async () => {
+      service.sendVoiceTurn(audioBlob, 'hi', 'female');
+
+      httpMock.expectOne(voiceTurnUrl).flush({
+        userTurn: {
+          id: 'u1',
+          role: 'user',
+          text: 'नमस्ते',
+          language: 'hi',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        assistantTurn: {
+          id: 'a1',
+          role: 'assistant',
+          text: 'नमस्ते, कैसे हैं आप?',
+          language: 'hi',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        audio: { contentType: 'audio/wav', base64: btoa('fake wav bytes') },
+      });
+
+      expect(service.turns().map((t) => t.text)).toEqual(['नमस्ते', 'नमस्ते, कैसे हैं आप?']);
+      expect(voiceState()).toBe('responding');
+
+      await Promise.resolve();
+      expect(audioPlaybackFake.play).toHaveBeenCalledTimes(1);
+      const playedBlob = audioPlaybackFake.play.mock.calls[0][0] as Blob;
+      expect(playedBlob.type).toBe('audio/wav');
+
+      vi.advanceTimersByTime(700);
+      expect(voiceState()).toBe('idle');
+    });
+
+    it('still appends both turns when synthesis failed (audio: null), without playing anything', () => {
+      service.sendVoiceTurn(audioBlob, 'hi', 'female');
+
+      httpMock.expectOne(voiceTurnUrl).flush({
+        userTurn: {
+          id: 'u1',
+          role: 'user',
+          text: 'नमस्ते',
+          language: 'hi',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        assistantTurn: {
+          id: 'a1',
+          role: 'assistant',
+          text: 'reply text',
+          language: 'hi',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+        audio: null,
+      });
+
+      expect(service.turns().map((t) => t.text)).toEqual(['नमस्ते', 'reply text']);
+      expect(audioPlaybackFake.play).not.toHaveBeenCalled();
+    });
+
+    it('sets the error state on an HTTP failure and adds no turns', () => {
+      service.sendVoiceTurn(audioBlob, 'hi', 'female');
+      httpMock.expectOne(voiceTurnUrl).flush('down', { status: 502, statusText: 'Bad Gateway' });
+
+      expect(voiceState()).toBe('error');
+      expect(service.turns()).toHaveLength(0);
+    });
+  });
 });

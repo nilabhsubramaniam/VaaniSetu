@@ -7,11 +7,10 @@ import {
   AudioCaptureService,
   MicrophoneUnavailableError,
 } from '../../core/services/audio-capture.service';
-import { SpeechService } from '../../core/services/speech.service';
 
 /** Drains the microtask queue so chained `await`s inside the component
- * (start recording -> stop -> transcribe -> send) settle before an
- * assertion, without touching fake timers (those only affect real
+ * (start recording -> stop -> send) settle before an assertion, without
+ * touching fake timers (those only affect real
  * `setTimeout`/`setInterval`, not Promise resolution). */
 async function flushMicrotasks(): Promise<void> {
   for (let i = 0; i < 5; i++) {
@@ -20,32 +19,29 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 describe('MicButton', () => {
-  let sendUserTurn: ReturnType<typeof vi.fn>;
+  let sendVoiceTurn: ReturnType<typeof vi.fn>;
   let voiceSession: VoiceSessionMockService;
   let audioStart: ReturnType<typeof vi.fn>;
   let audioStop: ReturnType<typeof vi.fn>;
   let audioCancel: ReturnType<typeof vi.fn>;
-  let transcribe: ReturnType<typeof vi.fn>;
 
   const fakeRecording = { blob: new Blob(['audio']), mimeType: 'audio/webm' };
 
   beforeEach(() => {
     vi.useFakeTimers();
-    sendUserTurn = vi.fn();
+    sendVoiceTurn = vi.fn();
     audioStart = vi.fn().mockResolvedValue(undefined);
     audioStop = vi.fn().mockResolvedValue(fakeRecording);
     audioCancel = vi.fn();
-    transcribe = vi.fn().mockResolvedValue('आज मौसम कैसा है?');
 
     TestBed.configureTestingModule({
       providers: [
         { provide: VoiceSessionService, useClass: VoiceSessionMockService },
-        { provide: ConversationService, useValue: { sendUserTurn, simulateError: vi.fn() } },
+        { provide: ConversationService, useValue: { sendVoiceTurn, simulateError: vi.fn() } },
         {
           provide: AudioCaptureService,
           useValue: { start: audioStart, stop: audioStop, cancel: audioCancel },
         },
-        { provide: SpeechService, useValue: { transcribe } },
       ],
     });
 
@@ -67,7 +63,7 @@ describe('MicButton', () => {
     expect(audioStart).toHaveBeenCalledTimes(1);
   });
 
-  it('on a second press, stops recording, transcribes, and sends the real transcript', async () => {
+  it('on a second press, stops recording and sends one orchestrated voice turn', async () => {
     const fixture = TestBed.createComponent(MicButton);
     fixture.detectChanges();
     const button = (fixture.nativeElement as HTMLElement).querySelector('button')!;
@@ -78,9 +74,11 @@ describe('MicButton', () => {
     await flushMicrotasks();
 
     expect(audioStop).toHaveBeenCalledTimes(1);
-    expect(transcribe).toHaveBeenCalledWith(fakeRecording.blob, 'hi'); // SettingsStore default language
-    expect(sendUserTurn).toHaveBeenCalledTimes(1);
-    expect(sendUserTurn).toHaveBeenCalledWith('आज मौसम कैसा है?', 'hi');
+    // SettingsStore defaults: language 'hi', voice 'female'. Transcription,
+    // reply generation, and synthesis all happen server-side now
+    // (docs/DECISIONS.md ADR-024) — this component makes exactly one call.
+    expect(sendVoiceTurn).toHaveBeenCalledTimes(1);
+    expect(sendVoiceTurn).toHaveBeenCalledWith(fakeRecording.blob, 'hi', 'female');
   });
 
   it('auto-stops and sends after the max-duration safety timeout', async () => {
@@ -92,7 +90,7 @@ describe('MicButton', () => {
     vi.advanceTimersByTime(30_000);
     await flushMicrotasks();
 
-    expect(sendUserTurn).toHaveBeenCalledTimes(1);
+    expect(sendVoiceTurn).toHaveBeenCalledTimes(1);
   });
 
   it('goes to the error state if starting the recording fails', async () => {
@@ -104,11 +102,11 @@ describe('MicButton', () => {
     await flushMicrotasks();
 
     expect(voiceSession.state()).toBe('error');
-    expect(sendUserTurn).not.toHaveBeenCalled();
+    expect(sendVoiceTurn).not.toHaveBeenCalled();
   });
 
-  it('goes to the error state if transcription fails, without sending a turn', async () => {
-    transcribe.mockRejectedValue(new Error('network error'));
+  it('goes to the error state if stopping the recording fails, without sending a turn', async () => {
+    audioStop.mockRejectedValue(new Error('recorder error'));
     const fixture = TestBed.createComponent(MicButton);
     fixture.detectChanges();
     const button = (fixture.nativeElement as HTMLElement).querySelector('button')!;
@@ -119,7 +117,7 @@ describe('MicButton', () => {
     await flushMicrotasks();
 
     expect(voiceSession.state()).toBe('error');
-    expect(sendUserTurn).not.toHaveBeenCalled();
+    expect(sendVoiceTurn).not.toHaveBeenCalled();
   });
 
   it('cancels an in-progress recording when the component is destroyed', () => {

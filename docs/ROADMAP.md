@@ -17,7 +17,7 @@ Milestone-based plan for VaaniSetu.
 | 2 | Local LLM | DONE |
 | 3 | Speech-to-Text | DONE |
 | 4 | Text-to-Speech | DONE |
-| 5 | End-to-End Voice MVP | NOT STARTED |
+| 5 | End-to-End Voice MVP | DONE |
 | 6 | Indian Language Support | NOT STARTED |
 | 7 | RAG | NOT STARTED |
 | 8 | Dataset Pipeline | NOT STARTED |
@@ -191,7 +191,21 @@ gated on Hugging Face, access not yet granted) can be benchmarked. See
 
 ## Phase 5 - End-to-End Voice MVP
 
-**Status:** NOT STARTED
+**Status:** DONE — a real Go turn orchestrator (`backend/internal/orchestrator`,
+`POST /api/v1/voice/turn`) sequences transcribe -> think -> speak
+server-side; the mic flow now makes one call instead of three
+client-sequenced ones. A spoken Hindi/English conversation works
+end-to-end, entirely offline, verified live. **Known gap, not blocking,
+same honesty precedent as Phase 3/4's:** measured p50 end-to-end latency
+is **5.09s** against `docs/EVALUATION.md`'s "p50 < 3s non-streaming MVP"
+target — **not met**. Root cause: `faster-whisper-large-v3-turbo`
+transcription alone takes ~4s per request (already known from ADR-018,
+now shown to be the dominant bottleneck against a real budget), before
+LLM or TTS even run. Fixing it means reopening ADR-018's
+accuracy-vs-latency tradeoff with new evidence — not done here, flagged
+for a future phase (most likely Phase 11's streaming work, which changes
+the latency model entirely). See `docs/CURRENT_STATE.md` and
+`docs/DECISIONS.md` ADR-024 for full measured evidence.
 
 - **Objective:** Connect the stages into one working spoken loop for Hindi and
   Hinglish, single user, single machine, no RAG.

@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: VaaniSetu Backend — Voice API
+  version: "1.0.0"
+  description: >
+    Phase 5 (End-to-End Voice MVP)'s turn orchestrator endpoint
+    (docs/ARCHITECTURE.md §3.2, docs/DECISIONS.md ADR-024). Hand-maintained,
+    same convention as docs/openapi/chat.yaml. This is the one call the
+    microphone flow makes: recorded audio in, a full turn (transcript,
+    reply, and — usually — spoken audio) out. It runs the same
+    transcribe/persist/generate/synthesize steps `POST /speech/transcribe`,
+    `POST /chat`, and `POST /speech/synthesize` (docs/openapi/speech.yaml,
+    docs/openapi/chat.yaml) already expose individually — those three
+    endpoints are unchanged and still used elsewhere (typed text still
+    calls `/chat` directly) — this endpoint just sequences them
+    server-side instead of leaving that sequencing to the caller.
+    CORS: same policy as the chat API — see docs/openapi/chat.yaml.
+servers:
+  - url: http://localhost:8080/api/v1
+
+paths:
+  /voice/turn:
+    post:
+      summary: >
+        Run one full voice turn: transcribe the recorded audio, persist and
+        generate a reply, then synthesize it — one call in, one response
+        out. A synthesis failure does not fail the call (docs/DECISIONS.md
+        ADR-020/ADR-024, "voice is additive") — `audio` is simply null and
+        `userTurn`/`assistantTurn` are still returned.
+      parameters:
+        - name: language
+          in: query
+          required: true
+          schema:
+            $ref: "./chat.yaml#/components/schemas/LanguageCode"
+        - name: voice
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [female, male]
+            default: female
+          description: >
+            Which of the two simultaneously-loaded voices to reply with
+            (docs/DECISIONS.md ADR-023). Optional; omitted or empty
+            defaults to "female".
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: The completed turn.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userTurn, assistantTurn, audio]
+                properties:
+                  userTurn:
+                    $ref: "./chat.yaml#/components/schemas/Turn"
+                  assistantTurn:
+                    $ref: "./chat.yaml#/components/schemas/Turn"
+                  audio:
+                    nullable: true
+                    description: >
+                      Null when speech synthesis failed — the turns above
+                      are still valid and already persisted.
+                    type: object
+                    required: [contentType, base64]
+                    properties:
+                      contentType:
+                        type: string
+                        example: audio/wav
+                      base64:
+                        type: string
+                        format: byte
+                        description: >
+                          The synthesized audio, base64-encoded. Chosen
+                          over multipart or a second follow-up call so the
+                          whole turn is one request/response pair — see
+                          docs/DECISIONS.md ADR-024.
+        "400":
+          description: >
+            Missing/unrecognized language code or voice, malformed/empty
+            audio body, or no speech was recognized in the recording.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"
+        "502":
+          description: >
+            The ASR or LLM step failed (`asr_unavailable`/`llm_unavailable`
+            error codes, per docs/openapi/speech.yaml and
+            docs/openapi/chat.yaml's existing conventions). A TTS failure
+            never produces this — see the 200 response's `audio: null` case.
+          content:
+            application/json:
+              schema:
+                $ref: "./chat.yaml#/components/schemas/ErrorResponse"

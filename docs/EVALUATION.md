@@ -107,4 +107,7 @@ developer's target machine is confirmed).
 
 Nothing here is implemented in Phase 0 or Phase 1. The first real measurements
 are the phase-scoped model benchmarks in Phase 2 (LLM), Phase 3 (ASR), and
-Phase 4 (TTS). The automated, repeatable harness is Phase 9.
+Phase 4 (TTS), plus Phase 5's real end-to-end response-latency measurement
+(section 6's "Response latency" row) — see `docs/DECISIONS.md` ADR-024 for
+the actual p50/p95 numbers and root-cause breakdown; **that target is
+currently not met**. The automated, repeatable harness is Phase 9.

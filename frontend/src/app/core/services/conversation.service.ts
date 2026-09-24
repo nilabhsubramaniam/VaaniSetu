@@ -1,6 +1,7 @@
 import type { Signal } from '@angular/core';
 import type { LanguageCode } from '../models/language.model';
 import type { Turn } from '../models/turn.model';
+import type { VoiceCode } from '../models/voice.model';
 
 /**
  * Data-access boundary for the conversation.
@@ -22,6 +23,15 @@ export abstract class ConversationService {
    * cycle; a real implementation would call the Go backend instead.
    */
   abstract sendUserTurn(text: string, language: LanguageCode): void;
+
+  /**
+   * Runs a full spoken turn from recorded audio: transcribe, generate a
+   * reply, and speak it — one orchestrated call (Phase 5,
+   * docs/DECISIONS.md ADR-024), not three sequential ones. The real
+   * implementation drives processing -> responding -> idle itself, same
+   * as `sendUserTurn`.
+   */
+  abstract sendVoiceTurn(audio: Blob, language: LanguageCode, voice: VoiceCode): void;
 
   /**
    * Dev/demo affordance so the `error` voice state is reachable and
