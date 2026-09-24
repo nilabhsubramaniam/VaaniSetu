@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -512,6 +513,182 @@ func TestHandleSynthesize_TTSUnavailable(t *testing.T) {
 	server.Routes().ServeHTTP(rec, req)
 
 	assertErrorResponse(t, rec, http.StatusBadGateway, "tts_unavailable")
+}
+
+func TestHandleVoiceTurn_Success(t *testing.T) {
+	var sawSynthesizeText string
+	convFake := &fakeConversationService{
+		sendMessageFunc: func(_ context.Context, text, language string) (conversation.Turn, conversation.Turn, error) {
+			if text != "आज मौसम कैसा है?" {
+				t.Errorf("SendMessage text = %q, want the transcript", text)
+			}
+			if language != "hi" {
+				t.Errorf("SendMessage language = %q, want hi", language)
+			}
+			return conversation.Turn{ID: "u1", Role: "user", Text: text, Language: language},
+				conversation.Turn{ID: "a1", Role: "assistant", Text: "एक अच्छी कहानी", Language: language},
+				nil
+		},
+	}
+	asrFake := &fakeASRClient{
+		transcribeFunc: func(context.Context, asr.TranscribeRequest) (asr.TranscribeResponse, error) {
+			return asr.TranscribeResponse{Transcript: "आज मौसम कैसा है?"}, nil
+		},
+	}
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(_ context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			sawSynthesizeText = req.Text
+			if req.Voice != "male" {
+				t.Errorf("Voice = %q, want male", req.Voice)
+			}
+			return tts.SynthesizeResponse{Audio: []byte("fake wav bytes"), ContentType: "audio/wav"}, nil
+		},
+	}
+	server := NewServer(convFake, asrFake, ttsFake, testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=hi&voice=male", bytes.NewReader([]byte("audio bytes")))
+	req.Header.Set("Content-Type", "audio/webm")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var resp voiceTurnResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.UserTurn.Text != "आज मौसम कैसा है?" {
+		t.Errorf("UserTurn.Text = %q, want the transcript", resp.UserTurn.Text)
+	}
+	if resp.AssistantTurn.Text != "एक अच्छी कहानी" {
+		t.Errorf("AssistantTurn.Text = %q, want the reply", resp.AssistantTurn.Text)
+	}
+	if sawSynthesizeText != resp.AssistantTurn.Text {
+		t.Errorf("synthesize was called with %q, want the assistant reply text", sawSynthesizeText)
+	}
+	if resp.Audio == nil {
+		t.Fatal("Audio = nil, want a populated audio field on success")
+	}
+	if resp.Audio.ContentType != "audio/wav" {
+		t.Errorf("Audio.ContentType = %q, want audio/wav", resp.Audio.ContentType)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(resp.Audio.Base64)
+	if err != nil {
+		t.Fatalf("Audio.Base64 did not decode: %v", err)
+	}
+	if string(decoded) != "fake wav bytes" {
+		t.Errorf("decoded audio = %q, want the tts client's bytes", decoded)
+	}
+}
+
+func TestHandleVoiceTurn_SynthesisFailureStillReturnsTurns(t *testing.T) {
+	convFake := &fakeConversationService{
+		sendMessageFunc: func(_ context.Context, text, language string) (conversation.Turn, conversation.Turn, error) {
+			return conversation.Turn{ID: "u1", Role: "user", Text: text, Language: language},
+				conversation.Turn{ID: "a1", Role: "assistant", Text: "reply", Language: language},
+				nil
+		},
+	}
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(context.Context, tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			return tts.SynthesizeResponse{}, errUnexpected
+		},
+	}
+	server := NewServer(convFake, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 — a synthesis failure must not fail the turn; body = %s", rec.Code, rec.Body.String())
+	}
+	var resp voiceTurnResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.AssistantTurn.Text != "reply" {
+		t.Errorf("AssistantTurn.Text = %q, want the reply text even when synthesis failed", resp.AssistantTurn.Text)
+	}
+	if resp.Audio != nil {
+		t.Errorf("Audio = %+v, want nil when synthesis failed", resp.Audio)
+	}
+}
+
+func TestHandleVoiceTurn_MissingLanguage(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_UnknownVoice(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en&voice=robot", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_EmptyAudioBody(t *testing.T) {
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en", bytes.NewReader(nil))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_ASRUnavailable(t *testing.T) {
+	asrFake := &fakeASRClient{
+		transcribeFunc: func(context.Context, asr.TranscribeRequest) (asr.TranscribeResponse, error) {
+			return asr.TranscribeResponse{}, errUnexpected
+		},
+	}
+	server := NewServer(&fakeConversationService{}, asrFake, defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadGateway, "asr_unavailable")
+}
+
+func TestHandleVoiceTurn_NoSpeechRecognized(t *testing.T) {
+	asrFake := &fakeASRClient{
+		transcribeFunc: func(context.Context, asr.TranscribeRequest) (asr.TranscribeResponse, error) {
+			return asr.TranscribeResponse{Transcript: "   "}, nil
+		},
+	}
+	server := NewServer(&fakeConversationService{}, asrFake, defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_LLMUnavailable(t *testing.T) {
+	convFake := &fakeConversationService{
+		sendMessageFunc: func(context.Context, string, string) (conversation.Turn, conversation.Turn, error) {
+			return conversation.Turn{}, conversation.Turn{}, conversation.ErrGenerateFailed
+		},
+	}
+	server := NewServer(convFake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=en", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadGateway, "llm_unavailable")
 }
 
 var errUnexpected = &testError{"boom"}

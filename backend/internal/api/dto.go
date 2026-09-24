@@ -101,6 +101,25 @@ type synthesizeRequest struct {
 	Voice string `json:"voice,omitempty"`
 }
 
+// voiceTurnResponse is the POST /api/v1/voice/turn 200 response body, per
+// docs/openapi/voice.yaml. Unlike handleSynthesize's raw-bytes response,
+// this endpoint returns one JSON body carrying both turns and (optionally)
+// the synthesized audio — see handleVoiceTurn's doc comment for why a
+// single base64-encoded field was chosen over multipart or a second call.
+type voiceTurnResponse struct {
+	UserTurn      turnDTO            `json:"userTurn"`
+	AssistantTurn turnDTO            `json:"assistantTurn"`
+	Audio         *voiceTurnAudioDTO `json:"audio"`
+}
+
+// voiceTurnAudioDTO is nil when speech synthesis failed — the turns are
+// still valid and present (docs/DECISIONS.md ADR-020/ADR-024: voice is
+// additive, never fatal to a turn).
+type voiceTurnAudioDTO struct {
+	ContentType string `json:"contentType"`
+	Base64      string `json:"base64"`
+}
+
 // errorResponse is the body returned for every non-2xx response, per
 // docs/openapi/chat.yaml and docs/openapi/speech.yaml.
 type errorResponse struct {

@@ -3,7 +3,6 @@ import { ConversationService } from '../../core/services/conversation.service';
 import { SettingsStore } from '../../core/services/settings.store';
 import { VoiceSessionService } from '../../core/services/voice-session.service';
 import { AudioCaptureService } from '../../core/services/audio-capture.service';
-import { SpeechService } from '../../core/services/speech.service';
 
 /** Safety cap so a forgotten open mic doesn't record forever. Real
  * endpointing is manual (tap again to stop) — see docs/DECISIONS.md
@@ -21,7 +20,6 @@ export class MicButton {
   private readonly conversation = inject(ConversationService);
   private readonly settings = inject(SettingsStore);
   private readonly audioCapture = inject(AudioCaptureService);
-  private readonly speech = inject(SpeechService);
   private readonly destroyRef = inject(DestroyRef);
 
   private maxDurationHandle: ReturnType<typeof setTimeout> | undefined;
@@ -54,7 +52,11 @@ export class MicButton {
     this.voiceSession.setState('listening');
 
     try {
-      await this.audioCapture.start();
+      // Auto-stops on silence after real speech (docs/DECISIONS.md
+      // ADR-025) — feeds the same stop path manual tap and the
+      // max-duration timer below already use, so there's exactly one
+      // "what happens when a turn ends" handler regardless of trigger.
+      await this.audioCapture.start(() => void this.stopListeningAndSend());
     } catch (err) {
       console.error('failed to start recording', err);
       this.voiceSession.setState('error');
@@ -82,16 +84,12 @@ export class MicButton {
     }
 
     const language = this.settings.preferredLanguage();
-    try {
-      const transcript = await this.speech.transcribe(recording.blob, language);
-      // sendUserTurn takes it from here exactly as it would for typed
-      // text — it drives processing -> responding -> idle itself
-      // (docs/DECISIONS.md ADR-017).
-      this.conversation.sendUserTurn(transcript, language);
-    } catch (err) {
-      console.error('transcription failed', err);
-      this.voiceSession.setState('error');
-    }
+    const voice = this.settings.preferredVoice();
+    // sendVoiceTurn takes it from here — one orchestrated call runs
+    // transcribe -> think -> speak and drives processing -> responding ->
+    // idle itself (docs/DECISIONS.md ADR-024), the same way sendUserTurn
+    // already does for typed text.
+    this.conversation.sendVoiceTurn(recording.blob, language, voice);
   }
 
   private cancelRecording(): void {

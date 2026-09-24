@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { LanguageCode } from '../models/language.model';
 import type { Turn, TurnRole } from '../models/turn.model';
+import type { VoiceCode } from '../models/voice.model';
 import { AudioPlaybackService } from './audio-playback.service';
 import { ConversationService } from './conversation.service';
 import { SettingsStore } from './settings.store';
@@ -30,6 +31,15 @@ interface TurnWire {
 interface ChatResponseWire {
   readonly userTurn: TurnWire;
   readonly assistantTurn: TurnWire;
+}
+
+/** Wire shape of POST /v1/voice/turn's response, per docs/openapi/voice.yaml.
+ * `audio` is null when speech synthesis failed — the turns are still valid
+ * (docs/DECISIONS.md ADR-020/ADR-024). */
+interface VoiceTurnResponseWire {
+  readonly userTurn: TurnWire;
+  readonly assistantTurn: TurnWire;
+  readonly audio: { readonly contentType: string; readonly base64: string } | null;
 }
 
 interface HistoryResponseWire {
@@ -123,6 +133,58 @@ export class ConversationRealService implements ConversationService {
       });
   }
 
+  /** Runs a full spoken turn through the Phase 5 orchestrator endpoint
+   * (docs/openapi/voice.yaml, docs/DECISIONS.md ADR-024) — one call that
+   * transcribes, generates a reply, and synthesizes it, replacing what
+   * used to be a transcribe-then-sendUserTurn-then-synthesize sequence
+   * decided client-side (docs/ARCHITECTURE.md §4 forbids that). Unlike
+   * `sendUserTurn`, no user turn can be appended optimistically — the
+   * transcript isn't known until the response arrives. */
+  sendVoiceTurn(audio: Blob, language: LanguageCode, voice: VoiceCode): void {
+    const mySequence = ++this.sequence;
+    this.currentRequest?.unsubscribe();
+
+    this.voiceSession.setState('processing');
+
+    const url = `${environment.apiBaseUrl}/v1/voice/turn?language=${encodeURIComponent(language)}&voice=${encodeURIComponent(voice)}`;
+    this.currentRequest = this.http
+      .post<VoiceTurnResponseWire>(url, audio, {
+        headers: { 'Content-Type': audio.type || 'application/octet-stream' },
+      })
+      .subscribe({
+        next: (res) => {
+          if (mySequence !== this.sequence) {
+            return; // superseded by a newer turn or an error simulation
+          }
+
+          this.appendTurn(turnFromWire(res.userTurn));
+          this.appendTurn(turnFromWire(res.assistantTurn));
+          this.voiceSession.setState('responding');
+
+          if (res.audio) {
+            this.playSynthesizedAudio(res.audio.base64, res.audio.contentType);
+          } else {
+            // Non-fatal by design (ADR-020/ADR-024) — the reply is still
+            // fully readable as text.
+            console.error('voice turn: speech synthesis failed, no audio returned');
+          }
+
+          setTimeout(() => {
+            if (mySequence === this.sequence) {
+              this.voiceSession.setState('idle');
+            }
+          }, RESPONDING_DELAY_MS);
+        },
+        error: (err: HttpErrorResponse) => {
+          if (mySequence !== this.sequence) {
+            return;
+          }
+          console.error('sendVoiceTurn failed', err);
+          this.voiceSession.setState('error');
+        },
+      });
+  }
+
   simulateError(): void {
     this.sequence++;
     this.currentRequest?.unsubscribe();
@@ -131,6 +193,27 @@ export class ConversationRealService implements ConversationService {
 
   private appendTurn(turn: Turn): void {
     this._turns.update((turns) => [...turns, turn]);
+  }
+
+  /** Decodes a base64 audio payload from POST /v1/voice/turn and plays it.
+   * Playback failure is logged only, same non-fatal handling as
+   * `speakReply`'s. */
+  private playSynthesizedAudio(base64: string, contentType: string): void {
+    let blob: Blob;
+    try {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      blob = new Blob([bytes], { type: contentType });
+    } catch (err) {
+      console.error('failed to decode synthesized audio', err);
+      return;
+    }
+    this.audioPlayback
+      .play(blob)
+      .catch((err: unknown) => console.error('speech playback failed', err));
   }
 
   /** Synthesizes and plays an assistant reply's speech. Fire-and-forget by
