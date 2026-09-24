@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import resource
 import subprocess
 import sys
@@ -34,44 +33,14 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
+from scripts.wer import word_error_rate  # noqa: E402 - see sys.path.insert above
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REGISTRY_PATH = os.path.join(_HERE, "..", "models.yaml")
 _ASR_STORE_DIR = os.path.join(_HERE, "..", "..", "models", "asr")
 _FIXTURES_PATH = os.path.join(_HERE, "..", "eval_data", "asr_fixtures.yaml")
 _AUDIO_DIR = os.path.join(_HERE, "..", "eval_data", "audio")
 _OUTPUT_PATH = os.path.join(_HERE, "..", "benchmark_results", "asr_milestone_3b.json")
-
-_PUNCTUATION = re.compile(r"[.,!?؟।॥\"'’—\-:;]")
-
-
-def _normalize(text: str) -> list[str]:
-    return _PUNCTUATION.sub("", text.lower()).split()
-
-
-def _word_error_rate(reference: str, hypothesis: str) -> float:
-    """Standard word-level Levenshtein-distance WER: (substitutions +
-    deletions + insertions) / len(reference words). Case- and
-    light-punctuation-insensitive (see _normalize) so trivial formatting
-    differences aren't counted as errors.
-    """
-    ref = _normalize(reference)
-    hyp = _normalize(hypothesis)
-    if not ref:
-        return 0.0 if not hyp else 1.0
-
-    n, m = len(ref), len(hyp)
-    dp = [[0] * (m + 1) for _ in range(n + 1)]
-    for i in range(n + 1):
-        dp[i][0] = i
-    for j in range(m + 1):
-        dp[0][j] = j
-    for i in range(1, n + 1):
-        for j in range(1, m + 1):
-            if ref[i - 1] == hyp[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
-            else:
-                dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
-    return dp[n][m] / n
 
 
 def _peak_rss_mb() -> float:
@@ -117,7 +86,7 @@ def _benchmark_one(key: str, entry: dict, fixtures: list[dict]) -> dict:
             )
         )
         elapsed = time.monotonic() - start
-        wer = _word_error_rate(fixture["text"], result.transcript)
+        wer = word_error_rate(fixture["text"], result.transcript)
 
         print(
             f"  [{fixture['language']}] {fixture['id']}: WER={wer:.2f} ({elapsed:.2f}s)",

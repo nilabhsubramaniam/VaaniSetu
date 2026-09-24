@@ -1,6 +1,7 @@
 """VaaniSetu's Python AI service HTTP surface: the `llm` capability
-(proto/llm.openapi.yaml, `POST /v1/generate`) and the `asr` capability
-(proto/asr.openapi.yaml, `POST /v1/transcribe`), hosted in one FastAPI app
+(proto/llm.openapi.yaml, `POST /v1/generate`), the `asr` capability
+(proto/asr.openapi.yaml, `POST /v1/transcribe`), and the `tts` capability
+(proto/tts.openapi.yaml, `POST /v1/synthesize`), hosted in one FastAPI app
 per docs/DECISIONS.md ADR-017 — "one module per capability" is a
 code-organization convention (docs/DEVELOPMENT.md §5), not a
 one-process-per-capability deployment rule. Plus an operational
@@ -18,12 +19,13 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from . import config, registry
 from .engines.asr.base import ASREngine, TranscribeRequest
 from .engines.base import GenerateRequest, LLMEngine
+from .engines.tts.base import SynthesizeRequest, TTSEngine
 
 logger = logging.getLogger("vaanisetu.ai_services")
 
@@ -41,6 +43,8 @@ class _AppState:
     llm_model_key: str | None = None
     asr_engine: ASREngine | None = None
     asr_model_key: str | None = None
+    tts_engine: TTSEngine | None = None
+    tts_model_key: str | None = None
 
 
 @asynccontextmanager
@@ -55,6 +59,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.state.asr_engine = registry.build_engine(asr_entry, _cfg.asr_model_store_dir)
         app.state.state.asr_model_key = asr_entry.key
         logger.info("asr model loaded: %s (%s)", asr_entry.key, asr_entry.repo_id)
+
+        tts_entry = registry.load_selected_entry(_cfg.model_registry_path, "tts")
+        app.state.state.tts_engine = registry.build_engine(tts_entry, _cfg.tts_model_store_dir)
+        app.state.state.tts_model_key = tts_entry.key
+        logger.info("tts model loaded: %s (%s)", tts_entry.key, tts_entry.repo_id)
     except registry.RegistryError as e:
         # Fail loudly at startup rather than on the first request — an
         # operator finds out immediately that a configured model isn't
@@ -80,6 +89,13 @@ def get_asr_engine() -> ASREngine:
     engine = app.state.state.asr_engine
     if engine is None:
         raise HTTPException(status_code=503, detail="asr model not loaded")
+    return engine
+
+
+def get_tts_engine() -> TTSEngine:
+    engine = app.state.state.tts_engine
+    if engine is None:
+        raise HTTPException(status_code=503, detail="tts model not loaded")
     return engine
 
 
@@ -137,11 +153,34 @@ async def transcribe(
     return TranscribeResponseBody(transcript=result.transcript)
 
 
+class SynthesizeRequestBody(BaseModel):
+    text: str
+    language: str
+
+
+@app.post("/v1/synthesize")
+def synthesize(
+    body: SynthesizeRequestBody, engine: TTSEngine = Depends(get_tts_engine)
+) -> Response:
+    try:
+        result = engine.synthesize(SynthesizeRequest(text=body.text, language=body.language))
+    except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
+        logger.error("synthesize failed: %s", e)
+        raise HTTPException(status_code=500, detail="synthesis failed") from e
+
+    return Response(content=result.audio, media_type=result.content_type)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, object]:
     state = app.state.state
     return {
-        "ready": state.llm_engine is not None and state.asr_engine is not None,
+        "ready": (
+            state.llm_engine is not None
+            and state.asr_engine is not None
+            and state.tts_engine is not None
+        ),
         "llm_model": state.llm_model_key,
         "asr_model": state.asr_model_key,
+        "tts_model": state.tts_model_key,
     }

@@ -7,14 +7,21 @@ project moves between milestones or a phase's status changes.
 
 - **Current phase:** Phase 2 - Local LLM, **DONE**. Phase 3 - Speech-to-Text,
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
-  **IN PROGRESS** (Milestone 4a complete; Milestone 4b not started).
+  **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap —
+  see below).
 - **Current focus:** none active — awaiting the user's decision to start
-  Milestone 4b (Python `tts` capability, model benchmark, real wiring); see
-  `AGENTS.md` §5, "never advance to the next milestone automatically".
-- **Last updated:** 2026-09-24 (Milestone 4a: Go `tts` capability boundary
-  built against `FakeTTSClient`, and real browser audio playback wired
-  into the conversation flow — an assistant reply now plays back a real,
-  audible WAV clip end to end, though not yet real synthesized speech)
+  Phase 5 (End-to-End Voice MVP); see `AGENTS.md` §5, "never advance to the
+  next milestone automatically".
+- **Last updated:** 2026-09-24 (Milestone 4b: Python `tts` capability
+  built and wired for real — `facebook/mms-tts-hin` selected after a
+  real RTF/proxy-WER benchmark against `coqui/XTTS-v2`; a third,
+  Apache-2.0-licensed candidate, `ai4bharat/indic-parler-tts`, is fully
+  implemented but could not be benchmarked because Hugging Face denied
+  gated-repo access. An assistant reply in Hindi now plays back real,
+  audible, freshly synthesized speech end to end through the real Go and
+  Python services — verified live, not just unit-tested. Known gap:
+  the selected model cannot produce Hinglish speech at all, only Hindi;
+  see `docs/DECISIONS.md` ADR-021 and `docs/ROADMAP.md` Phase 4)
 
 ## Completed
 
@@ -224,16 +231,111 @@ project moves between milestones or a phase's status changes.
     also verified live, not just in the benchmark, for honest reporting.
   - `docs/DEVELOPMENT.md` §5/§5.1 and its repository-structure tree
     updated for the second capability module and its scripts/fixtures.
+- **Phase 4, Milestone 4a - Go `tts` capability boundary and real audio
+  playback:**
+  - Backend: new `internal/tts` package mirrors `internal/llm`/
+    `internal/asr`'s fake/real-client shape exactly (`TTSClient`
+    interface, `FakeTTSClient` — a real, playable generated WAV tone, not
+    opaque stub bytes — in use now, `HTTPTTSClient` built for Milestone
+    4b). New `POST /api/v1/speech/synthesize` (`{text, language}` JSON in,
+    `audio/wav` bytes out, per `docs/openapi/speech.yaml` and
+    `proto/tts.openapi.yaml`) has no persistence side effect.
+  - Frontend: new `AudioPlaybackService` wraps the browser's `<audio>`
+    element; wired directly into `ConversationRealService` so a chat
+    reply triggers synthesis + playback fire-and-forget — a synthesis
+    failure is logged, never surfaces as the conversation's `error` state
+    (voice output is additive to the working text flow, ADR-020).
+  - Tests: new Go tests for `internal/tts`'s fake/HTTP clients and the
+    `handleSynthesize` handler; new frontend tests for
+    `AudioPlaybackService` and the extended `ConversationRealService`/
+    `SpeechService`. All pass; `go build/vet/test`, `gofmt`,
+    `golangci-lint`, `ng test/lint/build`, and `prettier` all clean.
+  - `docs/DECISIONS.md` ADR-020 records the transport-shape (JSON
+    in/binary out, the mirror image of `asr`), fake-tone, and
+    fire-and-forget-playback decisions this milestone made.
+- **Phase 4, Milestone 4b - Python `tts` capability, benchmark, and real
+  wiring:**
+  - `ai-services/app/engines/tts/` (new capability module, hosted in the
+    same FastAPI process as `llm`/`asr` per ADR-017): `TTSEngine`
+    interface with three implementations built —
+    `MmsVitsEngine` (`facebook/mms-tts-hin`, via `transformers`),
+    `XttsEngine` (`coqui/XTTS-v2`, via `coqui-tts`), and `ParlerTTSEngine`
+    (`ai4bharat/indic-parler-tts`, via `parler-tts`). `app/main.py` now
+    loads all three capabilities at startup and implements
+    `proto/tts.openapi.yaml`'s `POST /v1/synthesize`; `/healthz` reports
+    all three models.
+  - Model registry gained a `tts` section in `ai-services/models.yaml`
+    with a `voices` map per candidate (per-language voice selector —
+    `docs/ROADMAP.md` Phase 4's "per-language voice configuration" scope
+    item), `selected: mms-tts-hin`.
+  - Benchmark (`ai-services/scripts/benchmark_tts.py`) reuses
+    `eval_data/asr_fixtures.yaml`'s text/language set (no new fixture
+    file) and measures real-time factor plus an intelligibility proxy —
+    each synthesized clip fed back through the already-selected
+    `faster-whisper-large-v3-turbo` engine, WER computed against the
+    input text (`docs/EVALUATION.md` §5's documented proxy metric).
+    Pronunciation accuracy and naturalness (MOS) are recorded as
+    explicitly **not measured** — no human listening panel exists in this
+    environment. Full results in
+    `ai-services/benchmark_results/tts_milestone_4b.json`.
+  - `facebook/mms-tts-hin` selected: ~3x faster, less than half the peak
+    memory, and 3x more accurate on Hindi (0.238 vs 0.713 proxy WER) than
+    `coqui/XTTS-v2`. `ai4bharat/indic-parler-tts` — the only
+    Apache-2.0-licensed candidate — could **not** be benchmarked: its
+    Hugging Face repo is gated, and access was denied even after
+    requesting it with a real account/token ("not in the authorized
+    list"). See `docs/DECISIONS.md` ADR-021 for full reasoning and
+    numbers, including a real finding along the way: the selected model's
+    tokenizer vocabulary is Devanagari-phoneme only, so it cannot produce
+    **any** audio for Hinglish (Latin-script) text — `MmsVitsEngine`
+    raises a clear `UnsupportedTextError` for this rather than crashing
+    inside `transformers` with an opaque tensor-dtype error.
+  - `HTTPTTSClient` (already built in Milestone 4a) is now wired to a real
+    service: setting `VAANISETU_TTS_SERVICE_URL` on the backend switches
+    it from `FakeTTSClient` with no code change.
+  - `docker-compose.yml`'s `ai-services` environment gained
+    `VAANISETU_TTS_MODEL_STORE`; `backend`'s `VAANISETU_TTS_SERVICE_URL`
+    now points at it too (the existing `./models` mount already covers
+    `models/tts/`).
+  - Tests: 12 new Python tests (one engine-wrapper module per candidate,
+    mocking each underlying library; `/v1/synthesize` contract tests;
+    registry tests for the three new engine kinds) plus the WER
+    calculation extracted from `scripts/benchmark_asr.py` into a shared
+    `scripts/wer.py` (now imported by both benchmark scripts, avoiding
+    duplication) — 53 total, all pass; `ruff check`/`ruff format --check`
+    clean.
+  - **Verified live, end to end:** the AI service loads all three models
+    and reports all ready; a direct `POST /v1/synthesize` call returns a
+    real, valid, non-silent, playable WAV file; with the Go backend
+    pointed at it (`usesFakeTTS:false` in its startup log), a real
+    `POST /api/v1/chat` reply's text, sent to `POST
+    /api/v1/speech/synthesize`, produces real synthesized Hindi speech —
+    the full chain, actually run and inspected (duration, sample rate,
+    non-zero waveform), not just unit-tested. The known Hinglish gap was
+    also verified live (a 500, not a crash), for honest reporting.
+  - `ai-services/pyproject.toml` gained `torch`, `transformers`,
+    `parler-tts` (installed from GitHub — no PyPI release —
+    `tool.hatch.metadata.allow-direct-references` set accordingly), and
+    `coqui-tts` as runtime dependencies. `ai-services/.venv` was recreated
+    against Python 3.12 specifically (not 3.14, this machine's default) —
+    `tokenizers`' sdist hits a real, broken-metadata build failure on
+    Python 3.14 in the absence of a prebuilt wheel; 3.12 has wheels for
+    every dependency this milestone added. `ai-services/SETUP.md` and
+    `docs/DEVELOPMENT.md` §5/§5.1 updated accordingly.
 
 ## Next
 
 - No milestone is currently approved to start. `docs/ROADMAP.md` names
-  Phase 4 (Text-to-Speech) as next in order; per `AGENTS.md` §5, work does
-  not begin on it until the user decides to move the project there.
+  Phase 5 (End-to-End Voice MVP) as next in order; per `AGENTS.md` §5,
+  work does not begin on it until the user decides to move the project
+  there. Two smaller, well-scoped follow-ups are also open whenever the
+  user wants them: re-benchmarking `ai4bharat/indic-parler-tts` once its
+  Hugging Face gated-repo access is granted (ADR-021), and a hands-on
+  browser/microphone/speaker smoke test (still not performed by the agent
+  in any phase so far — no interactive browser available).
 
 ## Not started
 
-- Text-to-Speech
 - End-to-end voice loop
 - Indian language breadth (beyond Hindi / Hinglish scope)
 - RAG
@@ -247,11 +349,12 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean (88 tests). Its
+- `frontend/` builds, lints, and tests clean (117 tests). Its
   `ConversationService` runs against the real backend
   (`ConversationRealService`); `MicButton` now really records audio via
-  `AudioCaptureService`/`SpeechService`; only `VoiceSessionService` still
-  uses a mock (see above).
+  `AudioCaptureService`/`SpeechService`; a chat reply now really plays
+  back synthesized speech via `AudioPlaybackService`; only
+  `VoiceSessionService` still uses a mock (see above).
 - `backend/` builds, vets, lints (`golangci-lint`), and tests clean, and has
   now been run for real against a live, native PostgreSQL and a live,
   native `ai-services` instance (see above) — a developer following
@@ -261,21 +364,27 @@ project moves between milestones or a phase's status changes.
   this environment — they skip themselves cleanly rather than failing, and
   have not been run for real against a container.
 - `ai-services/` builds its dependencies (`uv sync` — `llama-cpp-python`
-  compiles from source, `faster-whisper`/`ctranslate2` use prebuilt
-  wheels), tests (35), lints, and formats clean. Its own tests never load
-  a real model (fake `LLMEngine`/`ASREngine` implementations are
-  dependency-injected); both models actually running have been verified
-  separately, live, per above.
-- The `docker-compose.yml` stack (postgres + backend + ai-services) has not
-  been run for real — Docker remains unavailable in this environment. Each
-  service has instead been verified running natively. `backend/Dockerfile`
-  and `ai-services/Dockerfile` have not been built. Worth doing on a
-  machine with Docker before either milestone is treated as fully verified
-  in every respect.
-- Two capabilities' models are selected: `llm`
-  (`llama-3.2-3b-instruct`, ADR-016) and `asr`
-  (`faster-whisper-large-v3-turbo`, ADR-018). Every other capability's
-  model choice is still `TBD` (see ADR-008).
+  compiles from source; `faster-whisper`/`ctranslate2`, `torch`,
+  `transformers`, and `coqui-tts` use prebuilt wheels; `parler-tts`
+  installs from GitHub, no PyPI release), tests (53), lints, and formats
+  clean. Its `.venv` targets Python 3.12 specifically, not this machine's
+  default 3.14 — `tokenizers` has no cp314 wheel yet and its sdist fails
+  to build (see `ai-services/SETUP.md` Troubleshooting). Its own tests
+  never load a real model (fake `LLMEngine`/`ASREngine`/`TTSEngine`
+  implementations are dependency-injected); all three models actually
+  running have been verified separately, live, per above.
+- The `docker-compose.yml` stack (postgres + backend + ai-services, now
+  covering all three capabilities) has not been run for real — Docker
+  remains unavailable in this environment. Each service has instead been
+  verified running natively. `backend/Dockerfile` and
+  `ai-services/Dockerfile` have not been built. Worth doing on a machine
+  with Docker before any milestone is treated as fully verified in every
+  respect.
+- Three capabilities' models are selected: `llm`
+  (`llama-3.2-3b-instruct`, ADR-016), `asr`
+  (`faster-whisper-large-v3-turbo`, ADR-018), and `tts`
+  (`facebook/mms-tts-hin`, ADR-021 — with the Hinglish gap noted above).
+  Every other capability's model choice is still `TBD` (see ADR-008).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
   Postgres data, `/models/` (downloaded weights), and
   `ai-services/eval_data/audio/` (generated ASR test fixtures) are all

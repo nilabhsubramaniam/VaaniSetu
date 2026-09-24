@@ -1,8 +1,9 @@
-"""Contract tests for the `llm` and `asr` capabilities' HTTP surfaces
-(proto/llm.openapi.yaml, proto/asr.openapi.yaml). Uses fake engines via
-FastAPI's dependency-override mechanism — no real model file or lifespan
-startup required, the same "depend on the interface, fake it in tests"
-pattern used on the Go side (internal/api's handler tests against a fake
+"""Contract tests for the `llm`, `asr`, and `tts` capabilities' HTTP
+surfaces (proto/llm.openapi.yaml, proto/asr.openapi.yaml,
+proto/tts.openapi.yaml). Uses fake engines via FastAPI's
+dependency-override mechanism — no real model file or lifespan startup
+required, the same "depend on the interface, fake it in tests" pattern
+used on the Go side (internal/api's handler tests against a fake
 ConversationService).
 """
 
@@ -14,7 +15,8 @@ from app.engines.asr.base import ASREngine
 from app.engines.asr.base import TranscribeRequest as ASRTranscribeRequest
 from app.engines.asr.base import TranscribeResponse as ASRTranscribeResponse
 from app.engines.base import GenerateRequest, GenerateResponse, LLMEngine
-from app.main import app, get_asr_engine, get_llm_engine
+from app.engines.tts.base import SynthesizeRequest, SynthesizeResponse, TTSEngine
+from app.main import app, get_asr_engine, get_llm_engine, get_tts_engine
 
 
 class FakeLLM(LLMEngine):
@@ -43,6 +45,19 @@ class FakeASR(ASREngine):
         return ASRTranscribeResponse(transcript=self.transcript)
 
 
+class FakeTTS(TTSEngine):
+    def __init__(self, audio: bytes = b"fake wav bytes", fail: bool = False) -> None:
+        self.audio = audio
+        self.fail = fail
+        self.last_request: SynthesizeRequest | None = None
+
+    def synthesize(self, request: SynthesizeRequest) -> SynthesizeResponse:
+        self.last_request = request
+        if self.fail:
+            raise RuntimeError("boom")
+        return SynthesizeResponse(audio=self.audio)
+
+
 def _client_with_llm(engine: LLMEngine) -> TestClient:
     app.dependency_overrides[get_llm_engine] = lambda: engine
     return TestClient(app)
@@ -50,6 +65,11 @@ def _client_with_llm(engine: LLMEngine) -> TestClient:
 
 def _client_with_asr(engine: ASREngine) -> TestClient:
     app.dependency_overrides[get_asr_engine] = lambda: engine
+    return TestClient(app)
+
+
+def _client_with_tts(engine: TTSEngine) -> TestClient:
+    app.dependency_overrides[get_tts_engine] = lambda: engine
     return TestClient(app)
 
 
@@ -160,6 +180,38 @@ def test_transcribe_can_return_an_empty_transcript_without_erroring() -> None:
     assert resp.json() == {"transcript": ""}
 
 
+def test_synthesize_returns_the_engines_audio_as_wav() -> None:
+    fake = FakeTTS(audio=b"RIFF....WAVEfmt ")
+    client = _client_with_tts(fake)
+
+    resp = client.post("/v1/synthesize", json={"text": "नमस्ते", "language": "hi"})
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "audio/wav"
+    assert resp.content == b"RIFF....WAVEfmt "
+    assert fake.last_request == SynthesizeRequest(text="नमस्ते", language="hi")
+
+
+def test_synthesize_rejects_a_malformed_body() -> None:
+    fake = FakeTTS()
+    client = _client_with_tts(fake)
+
+    resp = client.post("/v1/synthesize", json={"text": "hello"})  # missing "language"
+
+    assert resp.status_code == 422
+
+
+def test_synthesize_maps_engine_failure_to_5xx() -> None:
+    fake = FakeTTS(fail=True)
+    client = _client_with_tts(fake)
+
+    resp = client.post("/v1/synthesize", json={"text": "hello", "language": "en"})
+
+    # proto/tts.openapi.yaml only requires a non-2xx status on failure —
+    # Go's HTTPTTSClient treats every such response identically.
+    assert resp.status_code >= 500
+
+
 def test_healthz_reports_not_ready_when_no_engines_loaded() -> None:
     # No dependency override and no lifespan run (TestClient here is used
     # without entering it as a context manager, so startup never fires) —
@@ -170,4 +222,9 @@ def test_healthz_reports_not_ready_when_no_engines_loaded() -> None:
     resp = client.get("/healthz")
 
     assert resp.status_code == 200
-    assert resp.json() == {"ready": False, "llm_model": None, "asr_model": None}
+    assert resp.json() == {
+        "ready": False,
+        "llm_model": None,
+        "asr_model": None,
+        "tts_model": None,
+    }

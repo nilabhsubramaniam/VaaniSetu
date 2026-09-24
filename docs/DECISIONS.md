@@ -830,6 +830,110 @@ Status**.
   code change.
 - **Status:** Accepted.
 
+## ADR-021 - Phase 4 Milestone 4b: TTS engines, benchmark, and model selection
+
+- **Decision:** Three related Milestone 4b choices:
+  1. **Three candidates built and benchmarked (two actually benchmarked):**
+     `facebook/mms-tts-hin` (VITS, via `transformers`), `coqui/XTTS-v2`
+     (via `coqui-tts`), and `ai4bharat/indic-parler-tts` (via `parler-tts`)
+     each got a real `app/engines/tts/` wrapper implementing the shared
+     `TTSEngine` interface. `indic-parler-tts` could **not** be
+     benchmarked: its Hugging Face repo is gated, and even after a token
+     was created and used, Hugging Face returned "you are not in the
+     authorized list" — this specific account's access request has not
+     been (or will not be) manually approved. It stays fully implemented
+     and listed in `models.yaml`, unselected, ready to benchmark the
+     moment access is granted.
+  2. **Model selected: `facebook/mms-tts-hin`.** Fastest, lightest, and by
+     far the most accurate of the two benchmarked candidates on Hindi —
+     but it has a real, hard limitation, not just a quality gap: its
+     tokenizer vocabulary is Devanagari-phoneme only, so Latin-script text
+     (Hinglish, English) tokenizes to a **literally empty sequence** — it
+     cannot produce any audio for Hinglish input at all.
+     `MmsVitsEngine.synthesize` now raises a descriptive
+     `UnsupportedTextError` for this case instead of letting an empty
+     tensor crash inside `transformers` with an opaque dtype error.
+  3. **Intelligibility measured via the documented proxy** (feeding
+     synthesized audio back through the already-selected
+     `faster-whisper-large-v3-turbo` engine and computing WER against the
+     input text, reusing `eval_data/asr_fixtures.yaml`'s text/language
+     set — no new fixture file). **Pronunciation accuracy and naturalness
+     (MOS) are not measured** — both require a human listener, which
+     doesn't exist in this environment; recorded as an explicit,
+     unmeasured gap in `benchmark_results/tts_milestone_4b.json`, not
+     silently skipped.
+- **Reason:**
+  1. Full results in `ai-services/benchmark_results/tts_milestone_4b.json`
+     (8 fixtures: 4 Hindi, 2 Hinglish, 2 English; each candidate run in its
+     own subprocess for accurate memory isolation, same method as
+     ADR-016/ADR-018). Summary (proxy WER — lower is better; RTF —
+     synthesis time / audio duration):
+
+     | Candidate | License | Hindi WER | Hinglish WER | English WER | Mean RTF | Load | Peak RSS |
+     |---|---|---|---|---|---|---|---|
+     | mms-tts-hin | CC-BY-NC-4.0 | **0.238** | fails (0/2 producible) | 1.00 | **0.166** | **0.96s** | **2.43GB** |
+     | xtts-v2 | CPML | 0.713 | 1.813 (unintelligible) | 0.00 | 0.404 | 14.92s | 5.45GB |
+     | indic-parler-tts | Apache-2.0 | not benchmarked — gated repo access denied | | | | | |
+
+     `mms-tts-hin` is ~3x faster, uses less than half the memory, and is
+     three times more accurate on Hindi than `xtts-v2` — a decisive margin
+     on the language that matters most for the current MVP scope. Neither
+     candidate produces usable Hinglish speech: `mms-tts-hin` cannot
+     attempt it at all (see point 2 above); `xtts-v2` attempts it but the
+     proxy transcript is unintelligible word salad (WER 1.81, worse than
+     the "say nothing" baseline). `xtts-v2`'s only clear win is English
+     (0.00 WER, unsurprising for a model trained heavily on Western
+     languages) — not this project's MVP focus language.
+  2. Both benchmarked candidates carry a non-commercial license
+     (`mms-tts-hin`: CC-BY-NC-4.0; `xtts-v2`: CPML, and Coqui Inc. no
+     longer exists to sell a commercial license). License is therefore not
+     a differentiator between them this round — both are acceptable for
+     local/personal, non-commercial use only, and neither should be part
+     of any future commercial distribution without revisiting this ADR.
+     `indic-parler-tts` (Apache-2.0) is the only candidate here without
+     this constraint, which is exactly why it is worth re-benchmarking
+     once its access request is resolved, rather than dropping it.
+  3. Choosing evidence over convenience: `xtts-v2` "works" on every
+     language without crashing, which could look like the safer choice,
+     but its actual measured Hindi intelligibility is worse than
+     `mms-tts-hin`'s by a wide margin, and its Hinglish output is
+     unintelligible regardless. Selecting the candidate with a narrower
+     but higher-quality, faster, lighter capability — and documenting the
+     Hinglish gap plainly — follows the same principle ADR-018 applied to
+     Whisper's Hinglish weakness: report the real limitation rather than
+     picking a worse-but-technically-broader model to paper over it.
+- **Alternatives considered:**
+  - Waiting indefinitely for `indic-parler-tts` access before selecting
+    anything — rejected: Milestone 4b's Definition of Done needs a real,
+    working `selected` model now; re-benchmarking `indic-parler-tts` later
+    is a small, well-scoped follow-up (the wrapper and registry entry
+    already exist), not a reason to block this milestone.
+  - Selecting `xtts-v2` for its broader language coverage — rejected: its
+    Hindi intelligibility is measurably worse, it is ~15x slower to load
+    and ~2.2x heavier at rest, and its "coverage" of Hinglish is
+    unintelligible in practice, not a genuine capability advantage.
+  - Silently falling back to Hindi phonemes for Hinglish text on
+    `mms-tts-hin` (e.g. transliterating Latin-script input to Devanagari
+    before synthesis) — not attempted this round: transliteration quality
+    is itself an unevaluated variable that would need its own benchmark;
+    worth a real follow-up (Phase 6, Indian Language Support, already owns
+    script/language-ID work) rather than an untested guess bolted on here.
+- **Impact:** `ai-services/models.yaml`'s `tts.selected` is
+  `mms-tts-hin`. `backend/internal/tts.HTTPTTSClient` (already built in
+  Milestone 4a) needs only `VAANISETU_TTS_SERVICE_URL` set to switch from
+  `FakeTTSClient` — no code change. **Known gap, stated plainly: spoken
+  replies to Hinglish input have no real TTS voice yet** — the Go
+  `/speech/synthesize` call will fail (mapped to a 5xx, same as any other
+  engine failure) whenever `language=hinglish` is requested; the frontend's
+  Milestone 4a fire-and-forget playback (ADR-020, point 4) means this
+  degrades gracefully to text-only for Hinglish replies rather than
+  breaking the conversation. This should inform Phase 6 (Indian Language
+  Support) and is the first thing to revisit if `indic-parler-tts` access
+  is granted. The selected model's non-commercial license means the
+  current build must not be distributed commercially without first
+  resolving this ADR.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

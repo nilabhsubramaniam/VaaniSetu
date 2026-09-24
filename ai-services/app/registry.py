@@ -9,12 +9,13 @@ change (ADR-006).
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import yaml
 
 from .engines.asr.base import ASREngine
 from .engines.base import LLMEngine
+from .engines.tts.base import TTSEngine
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,13 @@ class ModelEntry:
     # resolved as <model_store_dir>/<key>/ — filename doesn't apply.
     compute_type: str = "int8"
     device: str = "auto"
+    # mms_vits / parler_tts / xtts ("tts" capability): each also a
+    # directory snapshot under <model_store_dir>/<key>/. Maps a
+    # LanguageCode to an engine-specific voice selector — a natural
+    # language description for parler_tts, a built-in speaker name for
+    # xtts, unused by mms_vits (docs/ARCHITECTURE.md §3.6's "per-language
+    # voice configuration").
+    voices: dict[str, str] = field(default_factory=dict)
 
 
 class RegistryError(Exception):
@@ -65,10 +73,11 @@ def load_selected_entry(registry_path: str, capability: str) -> ModelEntry:
         max_tokens=candidate.get("max_tokens", 512),
         compute_type=candidate.get("compute_type", "int8"),
         device=candidate.get("device", "auto"),
+        voices=candidate.get("voices", {}),
     )
 
 
-def build_engine(entry: ModelEntry, model_store_dir: str) -> LLMEngine | ASREngine:
+def build_engine(entry: ModelEntry, model_store_dir: str) -> LLMEngine | ASREngine | TTSEngine:
     """Builds the engine for `entry`. `entry.engine` selects the wrapper
     class; add a branch here (never a new caller-visible type) when a
     genuinely new engine kind is needed.
@@ -106,5 +115,28 @@ def build_engine(entry: ModelEntry, model_store_dir: str) -> LLMEngine | ASREngi
             compute_type=entry.compute_type,
             device=entry.device,
         )
+
+    if entry.engine in ("mms_vits", "parler_tts", "xtts"):
+        model_path = os.path.join(model_store_dir, entry.key)
+        if not os.path.isdir(model_path):
+            raise RegistryError(
+                f"registry: model directory not found: {model_path} "
+                f"(expected the full {entry.repo_id} snapshot downloaded there — "
+                "see ai-services/scripts/download_models.py)"
+            )
+
+        if entry.engine == "mms_vits":
+            from .engines.tts.mms_vits_engine import MmsVitsEngine
+
+            return MmsVitsEngine(model_path=model_path)
+
+        if entry.engine == "parler_tts":
+            from .engines.tts.parler_engine import ParlerTTSEngine
+
+            return ParlerTTSEngine(model_path=model_path, voices=entry.voices)
+
+        from .engines.tts.xtts_engine import XttsEngine
+
+        return XttsEngine(model_path=model_path, voices=entry.voices)
 
     raise RegistryError(f"registry: unknown engine kind {entry.engine!r}")

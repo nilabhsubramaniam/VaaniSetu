@@ -62,3 +62,41 @@ asr:
       compute_type: int8
       device: auto
       license: MIT
+
+# `selected` reflects the outcome of the Milestone 4b benchmark recorded
+# in docs/DECISIONS.md ADR-021. `voices` maps a LanguageCode to an
+# engine-specific voice selector (docs/ARCHITECTURE.md §3.6's
+# "per-language voice configuration") — a natural-language description
+# for parler_tts, a built-in speaker name for xtts; mms_vits is a single
+# Hindi-only voice and needs none.
+#
+# `indic-parler-tts` could NOT be benchmarked this round — its Hugging
+# Face repo is gated and access was denied for the account used (see
+# ADR-021). It stays listed, unselected, as a real candidate worth
+# re-benchmarking once access is granted, since it is the only
+# Apache-2.0-licensed candidate here: both `mms-tts-hin` (selected) and
+# `xtts-v2` are non-commercial-licensed. See ADR-021 for the full
+# reasoning and measured evidence.
+tts:
+  selected: mms-tts-hin
+  candidates:
+    mms-tts-hin:
+      engine: mms_vits
+      repo_id: facebook/mms-tts-hin
+      license: CC-BY-NC-4.0
+    indic-parler-tts:
+      engine: parler_tts
+      repo_id: ai4bharat/indic-parler-tts
+      license: Apache-2.0
+      voices:
+        hi: "A clear Indian female voice speaks in Hindi at a moderate pace with high quality, close-sounding audio."
+        hinglish: "A clear Indian female voice speaks at a moderate pace with high quality, close-sounding audio."
+        en: "A clear Indian-accented female voice speaks in English at a moderate pace with high quality, close-sounding audio."
+    xtts-v2:
+      engine: xtts
+      repo_id: coqui/XTTS-v2
+      license: CPML
+      voices:
+        hi: "Ana Florence"
+        hinglish: "Ana Florence"
+        en: "Andrew Chipper"

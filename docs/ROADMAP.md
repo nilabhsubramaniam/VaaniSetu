@@ -155,11 +155,21 @@ integration bug (see `docs/DECISIONS.md` ADR-018) — flagged for Phase 6
 
 ## Phase 4 - Text-to-Speech
 
-**Status:** IN PROGRESS — Milestone 4a (Go `tts` capability boundary
-against `FakeTTSClient`, real browser audio playback wired into the
-conversation flow) is complete. Milestone 4b (Python `tts` capability,
-model benchmark + selection ADR, real end-to-end wiring) has not started.
-See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-020.
+**Status:** DONE — Milestone 4a (Go `tts` capability boundary against
+`FakeTTSClient`, real browser audio playback wired into the conversation
+flow) and Milestone 4b (Python `tts` capability, RTF/proxy-WER benchmark +
+selection ADR, real end-to-end wiring) are both complete; Hindi replies are
+heard as real synthesized speech. **Known gap, not blocking, more severe
+than Phase 3's:** the selected model (`facebook/mms-tts-hin`) cannot
+produce Hinglish speech **at all** — its vocabulary is Devanagari-phoneme
+only, so Latin-script text fails outright rather than sounding merely
+imperfect. This degrades gracefully to text-only for Hinglish replies
+(Milestone 4a's playback call is fire-and-forget) but is a real, unmet part
+of this phase's "Hindi / Hinglish" expected result — flagged for Phase 6
+(Indian Language Support) and as the first thing to revisit if the one
+Apache-2.0 candidate (`ai4bharat/indic-parler-tts`, gated on Hugging Face,
+access not yet granted) can be benchmarked. See `docs/CURRENT_STATE.md`
+and `docs/DECISIONS.md` ADR-020/ADR-021.
 
 - **Objective:** Speak the assistant's reply aloud with a local TTS model.
 - **Scope:** Python TTS service behind a `tts` capability interface; audio
