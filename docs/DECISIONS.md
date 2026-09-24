@@ -1263,6 +1263,107 @@ Status**.
   isolated and easy to change if they're not.
 - **Status:** Accepted.
 
+## ADR-026 - Phase 6 Milestone 6a: `langid` capability boundary, wired into `conversation.Service`
+
+- **Decision:** Four related Milestone 6a choices, following the same
+  fake-boundary-first pattern Milestones 2a/3a/4a used for `llm`/`asr`/`tts`:
+  1. **New `backend/internal/langid` package**: `LangIDClient` interface
+     (`Detect(ctx, DetectRequest{Text}) (DetectResponse{Language,
+     Confidence}, error)`), `FakeLangIDClient` (in use now — a tiny,
+     self-contained Devanagari-vs-not Unicode check, not a language-ID
+     algorithm), and `HTTPLangIDClient` (built now, wired to a real
+     service only in Milestone 6b). `proto/langid.openapi.yaml` records
+     the contract now, before the Python side exists — same as
+     `proto/tts.openapi.yaml` in Milestone 4a.
+  2. **Detection is wired into `conversation.Service.SendMessage`**, not
+     the Phase 5 orchestrator, right alongside the existing
+     `DetectScript` calls — for both the user's text and the LLM's reply,
+     on every turn, typed or spoken. `Service` gains a `langIDClient`
+     field and a `logger` field (new — `Service` previously logged
+     nothing itself); `NewService`'s signature grows from
+     `(pool, llmClient)` to `(pool, llmClient, langIDClient, logger)`.
+  3. **A detection failure is logged and swallowed, never fatal** —
+     `detectLanguage` returns `nil` on error, and `SendMessage` persists
+     the turn exactly as it would have otherwise.
+  4. **The result is persisted (`turns.detected_language`, migration
+     `0003_add_detected_language.sql`) and returned over the API
+     (`turnDTO.detectedLanguage`, `docs/openapi/chat.yaml`,
+     `frontend/.../turn.model.ts`) but does not yet drive the LLM prompt
+     language or the TTS voice, and is not shown in any UI.**
+- **Reason:**
+  1. Confirmed by reading the code, not assumed:
+     `backend/migrations/0002_add_script.sql`'s own comment says script
+     detection is "not a language-identification model — that stays
+     Phase 6's job." `DetectScript` is a deterministic Unicode-range
+     check; language ID (Hindi vs. other Devanagari-script languages,
+     Hinglish vs. English in Latin script) is a genuinely harder problem
+     this milestone finally builds a real capability boundary for — even
+     though the fake behind it, honestly, is barely more sophisticated
+     than `DetectScript` itself. The gap between the two is exactly what
+     Milestone 6b's real model closes.
+  2. `docs/ARCHITECTURE.md`'s pipeline diagram places Language Detection
+     right after ASR/STT, operating on text — and `SendMessage` is
+     already the one place both the typed (`/chat`) and spoken
+     (`/voice/turn`, via the orchestrator calling `SendMessage` exactly
+     as before) paths converge, since it already computes `DetectScript`
+     "uniformly... at persist time" (ADR-017) for both. Wiring detection
+     in here covers both paths with **one** integration point and **zero**
+     changes to `backend/internal/orchestrator` or `internal/api`'s
+     handlers — the smallest change that satisfies "integrated into the
+     turn loop" (`docs/ROADMAP.md` Phase 6 scope).
+  3. Same principle ADR-020 established for TTS: a new, non-critical
+     signal must never make an existing, working operation (sending a
+     message) start failing. Logging (not silently dropping) the failure
+     keeps it observable without being disruptive — `Service` gaining a
+     logger is a small, contained cost for that, mirroring
+     `internal/api.Server`'s existing logger dependency.
+  4. `docs/PROJECT_GOAL.md`: "a manual language pin always wins over
+     auto-detection." Persisting and returning the detected value without
+     letting it drive anything keeps this milestone small, reversible,
+     and consistent with that standing product principle — exactly how
+     `script` itself shipped and sat unused until a real consumer needed
+     it (`turn.model.ts`'s own doc comment already said as much before
+     this milestone touched it).
+- **Alternatives considered:**
+  - Building the real Python `langid` capability and a benchmark now,
+    instead of a fake — rejected: the user explicitly chose the smaller,
+    2a/3a/4a-sized first step; real candidates (e.g. `ai4bharat/IndicLID`,
+    MIT-licensed and purpose-built for native-script *and* romanized
+    Indian-language text — a much better fit than general-purpose options
+    like fastText's `lid.176`, which has no code-mixed class and a
+    CC-BY-SA license) are Milestone 6b's evidence-based selection to make,
+    not this one's.
+  - Wiring detection into `internal/orchestrator` instead of
+    `conversation.Service` — rejected: the orchestrator only sees the
+    spoken path; typed messages via `/chat` never touch it, and
+    duplicating the call in two places for one signal is worse than one
+    integration point in the layer both paths already share.
+  - Reusing `DetectScript`'s logic inside `FakeLangIDClient` — rejected:
+    would require `internal/langid` to import `internal/conversation`
+    while `internal/conversation` also imports `internal/langid` for the
+    interface — an import cycle. The fake's own tiny, duplicated
+    Unicode check is simpler than restructuring package boundaries to
+    avoid it for placeholder code.
+  - Letting the detected language immediately override the LLM
+    prompt/TTS voice when it disagrees with the manual selection —
+    rejected: contradicts `docs/PROJECT_GOAL.md`'s standing "manual pin
+    wins" principle outright; worth a real, separate product decision in
+    a later milestone, not a side effect of adding the capability.
+- **Impact:** `backend/internal/langid` (new), `proto/langid.openapi.yaml`
+  (new); `internal/conversation` (`Service`'s new fields and constructor
+  signature, `Turn.DetectedLanguage`, `detectLanguage`);
+  `backend/migrations/0003_add_detected_language.sql` plus regenerated
+  `internal/db` (sqlc); `internal/api/dto.go` (`turnDTO.DetectedLanguage`);
+  `internal/config` (`LangIDServiceURL`/`UsesFakeLangID`); `cmd/api/main.go`
+  (client wiring, startup log); `docs/openapi/chat.yaml`; frontend
+  `turn.model.ts` and `conversation.real.service.ts` (wire shape only, no
+  UI change). Milestone 6b (the real Python `langid` engine, benchmark,
+  and model-selection ADR) is unblocked by all of this — only
+  `VAANISETU_LANGID_SERVICE_URL` needs to be set once it exists, no other
+  Go code change, per the same "swap by config" mechanism ADR-006
+  established.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

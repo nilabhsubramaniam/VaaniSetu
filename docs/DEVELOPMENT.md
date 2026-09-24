@@ -85,10 +85,13 @@ VaaniSetu/
     cmd/api/                        entrypoint
     internal/
       api/                          HTTP handlers, DTOs, CORS
-      conversation/                 turn persistence, LLM call, script tagging
+      conversation/                 turn persistence, LLM call, script +
+                                     detected-language tagging
       llm/                          LLMClient interface: Fake + HTTP clients
       asr/                          ASRClient interface: Fake + HTTP clients
       tts/                          TTSClient interface: Fake + HTTP clients
+      langid/                       LangIDClient interface: Fake + HTTP
+                                     clients (Phase 6 Milestone 6a)
       orchestrator/                 Phase 5 turn orchestrator: composes
                                      asr/llm/tts into one voice turn
       config/, db/, logging/
@@ -111,7 +114,8 @@ VaaniSetu/
     models.yaml                    model registry (docs/ARCHITECTURE.md §3.6)
     benchmark_results/             stored phase-scoped benchmark reports
     Makefile, .env.example, Dockerfile
-  proto/                           llm.openapi.yaml, asr.openapi.yaml, tts.openapi.yaml
+  proto/                           llm.openapi.yaml, asr.openapi.yaml, tts.openapi.yaml,
+                                    langid.openapi.yaml
                                     (Go<->Python contracts)
   docker-compose.yml               postgres + backend + ai-services
   models/                          local weights, git-ignored (not in git)

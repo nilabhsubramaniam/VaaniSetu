@@ -8,6 +8,8 @@ package conversation_test
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os/exec"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/migrations"
 )
@@ -30,8 +33,16 @@ func skipIfNoDocker(t *testing.T) {
 // newTestService starts a real Postgres container, applies the schema via
 // the exact same db.Migrate path cmd/api/main.go uses in production (not a
 // hand-rolled SQL-parsing shortcut), and returns a conversation.Service
-// backed by it.
+// backed by it, using the default FakeLangIDClient.
 func newTestService(t *testing.T, llmClient llm.LLMClient) *conversation.Service {
+	t.Helper()
+	return newTestServiceWithLangID(t, llmClient, langid.NewFakeLangIDClient())
+}
+
+// newTestServiceWithLangID is [newTestService] with an overridable
+// langid.LangIDClient, for tests that need to exercise a detection
+// failure specifically.
+func newTestServiceWithLangID(t *testing.T, llmClient llm.LLMClient, langIDClient langid.LangIDClient) *conversation.Service {
 	t.Helper()
 	skipIfNoDocker(t)
 
@@ -63,7 +74,8 @@ func newTestService(t *testing.T, llmClient llm.LLMClient) *conversation.Service
 	}
 	t.Cleanup(pool.Close)
 
-	return conversation.NewService(pool, llmClient)
+	testLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return conversation.NewService(pool, llmClient, langIDClient, testLogger)
 }
 
 func TestService_SendMessage_PersistsBothTurns(t *testing.T) {
@@ -86,6 +98,9 @@ func TestService_SendMessage_PersistsBothTurns(t *testing.T) {
 	}
 	if userTurn.Script == nil || *userTurn.Script != "Devanagari" {
 		t.Errorf("user turn Script = %v, want a computed \"Devanagari\"", userTurn.Script)
+	}
+	if userTurn.DetectedLanguage == nil || *userTurn.DetectedLanguage != "hi" {
+		t.Errorf("user turn DetectedLanguage = %v, want the fake langid client's \"hi\"", userTurn.DetectedLanguage)
 	}
 
 	history, err := svc.History(ctx)
@@ -129,6 +144,31 @@ func TestService_SendMessage_LLMFailureStillPersistsUserTurn(t *testing.T) {
 	if len(history) != 1 || history[0].Role != "user" {
 		t.Errorf("expected exactly the user turn to persist despite the LLM failure, got %+v", history)
 	}
+}
+
+func TestService_SendMessage_LangIDFailureDoesNotFailTheTurn(t *testing.T) {
+	// A brand new, non-critical tag must never stop a turn from being
+	// sent (docs/DECISIONS.md ADR-026, the same "additive, not required"
+	// rule ADR-020 already established for TTS).
+	svc := newTestServiceWithLangID(t, llm.NewFakeLLMClient(), failingLangIDClient{})
+	ctx := context.Background()
+
+	userTurn, assistantTurn, err := svc.SendMessage(ctx, "hello", "en")
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v, want nil — a langid failure must not fail the turn", err)
+	}
+	if userTurn.DetectedLanguage != nil {
+		t.Errorf("userTurn.DetectedLanguage = %v, want nil when detection fails", userTurn.DetectedLanguage)
+	}
+	if assistantTurn.DetectedLanguage != nil {
+		t.Errorf("assistantTurn.DetectedLanguage = %v, want nil when detection fails", assistantTurn.DetectedLanguage)
+	}
+}
+
+type failingLangIDClient struct{}
+
+func (failingLangIDClient) Detect(context.Context, langid.DetectRequest) (langid.DetectResponse, error) {
+	return langid.DetectResponse{}, errBoom
 }
 
 type failingLLMClient struct{}

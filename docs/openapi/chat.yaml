@@ -155,6 +155,16 @@ components:
             "Latin", "Bengali") — computed deterministically per turn
             (Phase 3, docs/DECISIONS.md ADR-017), not a language-ID model.
             Absent only on turns persisted before this field existed.
+        detectedLanguage:
+          $ref: "#/components/schemas/LanguageCode"
+          description: >
+            The `langid` capability's classification of `text` (Phase 6
+            Milestone 6a, docs/DECISIONS.md ADR-026) — currently
+            `langid.FakeLangIDClient`'s Devanagari-vs-not heuristic, not
+            real language identification (that's Milestone 6b). Not yet
+            used to drive any behavior; `language` above (the
+            manually-selected/ASR-hint value) still does. Absent only on
+            turns persisted before this field existed.
 
     ChatRequest:
       type: object

@@ -18,7 +18,7 @@ Milestone-based plan for VaaniSetu.
 | 3 | Speech-to-Text | DONE |
 | 4 | Text-to-Speech | DONE |
 | 5 | End-to-End Voice MVP | DONE |
-| 6 | Indian Language Support | NOT STARTED |
+| 6 | Indian Language Support | IN PROGRESS |
 | 7 | RAG | NOT STARTED |
 | 8 | Dataset Pipeline | NOT STARTED |
 | 9 | Evaluation & Benchmarking | NOT STARTED |
@@ -245,7 +245,15 @@ the latency model entirely). See `docs/CURRENT_STATE.md` and
 
 ## Phase 6 - Indian Language Support
 
-**Status:** NOT STARTED
+**Status:** IN PROGRESS — Milestone 6a (Go `langid` capability boundary
+against `FakeLangIDClient`, wired into `conversation.Service` so every
+turn — typed or spoken — gets a `detectedLanguage` tag) is complete.
+Milestone 6b (Python `langid` capability, benchmark against real
+candidates such as `ai4bharat/IndicLID`, model selection) has not started.
+The detected language is persisted and returned over the API but does not
+yet drive the LLM prompt, the TTS voice, or any UI — the manual language
+pin still wins throughout, per `docs/PROJECT_GOAL.md`. See
+`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-026.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.

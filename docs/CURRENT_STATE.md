@@ -9,25 +9,34 @@ project moves between milestones or a phase's status changes.
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
   **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap —
   see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
-  latency gap — see below).
+  latency gap — see below). Phase 6 - Indian Language Support,
+  **IN PROGRESS** (Milestone 6a complete; Milestone 6b not started).
 - **Current focus:** none active — awaiting the user's decision to start
-  Phase 6 (Indian Language Support); see `AGENTS.md` §5, "never advance to
-  the next milestone automatically".
-- **Last updated:** 2026-09-25 (ADR-025: the mic button now auto-stops on
-  silence — the user asked for it to detect automatically when they've
-  finished speaking. A real, benchmarked VAD model is Phase 11's scope
-  (ADR-017), so this is deliberately narrower: a coarse client-side
-  amplitude heuristic in `AudioCaptureService` (Web Audio API, no model),
-  wired into the same `stopListeningAndSend()` path manual tap and the
-  30s max-duration timer already use. Feature-detected — falls back to
-  manual tap-to-stop if the browser has no usable Web Audio API. The day
-  before (2026-09-24): Phase 5 landed a real Go turn orchestrator
+  Milestone 6b (Python `langid` capability, benchmark, real wiring); see
+  `AGENTS.md` §5, "never advance to the next milestone automatically".
+- **Last updated:** 2026-09-25 (Phase 6 Milestone 6a: a real `langid`
+  capability boundary — `backend/internal/langid`, `LangIDClient` interface,
+  `FakeLangIDClient` in use now — wired into `conversation.Service` so
+  every turn, typed or spoken, gets a `detectedLanguage` tag persisted and
+  returned over the API. Not yet real language identification (the fake is
+  a Devanagari-vs-not heuristic) and does not yet drive the LLM prompt, the
+  TTS voice, or any UI — the manual language pin still wins throughout,
+  per `docs/PROJECT_GOAL.md`. See `docs/DECISIONS.md` ADR-026.
+  The day before (2026-09-24): ADR-025 gave the mic button an automatic
+  silence-based auto-stop — the user asked for it to detect automatically
+  when they've finished speaking. A real, benchmarked VAD model is Phase
+  11's scope (ADR-017), so this is deliberately narrower: a coarse
+  client-side amplitude heuristic in `AudioCaptureService` (Web Audio API,
+  no model), wired into the same `stopListeningAndSend()` path manual tap
+  and the 30s max-duration timer already use. Feature-detected — falls
+  back to manual tap-to-stop if the browser has no usable Web Audio API.
+  Also that day: Phase 5 landed a real Go turn orchestrator
   (`backend/internal/orchestrator`, `POST /api/v1/voice/turn`), verified
   live end to end against real recorded audio, with a known,
   documented latency gap (measured p50 5.09s against a <3s target —
   see `docs/DECISIONS.md` ADR-024); Phase 4 gained a real Female/Male
   voice choice (ADR-022/ADR-023). See `docs/DECISIONS.md`
-  ADR-020 through ADR-025 and `docs/ROADMAP.md` Phases 4/5 for that full
+  ADR-020 through ADR-026 and `docs/ROADMAP.md` Phases 4/5/6 for that full
   history, including the still-open Hinglish TTS gap and the still-gated
   `ai4bharat/indic-parler-tts` candidate)
 
@@ -401,13 +410,53 @@ project moves between milestones or a phase's status changes.
   speech-then-silence; never fires on silence alone; fires at most once;
   torn down by `stop()`/`cancel()`; still works with no `AudioContext`)
   plus 1 in `mic-button.spec.ts`. `ng lint`/`test`/`build` all clean.
+- **Phase 6, Milestone 6a - Go `langid` capability boundary:**
+  - `backend/internal/langid` (new package, mirrors `internal/asr`/
+    `internal/tts` exactly): `LangIDClient` interface
+    (`Detect(ctx, DetectRequest{Text}) (DetectResponse{Language,
+    Confidence}, error)`), `FakeLangIDClient` (in use now — a
+    self-contained Devanagari-vs-not Unicode check, not a language-ID
+    algorithm), `HTTPLangIDClient` (built now, wired to a real service
+    only in Milestone 6b). `proto/langid.openapi.yaml` records the
+    Go<->Python contract, written before the Python side exists.
+  - Wired into `internal/conversation.Service.SendMessage` — not the
+    Phase 5 orchestrator — right alongside the existing `DetectScript`
+    call, for both the user's text and the LLM's reply, on every turn,
+    typed or spoken. One integration point covers both `/chat` and
+    `/voice/turn` (the orchestrator already calls `SendMessage`
+    unchanged). `Service` gained a `logger` field (it previously logged
+    nothing itself) so a detection failure is observable; the failure
+    itself is always non-fatal to the turn (same "additive" rule ADR-020
+    established for TTS).
+  - New migration `0003_add_detected_language.sql`
+    (`turns.detected_language`, nullable); `internal/db` regenerated via
+    `sqlc generate`. Returned over the API as
+    `turnDTO.detectedLanguage`/`docs/openapi/chat.yaml`, and carried
+    through (unused) in the frontend's `Turn` model — the same "compute
+    and carry, don't render yet" pattern `script` followed before any UI
+    used it. Does **not** yet drive the LLM prompt language, the TTS
+    voice, or any UI, per `docs/PROJECT_GOAL.md`'s "a manual language pin
+    always wins over auto-detection."
+  - `config.Config` gained `LangIDServiceURL`/`UsesFakeLangID`, mirroring
+    `TTSServiceURL`/`UsesFakeTTS` exactly; `cmd/api/main.go` wires the fake
+    client (no `VAANISETU_LANGID_SERVICE_URL` set — no Python `langid`
+    capability exists yet).
+  - Tests: 8 new Go tests in `internal/langid` (fake + HTTP client
+    behavior, including the fake's honest inability to distinguish
+    Hinglish from English) plus 2 new Docker-gated integration tests in
+    `internal/conversation` (detected-language round-trip; a langid
+    failure doesn't fail the turn). All pass; `go build/vet/test`,
+    `gofmt`, `golangci-lint` clean. Frontend model/service changes:
+    `ng lint`/`test`/`build` clean, no new tests needed (no new logic,
+    just a wire field carried through).
 
 ## Next
 
 - No milestone is currently approved to start. `docs/ROADMAP.md` names
-  Phase 6 (Indian Language Support) as next in order; per `AGENTS.md` §5,
-  work does not begin on it until the user decides to move the project
-  there. Open follow-ups, none blocking, whenever the user wants them:
+  Milestone 6b (Python `langid` capability, benchmark against real
+  candidates, model selection) as next in order; per `AGENTS.md` §5, work
+  does not begin on it until the user decides to move the project there.
+  Open follow-ups, none blocking, whenever the user wants them:
   re-benchmarking `ai4bharat/indic-parler-tts` once its Hugging Face
   gated-repo access is granted (ADR-021); closing the Phase 5 latency gap
   (ADR-024), most likely as part of Phase 11's streaming work; and a
@@ -440,7 +489,8 @@ project moves between milestones or a phase's status changes.
   (`SettingsStore.preferredVoice`, ADR-023); only `VoiceSessionService`
   still uses a mock (see above).
 - `backend/` builds, vets, lints (`golangci-lint`), and tests clean (now
-  including `internal/orchestrator`, Phase 5's new package), and has been
+  including `internal/orchestrator`, Phase 5's new package, and
+  `internal/langid`, Phase 6 Milestone 6a's new package), and has been
   run for real against a live, native PostgreSQL and a live, native
   `ai-services` instance (see above) — a developer following
   `backend/SETUP.md` and `ai-services/SETUP.md` on this machine can

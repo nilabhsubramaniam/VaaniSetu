@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 )
 
@@ -36,22 +38,37 @@ type Turn struct {
 	// DetectScript), computed at persist time for every turn. Nil only
 	// for turns written before this column existed (Phase 3).
 	Script *string
+	// DetectedLanguage is the langid.LangIDClient's classification of
+	// Text, computed at persist time for every turn (Phase 6 Milestone
+	// 6a). Nil for turns written before this column existed, and also
+	// nil (not an error) when detection itself failed — see SendMessage.
+	// Not yet used to drive the LLM prompt or TTS voice; Language (the
+	// manually-selected/ASR-hint value) still does that.
+	DetectedLanguage *string
 }
 
 // Service is the business-logic layer behind the chat API. It owns getting
-// or creating Phase 2's single implicit session, persisting turns, and
-// calling the configured [llm.LLMClient] for a reply.
+// or creating Phase 2's single implicit session, persisting turns,
+// calling the configured [llm.LLMClient] for a reply, and (Phase 6
+// Milestone 6a) tagging each turn with the configured
+// [langid.LangIDClient]'s detected language.
 type Service struct {
-	queries   *db.Queries
-	llmClient llm.LLMClient
+	queries      *db.Queries
+	llmClient    llm.LLMClient
+	langIDClient langid.LangIDClient
+	logger       *slog.Logger
 }
 
-// NewService builds a Service backed by pool and llmClient. Passing a
-// [llm.FakeLLMClient] or an [llm.HTTPLLMClient] here is the entire
-// difference between Milestone 2a and Milestone 2b — Service itself never
-// changes.
-func NewService(pool *pgxpool.Pool, llmClient llm.LLMClient) *Service {
-	return &Service{queries: db.New(pool), llmClient: llmClient}
+// NewService builds a Service backed by pool, llmClient, and langIDClient.
+// Passing a [llm.FakeLLMClient] or an [llm.HTTPLLMClient] here is the
+// entire difference between Milestone 2a and Milestone 2b, and likewise a
+// [langid.FakeLangIDClient] vs [langid.HTTPLangIDClient] between Milestone
+// 6a and 6b — Service itself never changes. logger is used only to
+// observe a non-fatal langIDClient failure (see SendMessage) — everything
+// else Service does either succeeds or returns an error for the caller to
+// log, the existing convention internal/api's handlers follow.
+func NewService(pool *pgxpool.Pool, llmClient llm.LLMClient, langIDClient langid.LangIDClient, logger *slog.Logger) *Service {
+	return &Service{queries: db.New(pool), llmClient: llmClient, langIDClient: langIDClient, logger: logger}
 }
 
 // SendMessage persists text as a user turn, asks the configured LLMClient
@@ -67,11 +84,12 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 
 	userScript := DetectScript(text)
 	dbUserTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
-		SessionID: sessionID,
-		Role:      "user",
-		Language:  language,
-		Text:      text,
-		Script:    &userScript,
+		SessionID:        sessionID,
+		Role:             "user",
+		Language:         language,
+		Text:             text,
+		Script:           &userScript,
+		DetectedLanguage: s.detectLanguage(ctx, text),
 	})
 	if err != nil {
 		return Turn{}, Turn{}, fmt.Errorf("conversation: persist user turn: %w", err)
@@ -87,18 +105,33 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 	assistantScript := DetectScript(genResp.Reply)
 
 	dbAssistantTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
-		SessionID: sessionID,
-		Role:      "assistant",
-		Language:  language,
-		Text:      genResp.Reply,
-		LatencyMs: &latencyMs,
-		Script:    &assistantScript,
+		SessionID:        sessionID,
+		Role:             "assistant",
+		Language:         language,
+		Text:             genResp.Reply,
+		LatencyMs:        &latencyMs,
+		Script:           &assistantScript,
+		DetectedLanguage: s.detectLanguage(ctx, genResp.Reply),
 	})
 	if err != nil {
 		return userTurn, Turn{}, fmt.Errorf("conversation: persist assistant turn: %w", err)
 	}
 
 	return userTurn, turnFromDB(dbAssistantTurn), nil
+}
+
+// detectLanguage calls the configured langid.LangIDClient and returns its
+// detected language, or nil if detection fails. Non-fatal by design
+// (docs/DECISIONS.md ADR-026, the same "additive, not required" rule
+// ADR-020 already established for TTS): a brand new, non-critical tag
+// must never stop a turn from being sent.
+func (s *Service) detectLanguage(ctx context.Context, text string) *string {
+	resp, err := s.langIDClient.Detect(ctx, langid.DetectRequest{Text: text})
+	if err != nil {
+		s.logger.Warn("langid detect failed", "error", err)
+		return nil
+	}
+	return &resp.Language
 }
 
 // History returns every turn in the current session, oldest first, or an
@@ -147,12 +180,13 @@ func (s *Service) getOrCreateSessionID(ctx context.Context) (pgtype.UUID, error)
 
 func turnFromDB(t db.Turn) Turn {
 	return Turn{
-		ID:        t.ID.String(),
-		Role:      t.Role,
-		Language:  t.Language,
-		Text:      t.Text,
-		LatencyMs: t.LatencyMs,
-		CreatedAt: t.CreatedAt.Time,
-		Script:    t.Script,
+		ID:               t.ID.String(),
+		Role:             t.Role,
+		Language:         t.Language,
+		Text:             t.Text,
+		LatencyMs:        t.LatencyMs,
+		CreatedAt:        t.CreatedAt.Time,
+		Script:           t.Script,
+		DetectedLanguage: t.DetectedLanguage,
 	}
 }

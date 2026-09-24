@@ -39,8 +39,9 @@ func isValidVoice(voice string) bool {
 
 // turnDTO is the wire representation of a turn, matching
 // frontend/src/app/core/models/turn.model.ts's Turn interface field for
-// field. LatencyMs and Script are omitted from the JSON entirely (not
-// null) when unset, matching the TypeScript fields' optionality.
+// field. LatencyMs, Script, and DetectedLanguage are omitted from the JSON
+// entirely (not null) when unset, matching the TypeScript fields'
+// optionality.
 type turnDTO struct {
 	ID        string  `json:"id"`
 	Role      string  `json:"role"`
@@ -49,17 +50,23 @@ type turnDTO struct {
 	CreatedAt string  `json:"createdAt"`
 	LatencyMs *int32  `json:"latencyMs,omitempty"`
 	Script    *string `json:"script,omitempty"`
+	// DetectedLanguage is the langid capability's classification (Phase 6
+	// Milestone 6a, docs/DECISIONS.md ADR-026) — not yet used to drive any
+	// behavior, carried through for a future milestone the same way
+	// Script was before any UI used it.
+	DetectedLanguage *string `json:"detectedLanguage,omitempty"`
 }
 
 func turnToDTO(t conversation.Turn) turnDTO {
 	return turnDTO{
-		ID:        t.ID,
-		Role:      t.Role,
-		Text:      t.Text,
-		Language:  t.Language,
-		CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339),
-		LatencyMs: t.LatencyMs,
-		Script:    t.Script,
+		ID:               t.ID,
+		Role:             t.Role,
+		Text:             t.Text,
+		Language:         t.Language,
+		CreatedAt:        t.CreatedAt.UTC().Format(time.RFC3339),
+		LatencyMs:        t.LatencyMs,
+		Script:           t.Script,
+		DetectedLanguage: t.DetectedLanguage,
 	}
 }
 

@@ -35,6 +35,9 @@ func TestLoad(t *testing.T) {
 				if !c.UsesFakeTTS() {
 					t.Error("UsesFakeTTS() = false, want true when TTSServiceURL is unset")
 				}
+				if !c.UsesFakeLangID() {
+					t.Error("UsesFakeLangID() = false, want true when LangIDServiceURL is unset")
+				}
 				if c.AllowedOrigin != "http://localhost:4200" {
 					t.Errorf("AllowedOrigin = %q, want default http://localhost:4200", c.AllowedOrigin)
 				}
@@ -77,6 +80,18 @@ func TestLoad(t *testing.T) {
 			},
 		},
 		{
+			name: "explicit langid service URL disables the fake client",
+			env: map[string]string{
+				"VAANISETU_DATABASE_URL":       "postgres://localhost/vaanisetu",
+				"VAANISETU_LANGID_SERVICE_URL": "http://ai-services:8090",
+			},
+			check: func(t *testing.T, c Config) {
+				if c.UsesFakeLangID() {
+					t.Error("UsesFakeLangID() = true, want false when LangIDServiceURL is set")
+				}
+			},
+		},
+		{
 			name: "explicit allowed origin overrides the default",
 			env: map[string]string{
 				"VAANISETU_DATABASE_URL":   "postgres://localhost/vaanisetu",
@@ -98,6 +113,7 @@ func TestLoad(t *testing.T) {
 				"VAANISETU_LLM_SERVICE_URL",
 				"VAANISETU_ASR_SERVICE_URL",
 				"VAANISETU_TTS_SERVICE_URL",
+				"VAANISETU_LANGID_SERVICE_URL",
 				"VAANISETU_LOG_LEVEL",
 				"VAANISETU_ALLOWED_ORIGIN",
 			} {

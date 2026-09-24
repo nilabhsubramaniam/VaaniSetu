@@ -26,6 +26,7 @@ interface TurnWire {
   readonly createdAt: string;
   readonly latencyMs?: number;
   readonly script?: string;
+  readonly detectedLanguage?: LanguageCode;
 }
 
 interface ChatResponseWire {
@@ -238,5 +239,6 @@ function turnFromWire(wire: TurnWire): Turn {
     createdAt: new Date(wire.createdAt),
     latencyMs: wire.latencyMs,
     script: wire.script,
+    detectedLanguage: wire.detectedLanguage,
   };
 }
