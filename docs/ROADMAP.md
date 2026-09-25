@@ -250,17 +250,24 @@ against `FakeLangIDClient`, wired into `conversation.Service` so every
 turn — typed or spoken — gets a `detectedLanguage` tag), Milestone 6b
 (Python `langid` capability, benchmarked against real candidates —
 `ai4bharat/IndicLID` and the original fastText `lid.176` — and wired in
-for real; `fasttext-lid176` selected, see ADR-027), and Milestone 6c
+for real; `fasttext-lid176` selected, see ADR-027), Milestone 6c
 (Malayalam enabled end to end — the model registry's `tts` section
 gained a real per-language axis, `facebook/mms-tts-mal` added, and
 Malayalam turned on in the UI despite a known TTS quality gap, see
-ADR-028) are all complete. The detected language is persisted and
-returned over the API but does not yet drive the LLM prompt or the TTS
-voice — the manual language pin still wins throughout, per
+ADR-028), and Milestone 6d (Hinglish TTS fixed via romanized-to-Devanagari
+transliteration — both Hindi voices now produce real audio for Hinglish
+instead of failing outright; Malayalam's real bottleneck properly
+diagnosed with the project's first real, human-recorded audio fixtures —
+`faster-whisper-large-v3-turbo` itself measures a real 0.96 WER on real
+Malayalam speech, so the gap is at least partly ASR, not purely TTS
+quality, see ADR-029) are all complete. The detected language is
+persisted and returned over the API but does not yet drive the LLM prompt
+or the TTS voice — the manual language pin still wins throughout, per
 `docs/PROJECT_GOAL.md`. The phase's broader scope below (Bengali,
 Gujarati, Marathi, Tamil, Telugu, Kannada, Punjabi, Odia — each needing
 this same per-language treatment) has no milestone named or approved yet.
-See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-026/ADR-027/ADR-028.
+See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md`
+ADR-026/ADR-027/ADR-028/ADR-029.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.

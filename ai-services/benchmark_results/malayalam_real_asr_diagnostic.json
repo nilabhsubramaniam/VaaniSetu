@@ -1,0 +1,38 @@
+{
+  "asr_key": "faster-whisper-large-v3-turbo",
+  "asr_repo_id": "deepdml/faster-whisper-large-v3-turbo-ct2",
+  "audio_source": "Google IndicTTS Malayalam corpus, OpenSLR resource 63, CC-BY-SA-4.0",
+  "mean_wer": 0.96,
+  "runs": [
+    {
+      "fixture_id": "mlf_02321_00657140418",
+      "reference": "നല്ല ഒരു ഉപകരണം ആണ് അത്",
+      "hypothesis": "നല്ല് ഒുബു വരന്ന മാണത്ു",
+      "wer": 1.0
+    },
+    {
+      "fixture_id": "mlf_06469_00325832880",
+      "reference": "ഞാൻ ആ പേജിൽ പോയി നോക്കി",
+      "hypothesis": "न्यान आपेजल पोई नोकी",
+      "wer": 1.0
+    },
+    {
+      "fixture_id": "mlf_03228_01626077260",
+      "reference": "അതിൽ ഒരു കാരണം ഞാൻ പറയാം",
+      "hypothesis": "അദിലോരു കാരണം നാം പരയം.",
+      "wer": 0.8
+    },
+    {
+      "fixture_id": "mlf_03435_02144049700",
+      "reference": "ലേഖനം നല്ല ഒരു ആശയം ആണ്‌",
+      "hypothesis": "ലേകനും നല്ലവുരു ആശേമാണ",
+      "wer": 1.0
+    },
+    {
+      "fixture_id": "mlf_03228_00255406825",
+      "reference": "അവർ ഇവിടെ ഒരു കോട്ട പണിതു",
+      "hypothesis": "അവരി വിയുരു കോട്ടാ പണിദു",
+      "wer": 1.0
+    }
+  ]
+}

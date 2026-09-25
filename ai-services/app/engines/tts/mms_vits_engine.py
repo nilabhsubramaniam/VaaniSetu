@@ -13,13 +13,28 @@ a real limitation shared by every checkpoint this wrapper loads, not a bug
 in the wrapper itself; `synthesize` raises a clear, descriptive error for
 it rather than letting an empty tensor crash several frames deep inside
 `transformers` with an opaque dtype-mismatch message.
-License: each checkpoint's own `license` field in `models.yaml` — both
+
+Milestone 6d: for `language == "hinglish"` specifically, `request.text`
+is transliterated from romanized Hindi to Devanagari (ITRANS scheme, via
+`indic_transliteration`) before tokenizing, rather than giving up
+immediately — real, romanized Hindi words become real Devanagari and
+synthesize correctly; genuine English loanwords ("weather", "joke", ...)
+transliterate to meaningless phonemes instead of being recognized as
+English, a real, inherent, accepted limit of a rule-based scheme (see
+docs/DECISIONS.md ADR-029 for the measured effect). No other language
+is transliterated — `en` text with no Devanagari still raises
+`UnsupportedTextError` exactly as before.
+
+License: each checkpoint's own `license` field in `models.yaml` — all
 candidates built on this architecture so far are CC-BY-NC-4.0
-(non-commercial); see ADR-021/ADR-022 for how that weighs against
+(non-commercial); see ADR-021/ADR-022/ADR-028 for how that weighs against
 alternatives.
 """
 
 from __future__ import annotations
+
+from indic_transliteration import sanscript
+from indic_transliteration.sanscript import transliterate
 
 from .base import SynthesizeRequest, SynthesizeResponse, TTSEngine, encode_wav_from_float
 
@@ -46,7 +61,11 @@ class MmsVitsEngine(TTSEngine):
         self._model.eval()
 
     def synthesize(self, request: SynthesizeRequest) -> SynthesizeResponse:
-        inputs = self._tokenizer(request.text, return_tensors="pt")
+        text = request.text
+        if request.language == "hinglish":
+            text = transliterate(text, sanscript.ITRANS, sanscript.DEVANAGARI)
+
+        inputs = self._tokenizer(text, return_tensors="pt")
         if inputs["input_ids"].numel() == 0:
             raise UnsupportedTextError(
                 f"{self._name}: {request.text!r} contains no Devanagari characters "

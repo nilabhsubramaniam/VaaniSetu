@@ -19,6 +19,12 @@ dependencies = [
     # Milestone 6b `langid` candidates: IndicLID (fasttext + torch/transformers,
     # both already deps above) and the original fastText lid.176 baseline.
     "fasttext>=0.9,<1",
+    # Milestone 6d: romanized-Hindi-to-Devanagari transliteration so the
+    # Devanagari-only mms_vits checkpoints can speak Hinglish text at all
+    # (ADR-021's gap). Pure Python, no heavy ML framework — the real
+    # neural alternative (ai4bharat-transliteration) pulls in fairseq and
+    # other large, legacy dependencies for uncertain quality gain.
+    "indic-transliteration>=2.3,<3",
 ]
 
 [dependency-groups]

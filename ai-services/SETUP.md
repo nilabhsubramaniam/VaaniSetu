@@ -115,10 +115,19 @@ curl -X POST http://localhost:8090/v1/synthesize \
 
 curl -X POST http://localhost:8090/v1/synthesize \
   -H "Content-Type: application/json" \
+  -d '{"text":"namaste, aap kaise hain","language":"hinglish"}' \
+  --output /tmp/reply-hinglish.wav
+# a real, playable WAV file (Milestone 6d) — romanized Hindi is
+# transliterated to Devanagari before synthesis; genuine English
+# loanwords in a Hinglish sentence still mispronounce (ADR-029)
+
+curl -X POST http://localhost:8090/v1/synthesize \
+  -H "Content-Type: application/json" \
   -d '{"text":"നമസ്കാരം, സുഖമാണോ?","language":"ml"}' \
   --output /tmp/reply-ml.wav
-# a real, playable Malayalam WAV file — quality is a known, documented
-# gap (proxy WER 100-150%, ADR-028), but it does synthesize real audio
+# a real, playable Malayalam WAV file — quality is a known, diagnosed
+# gap (proxy WER 100-150%, ADR-028; real-audio ASR diagnostic shows this
+# is at least partly an ASR weakness, not purely synthesis, ADR-029)
 
 curl -X POST http://localhost:8090/v1/synthesize \
   -H "Content-Type: application/json" \
@@ -174,6 +183,8 @@ uv run scripts/generate_audio_fixtures.py   # macOS only, one time
 uv run scripts/benchmark_asr.py      # asr
 uv run scripts/benchmark_tts.py      # tts (needs the asr model too — see below)
 uv run scripts/benchmark_langid.py   # langid
+uv run scripts/download_malayalam_real_fixtures.py   # one time, ~710MB
+uv run scripts/benchmark_malayalam_real_asr.py        # real-audio Malayalam ASR diagnostic
 ```
 
 `benchmark.py` requires all `llm` candidates downloaded first, runs each
@@ -201,10 +212,19 @@ Malayalam (checked directly via `say -v '?'`) — so
 `generate_audio_fixtures.py` skips them (logged, not an error) and
 `benchmark_asr.py` never scores them standalone; `benchmark_tts.py`
 synthesizes their text directly (no pre-existing audio needed) and its
-proxy-WER measurement is the *only* Malayalam ASR+TTS evidence this
-project has. See `docs/DECISIONS.md`
-ADR-016/ADR-018/ADR-021/ADR-027/ADR-028 for how this evidence was used to
-select each model.
+proxy-WER measurement was, until Milestone 6d, the *only* Malayalam
+ASR+TTS evidence this project had. `download_malayalam_real_fixtures.py`
+(Milestone 6d) downloads a ~710MB one-time corpus (Google's IndicTTS
+Malayalam corpus, OpenSLR resource 63, CC-BY-SA-4.0 — cached under
+`.cache/`, not committed, see `.gitignore`) and extracts five real,
+human-recorded clips into `eval_data/audio_malayalam_real/`;
+`benchmark_malayalam_real_asr.py` runs the already-selected ASR model
+against them directly (no TTS involved) and writes
+`benchmark_results/malayalam_real_asr_diagnostic.json` — this is what
+first showed `faster-whisper-large-v3-turbo`'s own Malayalam recognition
+is weak (0.96 WER on real speech), not just `mms-tts-mal`'s synthesis. See
+`docs/DECISIONS.md` ADR-016/ADR-018/ADR-021/ADR-027/ADR-028/ADR-029 for
+how this evidence was used to select and diagnose each model.
 
 ## Troubleshooting
 

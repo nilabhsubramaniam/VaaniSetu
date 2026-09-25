@@ -1636,6 +1636,122 @@ Status**.
   /api/v1/speech/synthesize` returns real audio through the Go backend.
 - **Status:** Accepted.
 
+## ADR-029 - Phase 6 Milestone 6d: Hinglish TTS via transliteration; Malayalam's real bottleneck diagnosed
+
+- **Decision:** Two independent fixes, on explicit direction to close both
+  known gaps before any further language work:
+  1. **`MmsVitsEngine.synthesize()` transliterates `hinglish`-language
+     text from romanized Hindi to Devanagari (ITRANS scheme, via the new
+     `indic-transliteration` dependency, MIT) before tokenizing**, instead
+     of immediately raising `UnsupportedTextError` for every Hinglish
+     request as it did since ADR-021. No other language is transliterated
+     — `en` (and anything else with no Devanagari) still raises the same
+     error as before.
+  2. **A real, human-recorded Malayalam audio diagnostic was built and
+     run** (`eval_data/malayalam_real_fixtures.yaml`,
+     `scripts/download_malayalam_real_fixtures.py`,
+     `scripts/benchmark_malayalam_real_asr.py`) — five short utterances
+     from Google's IndicTTS Malayalam corpus (OpenSLR resource 63,
+     CC-BY-SA-4.0, ~710MB one-time download, only the manifest is
+     committed per `AGENTS.md` §12). This is the project's first
+     real, non-synthetic audio fixture set.
+- **Reason:**
+  1. **Hinglish, measured, real change**: before, both Hindi TTS
+     candidates failed 100% of Hinglish fixtures
+     (`UnsupportedTextError`, ADR-021). After transliteration, both
+     candidates now produce real audio for 100% of them — a genuine
+     crash-to-audio fix. Word-level quality is still poor
+     (`mms-tts-hin-ft-female`: `hinglish-weather` WER 1.00,
+     `hinglish-joke` WER 1.00; `mms-tts-hin`: WER 1.25 and 1.00
+     respectively) because both fixtures are heavily mixed with genuine
+     English loanwords ("weather", "joke", "bata sakte ho" alongside
+     them) that a rule-based romanized-Hindi scheme transliterates into
+     meaningless Devanagari phonemes rather than recognizing as English —
+     an inherent, accepted limit of this approach, not a bug, and stated
+     as such before implementation (the alternative, a real neural
+     transliterator via `ai4bharat-transliteration`, was rejected for
+     pulling in `fairseq` and other large, legacy dependencies for
+     uncertain gain over this simpler fix, `AGENTS.md` §4). The practical
+     result: Hinglish speech that leans mostly Hindi with light
+     code-switching will now be spoken reasonably; heavily English-mixed
+     Hinglish still won't be understandable — a real, partial
+     improvement, not a full fix, and the milestone's objective was
+     exactly this: "not a guarantee of solving English-loanword
+     mispronunciation."
+  2. **Malayalam, a genuinely important finding**: running the
+     already-selected `faster-whisper-large-v3-turbo` against *real*
+     human Malayalam speech (not TTS output) measured a mean WER of
+     **0.96** — nearly as bad as the TTS proxy's 100-150%. This means
+     Milestone 6c's proxy-WER measurement was not primarily indicting
+     `mms-tts-mal`'s synthesis quality; **faster-whisper's own Malayalam
+     recognition is itself weak**, independent of any TTS involvement.
+     One of the five real clips (`mlf_06469_00325832880`) was transcribed
+     entirely in **Devanagari script** instead of Malayalam script
+     despite `language="ml"` being forced — a genuine script-confusion
+     bug/limitation in Whisper's Malayalam handling specifically, distinct
+     from Hindi/English where forced-language decoding has reliably kept
+     script correct (ADR-018). The other four stayed in Malayalam script
+     with real phonetic errors — several hypotheses are recognizably close
+     to the reference despite high word-level WER (e.g. reference
+     "അതിൽ ഒരു കാരണം ഞാൻ പറയാം" / hypothesis "അദിലോരു കാരണം നാം പരയം." —
+     "കാരണം" matched exactly, "പറയാം"/"പരയം" is phonetically close), which
+     `word_error_rate`'s exact-string matching can't credit — a real,
+     stated caveat on the 0.96 headline number, not a claim that Whisper
+     produces zero usable signal for Malayalam.
+  3. **Given (2), there is no further "fix" available within this
+     project's existing tools**: no better Malayalam TTS candidate exists
+     (ADR-028's search already covered this), and the newly-discovered
+     real bottleneck is partly in the *already-selected* ASR engine, which
+     was chosen and benchmarked for Hindi/Hinglish/English (ADR-018) —
+     re-benchmarking ASR candidates specifically for Malayalam quality is
+     a real, separate, larger effort (a new candidate search, new
+     benchmark criteria) explicitly out of this milestone's scope. The
+     honest outcome here is a properly diagnosed root cause, not a
+     resolved metric — exactly the milestone's stated, accepted possible
+     result.
+- **Alternatives considered:**
+  - **`ai4bharat-transliteration` (IndicXlit)** for Hinglish — a real
+    neural transliterator trained on casual romanization, likely better
+    quality than ITRANS's rule-based mapping — rejected for its dependency
+    footprint (`fairseq`, `tensorboardX`, `flask`, and other large, legacy
+    packages) relative to the uncertain quality gain over the lightweight
+    option that was actually tried and measured.
+  - **Re-requesting `ai4bharat/indic-parler-tts`'s gated HF access** as
+    the Hinglish fix (it already lists a "hinglish" voice, Apache-2.0,
+    would need no transliteration hack at all) — not pursued this
+    milestone: access was already denied once (ADR-021) and re-requesting
+    is outside engineering control/timeline, unlike the transliteration
+    approach, which was actionable immediately.
+  - **Skipping the Malayalam diagnostic and just searching harder for a
+    different TTS candidate** — rejected per the explicit direction to
+    properly diagnose first; doing so would have kept the project
+    guessing at the wrong component, which is exactly what the real-audio
+    test just corrected.
+  - **Downloading Common Voice Malayalam via Hugging Face `datasets`**
+    instead of OpenSLR — tried first; `datasets-server`'s
+    `first-rows` endpoint returned "Not found" for the configs tried, and
+    Common Voice's own access terms typically need auth/agreement, making
+    OpenSLR's direct, unauthenticated, clearly-licensed download the more
+    reliable choice.
+- **Impact:** `ai-services/pyproject.toml` (`indic-transliteration`
+  added); `app/engines/tts/mms_vits_engine.py` (transliteration branch);
+  `tests/test_mms_vits_engine.py` (new coverage, and one existing test's
+  `language` fixed from `"hinglish"` to `"en"` since it no longer
+  represents genuinely unsupported text otherwise); new
+  `eval_data/malayalam_real_fixtures.yaml`,
+  `scripts/download_malayalam_real_fixtures.py`,
+  `scripts/benchmark_malayalam_real_asr.py`,
+  `benchmark_results/malayalam_real_asr_diagnostic.json`; `.gitignore`
+  (the new real-audio cache/output directories — the corpus archive and
+  extracted clips are never committed, only the fixture manifest and the
+  diagnostic's result JSON are). No Go or frontend change — this
+  milestone is entirely within `ai-services`. `models.yaml`'s `tts`
+  selections are unchanged (no new or different TTS candidate was
+  selected for either language); this milestone improved Hinglish's
+  existing selected engines' behavior and diagnosed, rather than changed,
+  Malayalam's.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

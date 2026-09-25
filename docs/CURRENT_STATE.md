@@ -7,19 +7,41 @@ project moves between milestones or a phase's status changes.
 
 - **Current phase:** Phase 2 - Local LLM, **DONE**. Phase 3 - Speech-to-Text,
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
-  **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap —
-  see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
+  **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap
+  — see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
   latency gap — see below). Phase 6 - Indian Language Support,
-  **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability — and 6c
-  — Malayalam enabled end to end — all complete, with known Hinglish
-  detection and Malayalam TTS gaps, see below; the phase's broader scope
-  — Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — has no
+  **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
+  Malayalam enabled end to end — and 6d — Hinglish TTS fixed via
+  transliteration, Malayalam's real bottleneck diagnosed — all complete,
+  with known remaining gaps, see below; the phase's broader scope —
+  Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — has no
   milestone named or approved yet).
 - **Current focus:** none active — no milestone is currently approved to
   start next. See `AGENTS.md` §5, "never advance to the next milestone
   automatically".
-- **Last updated:** 2026-09-25 (Phase 6 Milestone 6c: Malayalam enabled
-  end to end. `models.yaml`'s `tts.selected` gained a real language axis
+- **Last updated:** 2026-09-25 (Phase 6 Milestone 6d: closed two known
+  gaps, on explicit direction. **Hinglish TTS** — total failure since
+  ADR-021 — now transliterates romanized Hindi to Devanagari (ITRANS,
+  `indic-transliteration`) before synthesis: both Hindi voices now
+  produce real audio for 100% of Hinglish fixtures (was 0%), though word
+  accuracy stays poor for the genuinely English-mixed portions (an
+  accepted, inherent limit of rule-based transliteration, not a bug).
+  **Malayalam** — a real diagnostic, not just a guess: downloaded five
+  real, human-recorded clips from Google's IndicTTS Malayalam corpus
+  (OpenSLR 63, CC-BY-SA-4.0) and ran the already-selected
+  `faster-whisper-large-v3-turbo` against them directly, with no TTS
+  involved. Result: mean WER **0.96** on real speech — nearly as bad as
+  the TTS proxy's 100-150%, meaning Whisper's own Malayalam recognition
+  is a real, independent weak point, not just `mms-tts-mal`'s synthesis
+  quality. One of five clips was transcribed entirely into **Devanagari**
+  script instead of Malayalam despite the language being forced — a
+  genuine script-confusion bug specific to Malayalam. No further fix is
+  available within this project's existing tools (no better Malayalam
+  TTS or ASR candidate has been found or benchmarked) — this is a
+  properly diagnosed, honestly recorded root cause, not a resolved
+  metric. See `docs/DECISIONS.md` ADR-029.
+  The day before (2026-09-25, earlier): Phase 6 Milestone 6c enabled
+  Malayalam end to end. `models.yaml`'s `tts.selected` gained a real language axis
   (`{language: {voice: key}}`, was flat `{voice: key}`) — the piece
   `docs/ARCHITECTURE.md` §3.6 called "later each language" but never
   built — with `facebook/mms-tts-mal` added as Malayalam's TTS candidate.
@@ -76,9 +98,10 @@ project moves between milestones or a phase's status changes.
   documented latency gap (measured p50 5.09s against a <3s target —
   see `docs/DECISIONS.md` ADR-024); Phase 4 gained a real Female/Male
   voice choice (ADR-022/ADR-023). See `docs/DECISIONS.md`
-  ADR-020 through ADR-028 and `docs/ROADMAP.md` Phases 4/5/6 for that full
-  history, including the still-open Hinglish TTS/langid gaps, the
-  still-open Malayalam TTS gap, and the still-gated
+  ADR-020 through ADR-029 and `docs/ROADMAP.md` Phases 4/5/6 for that full
+  history, including the still-open Hinglish English-loanword and langid
+  detection gaps, the still-open Malayalam ASR/TTS gap (now properly
+  diagnosed, not just measured), and the still-gated
   `ai4bharat/indic-parler-tts` candidate)
 
 ## Completed
@@ -609,27 +632,78 @@ project moves between milestones or a phase's status changes.
     `script: "Malayalam"` and `detectedLanguage: "ml"`, and both `POST
     /v1/synthesize` (direct) and `POST /api/v1/speech/synthesize` (via
     Go) return real synthesized Malayalam audio.
+- **Phase 6, Milestone 6d - Hinglish TTS fixed via transliteration;
+  Malayalam's real bottleneck diagnosed:**
+  - `MmsVitsEngine.synthesize()` now transliterates `hinglish`-language
+    text from romanized Hindi to Devanagari (ITRANS scheme, new
+    `indic-transliteration` dependency, MIT) before tokenizing, instead
+    of immediately raising `UnsupportedTextError` for every Hinglish
+    request. No other language is transliterated.
+  - Real result: both Hindi voices went from **0% to 100%** of Hinglish
+    fixtures producing real audio (a genuine crash-to-audio fix).
+    Word-level quality stays poor (WER ~1.0-1.25) specifically because
+    both fixtures mix in genuine English words ("weather", "joke") that
+    transliterate to meaningless Devanagari phonemes — an accepted,
+    inherent limit of a rule-based scheme, not a bug, stated up front
+    before implementation.
+  - Built the project's **first real, human-recorded audio fixture set**:
+    `eval_data/malayalam_real_fixtures.yaml` (five short utterances from
+    Google's IndicTTS Malayalam corpus, OpenSLR resource 63,
+    CC-BY-SA-4.0), downloaded on demand by
+    `scripts/download_malayalam_real_fixtures.py` (~710MB one-time, never
+    committed — a dataset, per `AGENTS.md` §12).
+    `scripts/benchmark_malayalam_real_asr.py` ran the already-selected
+    `faster-whisper-large-v3-turbo` directly against this real audio, no
+    TTS involved.
+  - **Real, important finding**: mean WER on real Malayalam speech was
+    **0.96** — nearly as bad as Milestone 6c's TTS proxy WER
+    (100-150%). This means `faster-whisper-large-v3-turbo`'s own
+    Malayalam recognition is a genuine, independent weak point, not
+    primarily `mms-tts-mal`'s synthesis quality as Milestone 6c's proxy
+    metric alone suggested. One of five real clips was transcribed
+    entirely into **Devanagari script** instead of Malayalam despite
+    `language="ml"` being forced — a genuine script-confusion limitation
+    specific to Malayalam (Hindi/English don't show this, ADR-018). No
+    further fix is available within this project's existing tools (no
+    better Malayalam ASR or TTS candidate has been found/benchmarked) —
+    this milestone's honest deliverable is a properly diagnosed root
+    cause, not a resolved metric.
+  - Tests: 2 new + 1 fixed Python tests in `test_mms_vits_engine.py`
+    (transliteration-path coverage; one existing test's `language` moved
+    from `"hinglish"` to `"en"` since it no longer represents genuinely
+    unsupported text) — 84 total, all pass; `ruff check`/`ruff format
+    --check` clean. No Go or frontend change.
+  - **Verified live, end to end:** `POST /v1/synthesize` with real
+    Hinglish fixture text now returns a valid, non-silent WAV (was a
+    500); Hindi and Malayalam synthesis unaffected.
+  - See `docs/DECISIONS.md` ADR-029 for full reasoning, real numbers, and
+    alternatives considered (including why the heavier neural
+    `ai4bharat-transliteration` and re-requesting `indic-parler-tts`'s
+    gated access were not pursued this milestone).
 
 ## Next
 
-- No milestone is currently approved to start. Milestones 6a/6b/6c
-  (`langid` plus Malayalam end to end) are complete; Phase 6's broader
-  scope (Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — each
-  needs this same per-language ASR/TTS/LLM/UI treatment individually) has
-  no milestone named or approved yet. Per `AGENTS.md` §5, work does not
-  begin on it until the user decides to move the project there. Open
-  follow-ups, none blocking, whenever the user wants them: finding or
-  building a better Malayalam TTS candidate (`mms-tts-mal`'s proxy WER
-  badly fails the <10% target, ADR-028) — likely needs a real recording
-  or a second system voice to even isolate whether TTS or ASR is at
-  fault; re-benchmarking `indiclid` for `langid` against a larger fixture
+- No milestone is currently approved to start. Milestones 6a/6b/6c/6d
+  (`langid`, Malayalam end to end, Hinglish TTS fix + Malayalam
+  diagnostic) are complete; Phase 6's broader scope
+  (Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — each needs
+  this same per-language ASR/TTS/LLM/UI treatment individually) has no
+  milestone named or approved yet. Per `AGENTS.md` §5, work does not begin
+  on it until the user decides to move the project there. Open
+  follow-ups, none blocking, whenever the user wants them: Malayalam's
+  diagnosed ASR weakness (mean WER 0.96 on real speech, ADR-029) has no
+  available fix within this project's current tools — would need a
+  dedicated ASR-candidate re-benchmark for Malayalam specifically, a real,
+  separate effort; Hinglish TTS's remaining English-loanword
+  mispronunciation could be narrowed further by a real neural
+  transliterator (`ai4bharat-transliteration`), rejected this milestone
+  for its dependency weight, or by revisiting `indic-parler-tts`'s gated
+  access; re-benchmarking `indiclid` for `langid` against a larger fixture
   set, and specifically investigating the still-open Hinglish detection
-  gap neither candidate closed (ADR-027); re-benchmarking
-  `ai4bharat/indic-parler-tts` once its Hugging Face gated-repo access is
-  granted (ADR-021); closing the Phase 5 latency gap (ADR-024), most
-  likely as part of Phase 11's streaming work; and a hands-on
-  browser/microphone/speaker smoke test (still not performed by the agent
-  in any phase so far — no interactive browser available).
+  gap neither candidate closed (ADR-027); closing the Phase 5 latency gap
+  (ADR-024), most likely as part of Phase 11's streaming work; and a
+  hands-on browser/microphone/speaker smoke test (still not performed by
+  the agent in any phase so far — no interactive browser available).
 
 ## Not started
 
@@ -675,9 +749,10 @@ project moves between milestones or a phase's status changes.
   constraint.
 - `ai-services/` builds its dependencies (`uv sync` — `llama-cpp-python`
   compiles from source; `faster-whisper`/`ctranslate2`, `torch`,
-  `transformers`, `coqui-tts`, and `fasttext` use prebuilt wheels/compile
-  cleanly; `parler-tts` installs from GitHub, no PyPI release), tests
-  (82), lints, and formats clean. Its `.venv` targets Python 3.12
+  `transformers`, `coqui-tts`, `fasttext`, and `indic-transliteration` use
+  prebuilt wheels/compile cleanly or are pure Python; `parler-tts`
+  installs from GitHub, no PyPI release), tests (84), lints, and formats
+  clean. Its `.venv` targets Python 3.12
   specifically, not this machine's default 3.14 — `tokenizers` has no
   cp314 wheel yet and its sdist fails to build (see
   `ai-services/SETUP.md` Troubleshooting). Its own tests never load a
@@ -695,15 +770,19 @@ project moves between milestones or a phase's status changes.
   respect.
 - All four capabilities' models are selected: `llm`
   (`llama-3.2-3b-instruct`, ADR-016), `asr`
-  (`faster-whisper-large-v3-turbo`, ADR-018), `tts` — as of Milestone 6c,
+  (`faster-whisper-large-v3-turbo`, ADR-018 — now also known, per
+  ADR-029, to have a real Malayalam-recognition weakness including
+  occasional Devanagari-script confusion), `tts` — as of Milestone 6c,
   a *per-language* map: two simultaneously-loaded voices for `hi`/
   `hinglish` (`female: mms-tts-hin-ft-female`, `male: mms-tts-hin`,
-  ADR-021/ADR-022/ADR-023 — with the Hinglish gap noted above), and one
-  voice (used for both) for `ml` (`mms-tts-mal`, ADR-028 — with its own,
-  worse gap: proxy WER 100-150% against the <10% target) — and `langid`
-  (`fasttext-lid176`, ADR-027 — 100% accurate on Malayalam, its own,
-  different Hinglish gap noted above; `indiclid` stays listed,
-  unselected, as a real candidate for re-benchmarking).
+  ADR-021/ADR-022/ADR-023 — Hinglish now produces real audio via
+  transliteration, ADR-029, though English-mixed portions still
+  mispronounce), and one voice (used for both) for `ml` (`mms-tts-mal`,
+  ADR-028 — proxy WER 100-150%, now understood via ADR-029 to be at least
+  partly an ASR-side weakness, not purely this candidate's synthesis
+  quality) — and `langid` (`fasttext-lid176`, ADR-027 — 100% accurate on
+  Malayalam, its own, different Hinglish gap noted above; `indiclid`
+  stays listed, unselected, as a real candidate for re-benchmarking).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
   Postgres data, `/models/` (downloaded weights), and
   `ai-services/eval_data/audio/` (generated ASR test fixtures) are all
