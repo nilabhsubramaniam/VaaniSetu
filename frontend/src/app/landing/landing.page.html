@@ -1,17 +1,13 @@
 <main class="landing">
-  <!-- Hero: interactive 3D communication ecosystem -->
+  <!-- Hero: inherits the shared reference design's mood (dark, glowing
+       cyan/gold backdrop) via a procedural CSS gradient rather than the
+       photo itself — see landing.page.scss's .hero rule for why pasting
+       the raw image in directly as a full-bleed background looked clumsy
+       (fixed-resolution cropping drift, duplicated UI already baked into
+       the photo). Real, working controls sit on top: the mic button, the
+       status panel (bound to real component state below), and the
+       headline/CTA as real, translatable HTML text. -->
   <section class="hero">
-    <div class="hero-scene-layer">
-      @defer (on idle) {
-        <app-hero-experience
-          [selectedCode]="selectedDemoLanguage()"
-          (nodeSelected)="selectDemoLanguage($event)"
-        />
-      } @placeholder {
-        <div class="hero-scene-placeholder" aria-hidden="true"></div>
-      }
-    </div>
-
     <div class="hero-copy">
       <p class="eyebrow">{{ copy().hero.eyebrow }}</p>
       <h1>
@@ -23,6 +19,7 @@
         >
       </h1>
       <p class="dek">{{ copy().hero.description }}</p>
+      <p class="hero-vision-note">{{ copy().hero.visionNote }}</p>
 
       <a routerLink="/assistant" class="cta-pill">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="18" height="18">
@@ -49,11 +46,18 @@
           />
         </svg>
       </a>
-
-      @if (prefersReducedMotion()) {
-        <p class="hero-fallback-description">{{ copy().hero.fallbackDescription }}</p>
-      }
     </div>
+
+    <ul class="phase-legend" aria-hidden="true">
+      @for (phase of hudPhaseOrder; track phase) {
+        <li class="legend-row" [attr.data-phase]="phase">
+          <span class="legend-dot" [class]="'legend-dot--' + phase"></span>
+          <span class="legend-label" [class.is-active]="currentHudPhase() === phase">
+            {{ hudPhases[phase].label }}
+          </span>
+        </li>
+      }
+    </ul>
 
     <div class="mic-pedestal" [class.is-active]="isMicDemoActive()">
       <span class="mic-waveform mic-waveform--left" aria-hidden="true">
@@ -62,26 +66,37 @@
         }
       </span>
 
-      <button
-        type="button"
-        class="btn-mic"
-        [attr.aria-label]="copy().hero.micLabel"
-        (click)="triggerMicDemo()"
-      >
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22">
-          <path
-            d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
-            stroke="currentColor"
-            stroke-width="1.8"
-          />
-          <path
-            d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-          />
+      <div class="mic-dial">
+        <svg class="mic-dial-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <path id="micRingPath" fill="none" d="M 10,60 A 50,50 0 1,1 110,60.01" />
+          <text>
+            <textPath href="#micRingPath" startOffset="50%" text-anchor="middle">
+              {{ copy().hero.micHintIdle }}
+            </textPath>
+          </text>
         </svg>
-      </button>
+
+        <button
+          type="button"
+          class="btn-mic"
+          [attr.aria-label]="copy().hero.micLabel"
+          (click)="triggerMicDemo()"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22">
+            <path
+              d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+              stroke="currentColor"
+              stroke-width="1.8"
+            />
+            <path
+              d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
 
       <span class="mic-waveform mic-waveform--right" aria-hidden="true">
         @for (bar of waveformBars; track bar) {
@@ -93,8 +108,6 @@
         {{ isMicDemoActive() ? copy().hero.micHintListening : copy().hero.micHintIdle }}
       </p>
     </div>
-
-    <div class="hero-info-card">{{ copy().hero.infoCard }}</div>
 
     <button type="button" class="scroll-cue" (click)="scrollToNext()">
       <span>{{ copy().hero.scrollCue }}</span>
@@ -145,16 +158,6 @@
     [heading]="copy().transform.heading"
     [description]="copy().transform.description"
   />
-
-  @defer (on viewport) {
-    <app-global-network
-      [heading]="copy().globalNetwork.heading"
-      [description]="copy().globalNetwork.description"
-      [disclaimer]="copy().globalNetwork.disclaimer"
-    />
-  } @placeholder {
-    <div class="global-network-placeholder" aria-hidden="true"></div>
-  }
 
   <!-- What is VaaniSetu -->
   <section class="section" appRevealOnScroll>

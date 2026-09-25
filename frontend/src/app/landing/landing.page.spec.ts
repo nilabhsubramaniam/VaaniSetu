@@ -21,7 +21,7 @@ describe('LandingPage', () => {
     expect(headings[0].textContent).toContain('Speak');
     expect(headings[0].textContent).toContain('naturally.');
     expect(headings[0].textContent).toContain('Connect');
-    expect(headings[0].textContent).toContain('globally.');
+    expect(headings[0].textContent).toContain('across India.');
   });
 
   it('points the primary CTA at the assistant workspace', () => {
@@ -70,5 +70,30 @@ describe('LandingPage', () => {
     expect(fixture.componentInstance.isMicDemoActive()).toBe(true);
     const hint = (fixture.nativeElement as HTMLElement).querySelector('.mic-hint');
     expect(hint?.textContent).toContain('Listening');
+  });
+
+  it('cycles the status panel through voice -> language -> translation -> connection -> ready', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = TestBed.createComponent(LandingPage);
+      fixture.detectChanges();
+
+      fixture.componentInstance.triggerMicDemo();
+      expect(fixture.componentInstance.currentHudPhase()).toBe('voice');
+
+      vi.advanceTimersByTime(1000);
+      expect(fixture.componentInstance.currentHudPhase()).toBe('language');
+
+      vi.advanceTimersByTime(500);
+      expect(fixture.componentInstance.currentHudPhase()).toBe('translation');
+
+      vi.advanceTimersByTime(500);
+      expect(fixture.componentInstance.currentHudPhase()).toBe('connection');
+
+      vi.advanceTimersByTime(1000);
+      expect(fixture.componentInstance.currentHudPhase()).toBe('ready');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

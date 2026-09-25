@@ -5,19 +5,17 @@ import {
   computed,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { StatusPill } from '../shared/components/status-pill/status-pill';
 import { RevealOnScroll } from '../shared/directives/reveal-on-scroll.directive';
 import { LANGUAGE_OPTIONS } from '../core/models/language.model';
-import { HeroExperience } from './components/hero-experience/hero-experience';
 import { TextTransformDemo } from './components/text-transform-demo/text-transform-demo';
 import { HowItWorks } from './components/how-it-works/how-it-works';
-import { GlobalNetwork } from './components/global-network/global-network';
 import { DEMO_LANGUAGE_NODES, DEFAULT_DEMO_LANGUAGE_CODE } from './models/demo-language.model';
 import { LandingI18nService } from './i18n/landing-i18n.service';
 import { prefersReducedMotion as detectPrefersReducedMotion } from './three/environment-support';
+import { HUD_PHASE_ORDER, HUD_PHASES, type HudPhase } from './three/hud-system';
 
 interface Capability {
   readonly label: string;
@@ -28,24 +26,26 @@ interface Capability {
 
 const MIC_DEMO_HINT_MS = 3000;
 
+// Mirrors the timing the hero's previous 3D demo cycle used — a preview
+// of the real voice -> language -> understanding -> reply flow, not a
+// live capability on this marketing page (the real thing is at
+// /assistant). Kept as plain setTimeouts now that there's no Three.js
+// runtime driving it.
+const INBOUND_MS = 1000;
+const LANGUAGE_HOLD_MS = 500;
+const TRANSLATION_HOLD_MS = 500;
+const OUTBOUND_MS = 1000;
+
 /**
- * The public-facing entry point at `/`. The hero is a genuinely interactive
- * 3D communication ecosystem (see `components/hero-experience`); everything
- * below it — what the product is, supported languages, capabilities,
- * privacy stance, future direction — is static Phase 1 content, unchanged
- * by the hero redesign.
+ * The public-facing entry point at `/`. The hero is a static reference
+ * image (see `.hero`'s background in landing.page.scss) with the real,
+ * working mic button and status panel layered on top; everything below
+ * it — what the product is, supported languages, capabilities, privacy
+ * stance, future direction — is static Phase 1 content.
  */
 @Component({
   selector: 'app-landing-page',
-  imports: [
-    RouterLink,
-    StatusPill,
-    RevealOnScroll,
-    HeroExperience,
-    TextTransformDemo,
-    HowItWorks,
-    GlobalNetwork,
-  ],
+  imports: [RouterLink, StatusPill, RevealOnScroll, TextTransformDemo, HowItWorks],
   templateUrl: './landing.page.html',
   styleUrl: './landing.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,10 +63,14 @@ export class LandingPage {
   readonly selectedDemoLanguage = signal(DEFAULT_DEMO_LANGUAGE_CODE);
   readonly isMicDemoActive = signal(false);
 
-  readonly heroExperienceRef = viewChild(HeroExperience);
+  readonly hudPhaseOrder = HUD_PHASE_ORDER;
+  readonly hudPhases = HUD_PHASES;
+  readonly currentHudPhase = signal<HudPhase>('ready');
+
   private readonly hostEl = inject(ElementRef<HTMLElement>);
 
   private micDemoHintTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly hudPhaseTimeouts: ReturnType<typeof setTimeout>[] = [];
 
   readonly capabilities: readonly Capability[] = [
     {
@@ -121,13 +125,38 @@ export class LandingPage {
   }
 
   triggerMicDemo(): void {
-    this.heroExperienceRef()?.triggerDemo();
     this.isMicDemoActive.set(true);
+    this.runHudPhaseSequence();
 
     if (this.micDemoHintTimeout) clearTimeout(this.micDemoHintTimeout);
     this.micDemoHintTimeout = setTimeout(() => {
       this.isMicDemoActive.set(false);
     }, MIC_DEMO_HINT_MS);
+  }
+
+  private runHudPhaseSequence(): void {
+    this.hudPhaseTimeouts.forEach(clearTimeout);
+    this.hudPhaseTimeouts.length = 0;
+
+    this.currentHudPhase.set('voice');
+    this.hudPhaseTimeouts.push(
+      setTimeout(() => {
+        this.currentHudPhase.set('language');
+        this.hudPhaseTimeouts.push(
+          setTimeout(() => {
+            this.currentHudPhase.set('translation');
+            this.hudPhaseTimeouts.push(
+              setTimeout(() => {
+                this.currentHudPhase.set('connection');
+                this.hudPhaseTimeouts.push(
+                  setTimeout(() => this.currentHudPhase.set('ready'), OUTBOUND_MS),
+                );
+              }, TRANSLATION_HOLD_MS),
+            );
+          }, LANGUAGE_HOLD_MS),
+        );
+      }, INBOUND_MS),
+    );
   }
 
   scrollToNext(): void {

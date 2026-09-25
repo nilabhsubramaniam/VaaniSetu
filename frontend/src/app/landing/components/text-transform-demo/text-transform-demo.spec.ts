@@ -11,7 +11,7 @@ describe('TextTransformDemo', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Say it once');
     expect(el.textContent).toContain('Understood everywhere');
-    expect(el.textContent).toContain('नमस्ते');
-    expect(el.textContent).toContain('Hello');
+    expect(el.textContent).toContain('kal milte hain');
+    expect(el.textContent).toContain('कल मिलते हैं');
   });
 });

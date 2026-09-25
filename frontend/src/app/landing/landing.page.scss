@@ -34,77 +34,55 @@ h2 {
 }
 
 // ---- hero ----
+// The shared reference image is used as design inspiration, not pasted in
+// directly as a full-bleed background: a fixed-resolution photo stretched/
+// cropped via `background-size: cover` drifted out of alignment with the
+// real controls (mic button, status panel, headline) at most viewport
+// sizes, and duplicated visual elements the image already draws into
+// itself (its own mic pedestal graphic, its own HUD box) — genuinely
+// clumsy, not just a style preference. This procedural gradient inherits
+// the image's mood instead (deep near-black base, cyan glow suggesting
+// the network/globe, gold glow suggesting the pedestal's warm light) and
+// scales cleanly at every viewport size. A fixed-dark micro-theme,
+// deliberately independent of the sitewide --vs-* tokens (so unaffected
+// by the visitor's light/dark preference), drives the real controls'
+// chrome on top of it — only the hero and its own children read these
+// --hero-* tokens; nothing below it does.
 .hero {
+  --hero-bg: #0a0d12;
+  --hero-panel: rgb(18 22 28 / 70%);
+  --hero-panel-strong: rgb(18 22 28 / 88%);
+  --hero-line: rgb(255 255 255 / 14%);
+  --hero-ink: #f3f5f7;
+  --hero-ink-soft: rgb(243 245 247 / 74%);
+  --hero-ink-faint: rgb(243 245 247 / 52%);
+
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
   min-height: calc(100dvh - var(--app-header-height));
-  padding: var(--vs-space-6) var(--vs-space-4);
+  padding: var(--vs-space-6) var(--vs-space-5);
   overflow: hidden;
-  text-align: center;
+  text-align: left;
   background:
     radial-gradient(
-      ellipse 60% 50% at 52% 68%,
+      ellipse 60% 45% at 30% 85%,
       color-mix(in srgb, var(--vs-gold) 16%, transparent),
       transparent
     ),
     radial-gradient(
-      ellipse 55% 45% at 50% 30%,
-      color-mix(in srgb, var(--vs-cyan) 14%, transparent),
+      ellipse 55% 50% at 45% 15%,
+      color-mix(in srgb, var(--vs-cyan) 18%, transparent),
       transparent
     ),
-    linear-gradient(180deg, color-mix(in srgb, var(--vs-bg) 40%, transparent), var(--vs-bg) 70%);
-}
-
-// Soft, blurred "cloud" blobs for the reference's hazy golden-hour
-// backdrop — a cheap CSS approximation of tilt-shift softness, since real
-// depth-of-field blur across WebGL geometry isn't worth the render cost
-// here.
-.hero::before,
-.hero::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  border-radius: 50%;
-  filter: blur(40px);
-  pointer-events: none;
-}
-
-.hero::before {
-  top: 8%;
-  left: -8%;
-  width: min(26rem, 55vw);
-  height: min(12rem, 22vw);
-  background: color-mix(in srgb, white 70%, var(--vs-gold) 30%);
-  opacity: 0.35;
-}
-
-.hero::after {
-  bottom: 4%;
-  right: -10%;
-  width: min(30rem, 60vw);
-  height: min(14rem, 25vw);
-  background: color-mix(in srgb, white 75%, var(--vs-cyan) 25%);
-  opacity: 0.3;
-}
-
-.hero-scene-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.hero-scene-placeholder {
-  width: 100%;
-  height: 100%;
+    var(--hero-bg);
 }
 
 .hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 38rem;
+  max-width: 34rem;
+  margin-top: var(--vs-space-5);
 }
 
 .eyebrow {
@@ -121,7 +99,7 @@ h2 {
   font-size: clamp(2rem, 1.5vw + 1.6rem, 2.85rem);
   line-height: 1.14;
   margin: 0 0 var(--vs-space-4);
-  color: var(--vs-ink);
+  color: var(--hero-ink);
 }
 
 .title-line {
@@ -129,14 +107,14 @@ h2 {
 
   em {
     font-style: normal;
-    color: var(--vs-deep-blue);
+    color: var(--vs-gold);
   }
 }
 
 .dek {
   font-size: var(--vs-font-size-md);
-  color: var(--vs-ink-soft);
-  margin: 0 auto var(--vs-space-5);
+  color: var(--hero-ink-soft);
+  margin: 0 0 var(--vs-space-3);
 }
 
 .cta-pill {
@@ -149,6 +127,7 @@ h2 {
   color: var(--vs-on-accent);
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 8px 28px -10px color-mix(in srgb, var(--vs-accent) 70%, transparent);
   transition: transform 0.15s ease;
 
   @include mixins.focus-ring;
@@ -158,24 +137,19 @@ h2 {
   }
 }
 
-.hero-fallback-description {
-  margin-top: var(--vs-space-4);
-  color: var(--vs-ink-soft);
-  font-size: var(--vs-font-size-sm);
-  max-width: 32rem;
-}
-
 // ---- mic pedestal ----
 $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
 
 .mic-pedestal {
-  position: relative;
+  position: absolute;
   z-index: 1;
+  bottom: var(--vs-space-6);
+  left: 50%;
+  transform: translateX(-50%);
   display: grid;
   grid-template-columns: auto auto auto;
   align-items: center;
   gap: var(--vs-space-4);
-  margin-top: var(--vs-space-6);
   padding: var(--vs-space-4) var(--vs-space-6);
 }
 
@@ -223,14 +197,44 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   }
 }
 
-.btn-mic {
+// The dial: the SVG ring is a purely decorative label (aria-hidden — the
+// real accessible name is .btn-mic's own aria-label), sized and
+// positioned to sit exactly around .btn-mic without affecting its click
+// target or focus ring.
+.mic-dial {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 4.5rem;
-  height: 4.5rem;
-  border: 1px solid rgb(255 255 255 / 70%);
+  width: 9.5rem;
+  height: 9.5rem;
+}
+
+.mic-dial-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+
+  text {
+    fill: var(--hero-ink-faint);
+    font-size: 6.2px;
+    font-weight: 600;
+    letter-spacing: 0.25px;
+    text-transform: uppercase;
+  }
+}
+
+.btn-mic {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 6.5rem;
+  height: 6.5rem;
+  border: 1px solid rgb(255 255 255 / 25%);
   border-radius: 50%;
   background: radial-gradient(
     circle at 35% 30%,
@@ -240,8 +244,8 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   color: var(--vs-on-accent);
   cursor: pointer;
   box-shadow:
-    0 0 0 1px rgb(255 255 255 / 40%) inset,
-    0 0 22px -4px var(--vs-cyan);
+    0 0 0 1px rgb(255 255 255 / 20%) inset,
+    0 0 32px -4px var(--vs-cyan);
 
   @include mixins.focus-ring;
 
@@ -273,25 +277,102 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   grid-column: 1 / -1;
   margin: var(--vs-space-2) 0 0;
   font-size: var(--vs-font-size-sm);
-  color: var(--vs-ink-faint);
+  color: var(--hero-ink-faint);
 }
 
-.hero-info-card {
-  position: relative;
+// The honest "today vs. vision" signal — deliberately plain (no pill/
+// border chrome) so it reads as a footnote under the description, not a
+// competing headline claim.
+.hero-vision-note {
+  margin: 0 0 var(--vs-space-5);
+  font-size: 0.72rem;
+  color: var(--hero-ink-faint);
+}
+
+// ---- status panel (top-right, matching the reference) ----
+.phase-legend {
+  position: absolute;
+  top: var(--vs-space-4);
+  right: var(--vs-space-4);
   z-index: 1;
-  margin-top: var(--vs-space-5);
-  padding: var(--vs-space-2) var(--vs-space-4);
+  margin: 0;
+  padding: var(--vs-space-3) var(--vs-space-3);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vs-space-2);
+  border: 1px solid var(--hero-line);
+  border-radius: var(--vs-radius-md);
+  background: var(--hero-panel);
+  backdrop-filter: blur(8px);
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  padding: 2px 4px;
   border-radius: var(--vs-radius-pill);
-  background: rgb(255 255 255 / 70%);
-  color: var(--vs-ink-soft);
-  font-size: var(--vs-font-size-sm);
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+
+  &:has(.legend-label.is-active) {
+    opacity: 1;
+  }
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: box-shadow 0.2s ease;
+
+  &--voice {
+    background: #3fb56a;
+  }
+
+  &--language {
+    background: #3f96b0;
+  }
+
+  &--translation {
+    background: #7a5fc4;
+  }
+
+  &--connection {
+    background: #b9812e;
+  }
+}
+
+.legend-row:has(.legend-label.is-active) .legend-dot {
+  &--voice {
+    box-shadow: 0 0 6px 1px #3fb56a;
+  }
+
+  &--language {
+    box-shadow: 0 0 6px 1px #3f96b0;
+  }
+
+  &--translation {
+    box-shadow: 0 0 6px 1px #7a5fc4;
+  }
+
+  &--connection {
+    box-shadow: 0 0 6px 1px #b9812e;
+  }
+}
+
+.legend-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--hero-ink-soft);
 }
 
 .scroll-cue {
   position: absolute;
   bottom: var(--vs-space-4);
-  left: 50%;
-  transform: translateX(-50%);
+  right: var(--vs-space-4);
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -299,7 +380,7 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   gap: 2px;
   border: none;
   background: none;
-  color: var(--vs-ink-faint);
+  color: var(--hero-ink-faint);
   font-size: 0.7rem;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -448,10 +529,6 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   }
 }
 
-.global-network-placeholder {
-  min-height: 20rem;
-}
-
 @include mixins.breakpoint-tablet {
   .lang-groups {
     grid-template-columns: 1fr 1fr;
@@ -469,11 +546,13 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
 }
 
 @media (max-width: 860px) {
-  .hero {
-    flex-direction: column;
-  }
-
-  .hero-info-card,
+  // The background image is a wide (1408x768) landscape composition —
+  // at narrow widths `cover` crops most of its right-hand detail away
+  // regardless, so the decorative status panel and scroll cue (which
+  // would otherwise float over whatever's left) are hidden rather than
+  // shown against an arbitrary crop. The headline, mic button, and CTA
+  // — the actually-functional parts — stay exactly as they are.
+  .phase-legend,
   .scroll-cue {
     display: none;
   }
