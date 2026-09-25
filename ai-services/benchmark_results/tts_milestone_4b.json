@@ -47,6 +47,26 @@
       "language": "en",
       "text": "What's on my schedule today?",
       "voice": "Aman"
+    },
+    {
+      "id": "ml-weather",
+      "language": "ml",
+      "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?"
+    },
+    {
+      "id": "ml-capital",
+      "language": "ml",
+      "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?"
+    },
+    {
+      "id": "ml-story",
+      "language": "ml",
+      "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ"
+    },
+    {
+      "id": "ml-greeting",
+      "language": "ml",
+      "text": "നമസ്കാരം, സുഖമാണോ?"
     }
   ],
   "results": [
@@ -54,12 +74,12 @@
       "key": "mms-tts-hin",
       "repo_id": "facebook/mms-tts-hin",
       "license": "CC-BY-NC-4.0",
-      "load_seconds": 0.959,
-      "mean_rtf": 0.1657,
-      "max_rtf": 0.4278,
+      "load_seconds": 0.958,
+      "mean_rtf": 0.1634,
+      "max_rtf": 0.4096,
       "mean_proxy_wer": 0.4917,
-      "failed_fixture_count": 2,
-      "peak_rss_mb": 2430.5,
+      "failed_fixture_count": 6,
+      "peak_rss_mb": 2435.0,
       "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
       "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
       "runs": [
@@ -67,11 +87,11 @@
           "fixture_id": "hi-weather",
           "language": "hi",
           "text": "आज मौसम कैसा है?",
-          "proxy_transcript": "हाली मौसम के साहे",
+          "proxy_transcript": "आली मौसम के साहे",
           "proxy_wer": 0.75,
-          "synthesis_seconds": 0.732,
-          "audio_seconds": 1.712,
-          "rtf": 0.4278
+          "synthesis_seconds": 0.727,
+          "audio_seconds": 1.776,
+          "rtf": 0.4096
         },
         {
           "fixture_id": "hi-capital",
@@ -79,9 +99,9 @@
           "text": "भारत की राजधानी क्या है?",
           "proxy_transcript": "भारत की राजहनी क्या है?",
           "proxy_wer": 0.2,
-          "synthesis_seconds": 0.187,
+          "synthesis_seconds": 0.177,
           "audio_seconds": 2.384,
-          "rtf": 0.0784
+          "rtf": 0.0743
         },
         {
           "fixture_id": "hi-story",
@@ -89,9 +109,9 @@
           "text": "मुझे एक छोटी कहानी सुनाओ",
           "proxy_transcript": "मुझे एक छोटी कहानी सुनाओ",
           "proxy_wer": 0.0,
-          "synthesis_seconds": 0.244,
+          "synthesis_seconds": 0.203,
           "audio_seconds": 2.656,
-          "rtf": 0.0918
+          "rtf": 0.0762
         },
         {
           "fixture_id": "hi-greeting",
@@ -99,9 +119,9 @@
           "text": "नमस्ते, आप कैसे हैं?",
           "proxy_transcript": "नमस्ते आप कैसे हैं?",
           "proxy_wer": 0.0,
-          "synthesis_seconds": 0.138,
-          "audio_seconds": 1.808,
-          "rtf": 0.0765
+          "synthesis_seconds": 0.147,
+          "audio_seconds": 1.936,
+          "rtf": 0.0759
         },
         {
           "fixture_id": "hinglish-weather",
@@ -122,8 +142,8 @@
           "proxy_transcript": "Thank you.",
           "proxy_wer": 1.0,
           "synthesis_seconds": 0.057,
-          "audio_seconds": 0.368,
-          "rtf": 0.154
+          "audio_seconds": 0.32,
+          "rtf": 0.1787
         },
         {
           "fixture_id": "en-schedule",
@@ -134,6 +154,260 @@
           "synthesis_seconds": 0.056,
           "audio_seconds": 0.336,
           "rtf": 0.1659
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "error": "mms-tts-hin: 'ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "error": "mms-tts-hin: 'ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "error": "mms-tts-hin: 'എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "error": "mms-tts-hin: 'നമസ്കാരം, സുഖമാണോ?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        }
+      ]
+    },
+    {
+      "key": "mms-tts-hin-ft-female",
+      "repo_id": "Anjan9320/fb-mms-tts-hin-ft-female",
+      "license": "CC-BY-NC-4.0",
+      "load_seconds": 0.997,
+      "mean_rtf": 0.1381,
+      "max_rtf": 0.2677,
+      "mean_proxy_wer": 0.4417,
+      "failed_fixture_count": 6,
+      "peak_rss_mb": 2610.4,
+      "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
+      "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "proxy_transcript": "आज मौसम कैसा है?",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 0.475,
+          "audio_seconds": 1.776,
+          "rtf": 0.2677
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "proxy_transcript": "भारत की रास्थानी क्या है?",
+          "proxy_wer": 0.2,
+          "synthesis_seconds": 0.18,
+          "audio_seconds": 2.176,
+          "rtf": 0.083
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "proxy_transcript": "मुझे गे एक छोटी कहानी सुनाओ।",
+          "proxy_wer": 0.2,
+          "synthesis_seconds": 0.188,
+          "audio_seconds": 2.304,
+          "rtf": 0.0814
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "proxy_transcript": "नमस्ति आप कैसे हैं?",
+          "proxy_wer": 0.25,
+          "synthesis_seconds": 0.141,
+          "audio_seconds": 1.904,
+          "rtf": 0.0739
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "error": "mms-tts-hin-ft-female: 'kal ka weather kaisa rahega, bata sakte ho' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "error": "mms-tts-hin-ft-female: 'mujhe ek chhoti si joke sunao' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "proxy_transcript": "Thank you.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.066,
+          "audio_seconds": 0.416,
+          "rtf": 0.1598
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "proxy_transcript": "Thank you.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.06,
+          "audio_seconds": 0.368,
+          "rtf": 0.1626
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "error": "mms-tts-hin-ft-female: 'ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "error": "mms-tts-hin-ft-female: 'ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "error": "mms-tts-hin-ft-female: 'എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "error": "mms-tts-hin-ft-female: 'നമസ്കാരം, സുഖമാണോ?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        }
+      ]
+    },
+    {
+      "key": "mms-tts-mal",
+      "repo_id": "facebook/mms-tts-mal",
+      "license": "CC-BY-NC-4.0",
+      "load_seconds": 1.071,
+      "mean_rtf": 0.2432,
+      "max_rtf": 1.368,
+      "mean_proxy_wer": 1.1458,
+      "failed_fixture_count": 4,
+      "peak_rss_mb": 2744.0,
+      "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
+      "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "error": "mms-tts-mal: 'आज मौसम कैसा है?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "error": "mms-tts-mal: 'भारत की राजधानी क्या है?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "error": "mms-tts-mal: 'मुझे एक छोटी कहानी सुनाओ' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "error": "mms-tts-mal: 'नमस्ते, आप कैसे हैं?' contains no Devanagari characters this Hindi-only checkpoint's vocabulary can represent"
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "proxy_transcript": "Thank you.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.744,
+          "audio_seconds": 0.544,
+          "rtf": 1.368
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "proxy_transcript": "I know you there.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.114,
+          "audio_seconds": 1.36,
+          "rtf": 0.0835
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "proxy_transcript": "There, yeah, you know, man.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.15,
+          "audio_seconds": 1.824,
+          "rtf": 0.0821
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "proxy_transcript": "Bleh.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.102,
+          "audio_seconds": 0.96,
+          "rtf": 0.1058
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "proxy_transcript": "ഇന്ന കാലാവസത്ത യങ്ഗനേ ഉന്ട്?",
+          "proxy_wer": 1.3333,
+          "synthesis_seconds": 0.148,
+          "audio_seconds": 1.968,
+          "rtf": 0.0753
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "proxy_transcript": "ഇനതിയുടെ തായൽ സതാനമ ഏദാന്",
+          "proxy_wer": 1.3333,
+          "synthesis_seconds": 0.162,
+          "audio_seconds": 2.08,
+          "rtf": 0.0781
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "proxy_transcript": "എനിക്ക്ക്വിരുദ ചേരിയക് കകാപരു.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 0.175,
+          "audio_seconds": 2.288,
+          "rtf": 0.0763
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "proxy_transcript": "ൾ�ൾ� ്ൾ�ൾൾ്ു ്ൾ�ൾു",
+          "proxy_wer": 1.5,
+          "synthesis_seconds": 0.141,
+          "audio_seconds": 1.84,
+          "rtf": 0.0768
         }
       ]
     },
@@ -145,12 +419,12 @@
       "key": "xtts-v2",
       "repo_id": "coqui/XTTS-v2",
       "license": "CPML",
-      "load_seconds": 14.924,
-      "mean_rtf": 0.4039,
-      "max_rtf": 0.4604,
-      "mean_proxy_wer": 0.8094,
+      "load_seconds": 49.528,
+      "mean_rtf": 0.4,
+      "max_rtf": 0.4605,
+      "mean_proxy_wer": 1.9208,
       "failed_fixture_count": 0,
-      "peak_rss_mb": 5449.3,
+      "peak_rss_mb": 5145.0,
       "pronunciation_accuracy": "not measured — requires a human listener, unavailable in this environment",
       "naturalness_mos": "not measured — requires a human listener, unavailable in this environment",
       "runs": [
@@ -158,61 +432,61 @@
           "fixture_id": "hi-weather",
           "language": "hi",
           "text": "आज मौसम कैसा है?",
-          "proxy_transcript": "आज मौसम कैसा है? इलिनान केता दोर तराना नेशा.",
-          "proxy_wer": 1.25,
-          "synthesis_seconds": 3.373,
-          "audio_seconds": 7.327,
-          "rtf": 0.4604
+          "proxy_transcript": "आजिमाओन, आनाना, यसो जाओन, दार्नों कहतानासी.",
+          "proxy_wer": 1.5,
+          "synthesis_seconds": 3.16,
+          "audio_seconds": 6.862,
+          "rtf": 0.4605
         },
         {
           "fixture_id": "hi-capital",
           "language": "hi",
           "text": "भारत की राजधानी क्या है?",
-          "proxy_transcript": "भारत की राजधानी क्या है?",
-          "proxy_wer": 0.0,
-          "synthesis_seconds": 1.406,
-          "audio_seconds": 3.577,
-          "rtf": 0.3931
+          "proxy_transcript": "भारत की आजधानी क्या है?",
+          "proxy_wer": 0.2,
+          "synthesis_seconds": 1.363,
+          "audio_seconds": 3.53,
+          "rtf": 0.3861
         },
         {
           "fixture_id": "hi-story",
           "language": "hi",
           "text": "मुझे एक छोटी कहानी सुनाओ",
-          "proxy_transcript": "मुझे एक छोटी कहानी सुनाओ, कान नावान काना डॉब्धू, नेन स्यल पकानाई काई,",
-          "proxy_wer": 1.6,
-          "synthesis_seconds": 3.874,
-          "audio_seconds": 9.44,
-          "rtf": 0.4104
+          "proxy_transcript": "मुझे एक छोटी कहानी सुनाओ।",
+          "proxy_wer": 0.0,
+          "synthesis_seconds": 1.772,
+          "audio_seconds": 4.598,
+          "rtf": 0.3854
         },
         {
           "fixture_id": "hi-greeting",
           "language": "hi",
           "text": "नमस्ते, आप कैसे हैं?",
-          "proxy_transcript": "नमस्ते, आप कैसे हैं?",
-          "proxy_wer": 0.0,
-          "synthesis_seconds": 1.638,
-          "audio_seconds": 4.192,
-          "rtf": 0.3908
+          "proxy_transcript": "नमस्या काजी नानानानाना जान, अफ्षिन उनों खाल, केसी है?",
+          "proxy_wer": 2.25,
+          "synthesis_seconds": 2.887,
+          "audio_seconds": 7.118,
+          "rtf": 0.4057
         },
         {
           "fixture_id": "hinglish-weather",
           "language": "hinglish",
           "text": "kal ka weather kaisa rahega, bata sakte ho",
-          "proxy_transcript": "Kalka Vedrin Kaisar Raegokana Tithi Hortensi Kishuban Nangma Morndata.",
-          "proxy_wer": 1.125,
-          "synthesis_seconds": 3.774,
-          "audio_seconds": 9.498,
-          "rtf": 0.3974
+          "proxy_transcript": "Kyle Schuern, Garlanda Weather Kaisarai, batasakdeho.",
+          "proxy_wer": 1.0,
+          "synthesis_seconds": 2.84,
+          "audio_seconds": 7.269,
+          "rtf": 0.3907
         },
         {
           "fixture_id": "hinglish-joke",
           "language": "hinglish",
           "text": "mujhe ek chhoti si joke sunao",
-          "proxy_transcript": "Mujamya Anwaya Nando, Nong Shadha, Tavidhi Bonar Hena, Jinis Sikha Gidha, Kaada Nakane Gita Hai.",
-          "proxy_wer": 2.5,
-          "synthesis_seconds": 4.136,
-          "audio_seconds": 10.357,
-          "rtf": 0.3993
+          "proxy_transcript": "Muni na adai nang bai nao ta. Kis se donk edo, so a zai kai no.",
+          "proxy_wer": 2.6667,
+          "synthesis_seconds": 2.982,
+          "audio_seconds": 7.42,
+          "rtf": 0.4019
         },
         {
           "fixture_id": "en-learn-hindi",
@@ -220,9 +494,9 @@
           "text": "What's a good way to learn Hindi quickly?",
           "proxy_transcript": "What's a good way to learn Hindi quickly?",
           "proxy_wer": 0.0,
-          "synthesis_seconds": 1.228,
-          "audio_seconds": 3.182,
-          "rtf": 0.3861
+          "synthesis_seconds": 0.986,
+          "audio_seconds": 2.52,
+          "rtf": 0.3913
         },
         {
           "fixture_id": "en-schedule",
@@ -230,9 +504,49 @@
           "text": "What's on my schedule today?",
           "proxy_transcript": "What's on my schedule today?",
           "proxy_wer": 0.0,
-          "synthesis_seconds": 0.874,
-          "audio_seconds": 2.218,
-          "rtf": 0.394
+          "synthesis_seconds": 0.939,
+          "audio_seconds": 2.416,
+          "rtf": 0.3887
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "proxy_transcript": "livest Authored in πόνoopin ацион actly � opacity નીྗન૦�སી ની ન྾�� tresી ཏེ ની નીསྱ ཀག�іབ",
+          "proxy_wer": 5.3333,
+          "synthesis_seconds": 2.806,
+          "audio_seconds": 7.176,
+          "rtf": 0.391
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "proxy_transcript": "ླ ླླ ླམླ ༨ག ཁླ གའོ གསུ ཤྲད གྲུའག ཕྲག དོ རྭིེ",
+          "proxy_wer": 4.0,
+          "synthesis_seconds": 2.54,
+          "audio_seconds": 6.317,
+          "rtf": 0.4021
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "proxy_transcript": "വ൅യൾനൾനൾനൾന്യൾചൊ നൾനൾയ്ണായൾഺിന്പിന് അ повന്റ ഉനെറകർൻന്റമെ വന്ശയിനോ മനാചൻറിക്യ� spice.",
+          "proxy_wer": 1.6,
+          "synthesis_seconds": 3.328,
+          "audio_seconds": 8.279,
+          "rtf": 0.402
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "proxy_transcript": "്൉�൉ ്ർർ്ൂർ ്്൱് ർർർ�ൾ്ൃ ൢ്ർർ ്ർർ്��ൗു൲�ു൱്ു ്�༼് ്ർ് ൽ��൦്",
+          "proxy_wer": 4.5,
+          "synthesis_seconds": 2.425,
+          "audio_seconds": 6.154,
+          "rtf": 0.3941
         }
       ]
     }

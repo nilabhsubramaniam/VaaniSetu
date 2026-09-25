@@ -16,6 +16,9 @@ dependencies = [
     "transformers>=4.45,<5",
     "parler-tts @ git+https://github.com/huggingface/parler-tts.git",
     "coqui-tts>=0.24,<1",
+    # Milestone 6b `langid` candidates: IndicLID (fasttext + torch/transformers,
+    # both already deps above) and the original fastText lid.176 baseline.
+    "fasttext>=0.9,<1",
 ]
 
 [dependency-groups]
@@ -27,6 +30,11 @@ dev = [
     # never imported by the running service (app/), so it stays a dev
     # dependency rather than a runtime one.
     "huggingface-hub>=0.26,<1",
+    # download_models.py's direct-URL paths (fasttext_lid, indiclid —
+    # neither is a HF repo). Already an installed transitive dependency of
+    # huggingface-hub; declared explicitly because the script imports it
+    # directly now, not just through hf_hub_download/snapshot_download.
+    "requests>=2.32,<3",
 ]
 
 [tool.ruff]

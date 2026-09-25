@@ -41,6 +41,15 @@ describe('MessageBubble', () => {
     expect(bubble?.getAttribute('lang')).toBe('hi');
   });
 
+  it('sets lang="ml" for Malayalam text so the Malayalam font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'ml', text: 'നമസ്കാരം' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('ml');
+  });
+
   it('does not set a lang attribute for Hinglish text', async () => {
     const fixture = TestBed.createComponent(MessageBubble);
     fixture.componentRef.setInput('turn', makeTurn({ language: 'hinglish', text: 'Kaise ho?' }));

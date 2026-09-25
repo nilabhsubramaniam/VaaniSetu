@@ -1364,6 +1364,278 @@ Status**.
   established.
 - **Status:** Accepted.
 
+## ADR-027 - Phase 6 Milestone 6b: `langid` capability selects `fasttext-lid176`, not `indiclid`
+
+- **Decision:** The real Python `langid` capability is built
+  (`app/engines/langid/{base,indiclid_engine,fasttext_lid_engine}.py`,
+  `POST /v1/detect` per `proto/langid.openapi.yaml`) and `models.yaml`
+  selects **`fasttext-lid176`** (the original `lid.176.bin`,
+  CC-BY-SA-3.0), not `ai4bharat/IndicLID` (`indiclid`, MIT) — a real,
+  measured, and counter-intuitive result: the general-purpose baseline
+  outscored the Indic-specific candidate on this project's own fixture
+  set. `indiclid` stays listed as a candidate, not deleted, per
+  `AGENTS.md` §4 ("do not create duplicate components" is not "delete
+  a real alternative that lost a small-sample benchmark").
+- **Reason:**
+  1. **The benchmark** (`scripts/benchmark_langid.py`, run for real,
+     `benchmark_results/langid_milestone_6b.json`): both candidates
+     classify each of `eval_data/asr_fixtures.yaml`'s 8 fixtures (4 Hindi,
+     2 Hinglish, 2 English) and are scored against the fixture's labeled
+     language.
+     | Candidate | Overall accuracy | Hindi | Hinglish | English |
+     |---|---|---|---|---|
+     | `fasttext-lid176` | **75% (6/8)** | 100% (4/4) | 0% (0/2) | 100% (2/2) |
+     | `indiclid` | 50% (4/8) | 50% (2/4) | 0% (0/2) | 100% (2/2) |
+     Confusion matrix (true label -> predicted bucket; `other` = any
+     prediction outside {hi, hinglish, en}):
+     - `fasttext-lid176`: hi -> {hi: 4}; hinglish -> {en: 2}; en -> {en: 2}.
+     - `indiclid`: hi -> {hi: 2, other: 2}; hinglish -> {other: 2};
+       en -> {en: 2}.
+  2. **Why `indiclid` scored lower, verified by hand, not assumed**: its
+     two Hindi misses (`hi-weather`, `hi-story`) are its own native-script
+     fastText model (`IndicLID-FTN`) confidently (0.91-1.00) predicting
+     `mai_Deva` (Maithili) and `doi_Deva` (Dogri) instead of `hin_Deva` —
+     genuinely wrong, closely-related-language confusion on short,
+     single-sentence Devanagari input, reproduced directly against the
+     downloaded model outside this project's code. Its Hinglish misses
+     are its romanized model (`IndicLID-FTR`) confidently (0.90-0.96)
+     predicting `ben_Latn` (romanized Bengali) and `nep_Latn` (romanized
+     Nepali) instead of `hin_Latn` — again a genuine model error, not an
+     integration bug, and specifically *not* the BERT-fallback path
+     working as intended (both FTR calls exceeded the 0.6
+     confidence-to-trust-FTR threshold, so the BERT stage was never
+     reached for either miss). `fasttext-lid176`'s own Hinglish misses are
+     more explicable: both predicted `en` at low confidence (0.22, 0.32),
+     i.e. genuine uncertainty on romanized Hindi it was never trained to
+     recognize as a distinct class at all (no code-mixed class exists in
+     `lid.176`'s label space) — a known, expected gap, not a surprise.
+  3. **A real, load-bearing incompatibility was found and fixed along the
+     way, not worked around by skipping the affected stage**:
+     `IndicLID-BERT`'s checkpoint is a `torch.load`-ed, fully pickled
+     `nn.Module` saved against an older `transformers` version. Loading it
+     under this project's `transformers==4.46.1` reproducibly raised
+     `AttributeError: 'BertModel' object has no attribute
+     'attn_implementation'` on every BERT-fallback call — because that
+     attribute is set only in `BertModel.__init__` (line 981 of
+     `transformers/models/bert/modeling_bert.py` in this project's
+     installed version), and unpickling never calls `__init__`. Fixed in
+     `IndicLIDEngine.__init__` by copying
+     `self._bert.bert.config._attn_implementation` onto
+     `self._bert.bert.attn_implementation` right after `torch.load` — a
+     real, minimal, verified-necessary compatibility shim, not a
+     hypothetical one; `en-schedule`'s BERT-fallback call failed before
+     this fix and passed after it, isolating the fix's effect precisely.
+  4. **Neither candidate meets `docs/EVALUATION.md`'s >90% accuracy target
+     for Hinglish** — stated plainly, not glossed over. This is a real,
+     open gap, not a milestone failure: `docs/DECISIONS.md` ADR-026
+     already scoped Milestone 6a/6b to "detection is real but drives
+     nothing yet" (no LLM prompt, no TTS voice, no UI depends on this
+     value), so a still-imperfect Hinglish signal is not currently
+     load-bearing anywhere. It is recorded here as evidence for whoever
+     revisits this capability, not hidden.
+  5. **Given (1)-(4), the evidence-based choice per `AGENTS.md` §8
+     ("model selection is evidence-based... none is selected until
+     benchmarked... on the target hardware for... Hinglish... quality")
+     is `fasttext-lid176`**: it has the higher measured overall and
+     per-language accuracy everywhere the two differ, loads in 0.05s
+     versus `indiclid`'s 4.5s (three fastText/BERT models plus a
+     tokenizer), and has a near-zero memory/dependency footprint (no
+     `torch`/`transformers` model load at all for this capability's own
+     purposes, though both remain installed for the `tts` capability
+     regardless). Choosing `indiclid` anyway because its architecture is
+     *supposed* to handle Hinglish better, when the measured evidence on
+     this project's own fixtures says otherwise, would be exactly the
+     "select without evidence" `AGENTS.md` prohibits.
+  6. **License**: both are viable — `fasttext-lid176` is CC-BY-SA-3.0 (a
+     share-alike obligation on redistribution of the model itself, not a
+     commercial-use restriction), `indiclid` is MIT (no obligations at
+     all). Neither is the deciding factor here, since `fasttext-lid176`
+     wins on accuracy regardless; recorded for completeness, same as
+     every prior model-selection ADR.
+- **Alternatives considered:**
+  - **Selecting `indiclid` anyway, on the strength of its purpose-built
+    architecture** — rejected per (5) above: this is precisely the kind
+    of vibes-based selection `AGENTS.md` explicitly forbids ("model
+    selection is evidence-based").
+  - **Re-benchmarking against a larger, held-out fixture set before
+    selecting anything** — considered, but Phase 9 is explicitly where
+    "the automated, repeatable harness" (this project's own recurring
+    disclaimer, see `scripts/benchmark_asr.py`/`benchmark_tts.py`) belongs;
+    every prior capability (2b/3b/4b) selected from this same small,
+    directional, 8-fixture set, so holding `langid` to a stricter
+    standard than `llm`/`asr`/`tts` were held to would be inconsistent,
+    not more rigorous.
+  - **Skipping the BERT-fallback stage entirely (FTN/FTR-only IndicLID)**
+    to sidestep the `attn_implementation` incompatibility instead of
+    fixing it — rejected: the BERT fallback is specifically what
+    disambiguates uncertain romanized text, i.e. the Hinglish case this
+    milestone cares about measuring most; skipping it would have hidden
+    a real capability gap rather than measuring it honestly, and the fix
+    itself was small and verified.
+  - **Marking `langid` as "no model meets the bar, capability stays fake"**
+    — rejected: `fasttext-lid176` measurably beats the Milestone 6a fake
+    (a bare Devanagari-Unicode-range check with no English/Hinglish
+    distinction at all) on every fixture, so real progress exists even
+    though the Hinglish gap remains; withholding a strictly-better real
+    model because it isn't perfect contradicts the incremental,
+    evidence-based spirit of `AGENTS.md` §4/§8.
+- **Impact:** `ai-services/app/engines/langid/` (new: `base.py`,
+  `indiclid_engine.py`, `fasttext_lid_engine.py`); `app/registry.py`
+  (`ModelEntry.download_url`/`download_urls`/`bert_tokenizer`,
+  `build_engine`'s `fasttext_lid`/`indiclid` branches,
+  `_find_model_file` helper); `app/config.py`
+  (`langid_model_store_dir`/`VAANISETU_LANGID_MODEL_STORE`); `app/main.py`
+  (`POST /v1/detect`, `langid` in `/healthz`, startup loading);
+  `models.yaml` (`langid` section, `selected: fasttext-lid176`);
+  `scripts/download_models.py` (direct-URL single-file and
+  zip-plus-HF-tokenizer download paths); `scripts/benchmark_langid.py`
+  (new); `pyproject.toml` (`fasttext`, `requests` added — `torch`/
+  `transformers` already present since Milestone 4b);
+  `docker-compose.yml` (`VAANISETU_LANGID_MODEL_STORE`,
+  `VAANISETU_LANGID_SERVICE_URL`); `ai-services/SETUP.md`. On the Go side,
+  per ADR-026's design, only `VAANISETU_LANGID_SERVICE_URL` needs setting
+  to switch `conversation.Service` from `FakeLangIDClient` to
+  `HTTPLangIDClient` talking to this real model — verified end-to-end
+  (see `docs/CURRENT_STATE.md`). No LLM prompt, TTS voice, or UI logic
+  reads `detectedLanguage` yet — that boundary, set in ADR-026, is
+  unchanged by this milestone.
+- **Status:** Accepted.
+
+## ADR-028 - Phase 6 Milestone 6c: Malayalam enabled end to end; TTS's language axis added to the registry
+
+- **Decision:** Four related Milestone 6c choices:
+  1. **`models.yaml`'s `tts.selected` becomes a two-level
+     `{language: {voice: key}}` map**, not the flat `{voice: key}` map
+     ADR-023 introduced. `app/registry.py`'s `load_selected_entry` gains a
+     `language` parameter for `tts`; a new `tts_languages()` helper reads
+     the configured language set from `models.yaml` rather than
+     hardcoding it in `app/main.py`. The startup loop now loads one engine
+     per `(language, voice)` pair, de-duplicated by candidate key so
+     `hi`/`hinglish` sharing the same Hindi checkpoints load them once,
+     not twice. `get_tts_engine`/`/v1/synthesize` now select by
+     `(language, voice)`; an unconfigured language is a clean `400`
+     ("tts not available for language X") instead of silently routing to
+     the Hindi engine and failing inside it — the same failure mode
+     Hinglish already had (ADR-021's `UnsupportedTextError`), now
+     surfaced correctly as a missing-language response for any language
+     genuinely not configured, while Hinglish keeps its existing
+     in-engine-failure behavior since it *is* configured (against the
+     Hindi checkpoints, which still can't speak Latin script).
+  2. **`facebook/mms-tts-mal` (CC-BY-NC-4.0) added and selected** as
+     Malayalam's TTS candidate — the only viable one found. A broader
+     Hugging Face search for a Malayalam MMS-VITS fine-tune equivalent to
+     `Anjan9320/fb-mms-tts-hin-ft-female` (Hindi's female voice, ADR-022)
+     turned up none; other Malayalam TTS projects found (Praha-Labs'
+     LFM/Qwen3/Orpheus-based models, Sandhya2002's Spark/Orpheus models)
+     use entirely different architectures that would require new engine
+     wrappers and new dependencies — rejected per `AGENTS.md` §4's "no
+     unnecessary dependencies" for uncertain quality gain. Both the
+     "female" and "male" voice keys point at the same `mms-tts-mal`
+     engine instance — a real, honestly-recorded asymmetry with Hindi's
+     two distinct voices, not an oversight.
+  3. **Malayalam is enabled in the UI
+     (`LANGUAGE_OPTIONS[].enabled = true` for `ml`)** despite its TTS
+     failing badly — see the Reason section for the real numbers and the
+     reasoning for shipping anyway.
+  4. **Self-hosted Malayalam typography added**: `Noto Sans Malayalam`
+     (SIL OFL 1.1, `public/fonts/OFL-Malayalam.txt` — a separate license
+     file from the Devanagari font's, since each Noto script repo carries
+     its own copyright line) alongside the existing Devanagari font;
+     `message-bubble.ts`'s `langAttr` (previously a single Hindi-only
+     ternary) generalizes to a small set lookup covering both
+     script-specific languages.
+- **Reason:**
+  1. **The real, measured evidence, per capability** (fixtures:
+     `eval_data/asr_fixtures.yaml`'s four new `ml-*` entries; results:
+     `benchmark_results/tts_milestone_4b.json`,
+     `benchmark_results/langid_milestone_6b.json`, and a one-off
+     `--only llama-3.2-3b-instruct` run for the LLM, not saved over the
+     committed `llm_milestone_2b.json` since it isn't a re-selection):
+     - **langid: strong pass.** 100% accuracy (4/4) for *both*
+       `fasttext-lid176` and `indiclid` — Malayalam's own Unicode block
+       (U+0D00-0D7F) makes it trivially distinguishable, unlike the
+       Devanagari-vs-Devanagari and Latin-vs-Latin ambiguity that caused
+       Hindi/Hinglish's imperfect scores in ADR-027. The strongest
+       language-detection result measured in this project so far.
+     - **LLM: pass, read directly** (per `docs/EVALUATION.md` §3,
+       "multilingual quality" has no automated score). The
+       already-selected `llama-3.2-3b-instruct` produced fluent,
+       grammatical, on-topic Malayalam for both a weather question
+       (correctly referencing Kerala) and a short-story request — no
+       code change was needed since `llama_cpp_engine.py`'s
+       `_LANGUAGE_NAMES`/system-prompt template already covered `ml`, an
+       artifact of the prompt already being written generically for
+       every `LanguageCode`, not a change made for this milestone.
+     - **TTS: fails badly.** `mms-tts-mal`'s proxy WER (synthesize the
+       fixture text, transcribe it back with the already-selected
+       `faster-whisper-large-v3-turbo`, compare) ranged 100-150% against
+       `docs/EVALUATION.md` §5's <10% target — e.g. `ml-greeting`
+       transcribed back as unintelligible fragments
+       ("ൾ�ൾ� ്ൾ�ൾൾ്ു..."). This proxy conflates TTS and ASR quality
+       (there is no independent Malayalam recording or macOS system
+       voice to isolate which is at fault — confirmed directly via
+       `say -v '?'`: Hindi/Bengali/Tamil/Telugu/Kannada have a voice,
+       Malayalam doesn't) — a real, stated limitation, not a
+       hypothetical one, and not something this milestone can resolve
+       without Phase 8's future real dataset pipeline.
+  2. **The enable/disable decision was a real policy conflict, put to the
+     user rather than decided silently** (`AGENTS.md` §14): `docs/ROADMAP.md`
+     Phase 6's Definition of Done reads literally as "every threshold
+     must pass, languages that fail stay disabled" — Malayalam's TTS
+     result fails that reading outright. But Hinglish already ships
+     enabled today despite its own TTS failing *completely* (not just a
+     bad score — a total `UnsupportedTextError` for every fixture, ADR-021),
+     because a TTS failure is non-fatal by design (ADR-020: the text
+     conversation still completes, voice output for that turn silently
+     doesn't happen). Presented both readings, with a recommendation to
+     follow the Hinglish precedent; the user chose to enable Malayalam,
+     consistent with that precedent rather than the DoD's literal
+     wording — recorded here as the applicable precedent for the next
+     language this happens for, not a one-off exception.
+  3. The registry's language axis is real, useful new architecture
+     regardless of Malayalam specifically —
+     `docs/ARCHITECTURE.md` §3.6 already anticipated "later each
+     language" as the intended shape; this milestone is what actually
+     builds it, and every future TTS-language addition reuses it as a
+     pure `models.yaml` edit (ADR-006), not a code change.
+- **Alternatives considered:**
+  - **Keeping Malayalam disabled until a better TTS candidate or a real
+    recording exists** — the literal-DoD reading; rejected in favor of
+    the Hinglish-precedent reading per the user's explicit decision
+    above, not because the TTS gap isn't real (it is, and stays
+    documented as a known, open gap for Malayalam specifically).
+  - **Building a new engine wrapper for one of the other Malayalam TTS
+    projects found (LFM/Qwen3/Orpheus/Spark-based)** — rejected: unknown
+    quality, a new dependency and a new `TTSEngine` implementation for an
+    unverified gain, when `mms_vits`'s existing wrapper already works
+    mechanically (it synthesizes real audio, just at poor measured
+    quality) — not a "no candidate works at all" situation.
+  - **Keeping `tts.selected` flat and special-casing Malayalam in Python
+    code instead of the registry** — rejected: exactly the kind of
+    per-language `if` branch `docs/ARCHITECTURE.md`'s "later each
+    language... in the model registry" phrasing was written to avoid,
+    and would need to be undone the next time a language is added anyway.
+- **Impact:** `ai-services/app/registry.py` (`load_selected_entry`'s
+  `language` param, new `tts_languages()`); `app/main.py` (nested
+  `(language, voice)` loading + dedup, `get_tts_engine`, `/v1/synthesize`,
+  `/healthz`); `models.yaml` (`tts.selected` reshaped, `mms-tts-mal`
+  added); `eval_data/asr_fixtures.yaml` (four `ml-*` fixtures, no `voice`
+  field); `scripts/generate_audio_fixtures.py` (skips fixtures with no
+  `voice`); `scripts/benchmark.py` (two `ml` prompts added to `_PROMPTS`);
+  `tests/test_registry.py`/`tests/test_main.py` (new-shape coverage);
+  frontend `language.model.ts` (`ml.enabled = true`), `styles.scss`/
+  `_tokens.scss` (Malayalam font-face, token, `[lang='ml']` rule),
+  `message-bubble.ts` (`langAttr` generalized), plus the two new font
+  files under `public/fonts/`. No Go source change — `language`/`voice`
+  were already required, validated, passed-through fields end to end
+  (`internal/api/dto.go`'s `isValidLanguage` already included `ml`).
+  Verified end-to-end live: `/healthz` reports the nested shape correctly,
+  `POST /v1/synthesize` returns real Malayalam audio, `POST
+  /api/v1/chat` with Malayalam text returns a real Malayalam LLM reply
+  with `script: "Malayalam"` and `detectedLanguage: "ml"`, and `POST
+  /api/v1/speech/synthesize` returns real audio through the Go backend.
+- **Status:** Accepted.
+
 ## Template for future ADRs
 
 ```

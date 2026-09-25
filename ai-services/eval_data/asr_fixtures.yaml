@@ -20,6 +20,18 @@
 # macOS (the `say` command); this is a real portability limitation of
 # this specific benchmark run, not of the ASR service itself, which
 # accepts any recorded audio regardless of how it was produced.
+#
+# Milestone 6c added the four `ml-*` (Malayalam) fixtures below with no
+# `voice` field, deliberately: macOS has no Malayalam `say` voice at all
+# (checked directly — Hindi/Bengali/Tamil/Telugu/Kannada have one, this
+# language doesn't), so scripts/generate_audio_fixtures.py cannot produce
+# real audio for them the way it does every other language here. They
+# exist only for scripts/benchmark_tts.py's synthesize-then-transcribe
+# proxy measurement (the mms-tts-mal candidate synthesizes the text,
+# faster-whisper transcribes it back, WER is computed against the
+# original) — the only Malayalam ASR+TTS evidence available in this
+# environment, and a real, stated limitation (docs/DECISIONS.md ADR-028),
+# not something hidden.
 fixtures:
   - id: hi-weather
     language: hi
@@ -53,3 +65,15 @@ fixtures:
     language: en
     text: "What's on my schedule today?"
     voice: Aman
+  - id: ml-weather
+    language: ml
+    text: "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?"
+  - id: ml-capital
+    language: ml
+    text: "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?"
+  - id: ml-story
+    language: ml
+    text: "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ"
+  - id: ml-greeting
+    language: ml
+    text: "നമസ്കാരം, സുഖമാണോ?"

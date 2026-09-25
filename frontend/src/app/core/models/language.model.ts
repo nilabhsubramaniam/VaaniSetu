@@ -1,10 +1,15 @@
 /**
  * Language identity used across the UI.
  *
- * Mirrors the long-term language set in `docs/PROJECT_GOAL.md`. Only `hi`
- * and `hinglish` are enabled in Phase 1; the rest are listed so the language
- * selector can show them as "coming soon" without any functionality behind
- * them (see `docs/ROADMAP.md` Phase 6).
+ * Mirrors the long-term language set in `docs/PROJECT_GOAL.md`. `hi` and
+ * `hinglish` were enabled in Phase 1; `ml` (Malayalam) joined them in
+ * Phase 6 Milestone 6c (see `docs/DECISIONS.md` ADR-028) — its LLM and
+ * langid results are strong, but its only real TTS candidate fails badly
+ * (proxy WER 100-150% against the <10% target); it ships anyway on the
+ * same precedent Hinglish already set (ADR-020's non-fatal TTS failure —
+ * text conversation still works, voice output for that turn silently
+ * doesn't). The rest are listed so the language selector can show them as
+ * "coming soon" without any functionality behind them.
  */
 export type LanguageCode =
   'hi' | 'hinglish' | 'en' | 'bn' | 'gu' | 'mr' | 'ta' | 'te' | 'kn' | 'ml' | 'pa' | 'or';
@@ -33,7 +38,7 @@ export const LANGUAGE_OPTIONS: readonly LanguageOption[] = [
   { code: 'ta', label: 'தமிழ்', englishName: 'Tamil', enabled: false },
   { code: 'te', label: 'తెలుగు', englishName: 'Telugu', enabled: false },
   { code: 'kn', label: 'ಕನ್ನಡ', englishName: 'Kannada', enabled: false },
-  { code: 'ml', label: 'മലയാളം', englishName: 'Malayalam', enabled: false },
+  { code: 'ml', label: 'മലയാളം', englishName: 'Malayalam', enabled: true },
   { code: 'pa', label: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', enabled: false },
   { code: 'or', label: 'ଓଡ଼ିଆ', englishName: 'Odia', enabled: false },
 ];

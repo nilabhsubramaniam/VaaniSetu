@@ -1,0 +1,400 @@
+{
+  "fixtures": [
+    {
+      "id": "hi-weather",
+      "language": "hi",
+      "text": "आज मौसम कैसा है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-capital",
+      "language": "hi",
+      "text": "भारत की राजधानी क्या है?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-story",
+      "language": "hi",
+      "text": "मुझे एक छोटी कहानी सुनाओ",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hi-greeting",
+      "language": "hi",
+      "text": "नमस्ते, आप कैसे हैं?",
+      "voice": "Lekha"
+    },
+    {
+      "id": "hinglish-weather",
+      "language": "hinglish",
+      "text": "kal ka weather kaisa rahega, bata sakte ho",
+      "voice": "Tara"
+    },
+    {
+      "id": "hinglish-joke",
+      "language": "hinglish",
+      "text": "mujhe ek chhoti si joke sunao",
+      "voice": "Rishi"
+    },
+    {
+      "id": "en-learn-hindi",
+      "language": "en",
+      "text": "What's a good way to learn Hindi quickly?",
+      "voice": "Samantha"
+    },
+    {
+      "id": "en-schedule",
+      "language": "en",
+      "text": "What's on my schedule today?",
+      "voice": "Aman"
+    },
+    {
+      "id": "ml-weather",
+      "language": "ml",
+      "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?"
+    },
+    {
+      "id": "ml-capital",
+      "language": "ml",
+      "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?"
+    },
+    {
+      "id": "ml-story",
+      "language": "ml",
+      "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ"
+    },
+    {
+      "id": "ml-greeting",
+      "language": "ml",
+      "text": "നമസ്കാരം, സുഖമാണോ?"
+    }
+  ],
+  "results": [
+    {
+      "key": "indiclid",
+      "repo_id": "ai4bharat/IndicLID",
+      "license": "MIT",
+      "load_seconds": 5.365,
+      "overall_accuracy": 0.6667,
+      "per_language_accuracy": {
+        "hi": {
+          "count": 4,
+          "accuracy": 0.5
+        },
+        "ml": {
+          "count": 4,
+          "accuracy": 1.0
+        },
+        "en": {
+          "count": 2,
+          "accuracy": 1.0
+        },
+        "hinglish": {
+          "count": 2,
+          "accuracy": 0.0
+        }
+      },
+      "confusion_matrix": {
+        "hi": {
+          "hi": 2,
+          "hinglish": 0,
+          "en": 0,
+          "other": 2
+        },
+        "hinglish": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 0,
+          "other": 2
+        },
+        "en": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 2,
+          "other": 0
+        },
+        "other": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 0,
+          "other": 4
+        }
+      },
+      "failed_fixture_count": 0,
+      "peak_rss_mb": 3025.8,
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "predicted_language": "",
+          "confidence": 1.0,
+          "correct": false,
+          "latency_seconds": 0.0003
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "predicted_language": "hi",
+          "confidence": 0.9993,
+          "correct": true,
+          "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "predicted_language": "",
+          "confidence": 0.9084,
+          "correct": false,
+          "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "predicted_language": "hi",
+          "confidence": 0.9691,
+          "correct": true,
+          "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "predicted_language": "bn",
+          "confidence": 0.9041,
+          "correct": false,
+          "latency_seconds": 0.0003
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "predicted_language": "",
+          "confidence": 0.964,
+          "correct": false,
+          "latency_seconds": 0.0002
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "predicted_language": "en",
+          "confidence": 0.9717,
+          "correct": true,
+          "latency_seconds": 0.0003
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "predicted_language": "en",
+          "confidence": 0.9953,
+          "correct": true,
+          "latency_seconds": 0.0393
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0003
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0002
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0002
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0001
+        }
+      ]
+    },
+    {
+      "key": "fasttext-lid176",
+      "repo_id": "facebook/fastText (lid.176)",
+      "license": "CC-BY-SA-3.0",
+      "load_seconds": 0.058,
+      "overall_accuracy": 0.8333,
+      "per_language_accuracy": {
+        "hinglish": {
+          "count": 2,
+          "accuracy": 0.0
+        },
+        "en": {
+          "count": 2,
+          "accuracy": 1.0
+        },
+        "ml": {
+          "count": 4,
+          "accuracy": 1.0
+        },
+        "hi": {
+          "count": 4,
+          "accuracy": 1.0
+        }
+      },
+      "confusion_matrix": {
+        "hi": {
+          "hi": 4,
+          "hinglish": 0,
+          "en": 0,
+          "other": 0
+        },
+        "hinglish": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 2,
+          "other": 0
+        },
+        "en": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 2,
+          "other": 0
+        },
+        "other": {
+          "hi": 0,
+          "hinglish": 0,
+          "en": 0,
+          "other": 4
+        }
+      },
+      "failed_fixture_count": 0,
+      "peak_rss_mb": 174.5,
+      "runs": [
+        {
+          "fixture_id": "hi-weather",
+          "language": "hi",
+          "text": "आज मौसम कैसा है?",
+          "predicted_language": "hi",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "hi-capital",
+          "language": "hi",
+          "text": "भारत की राजधानी क्या है?",
+          "predicted_language": "hi",
+          "confidence": 0.9977,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "hi-story",
+          "language": "hi",
+          "text": "मुझे एक छोटी कहानी सुनाओ",
+          "predicted_language": "hi",
+          "confidence": 0.9769,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "hi-greeting",
+          "language": "hi",
+          "text": "नमस्ते, आप कैसे हैं?",
+          "predicted_language": "hi",
+          "confidence": 0.9948,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "hinglish-weather",
+          "language": "hinglish",
+          "text": "kal ka weather kaisa rahega, bata sakte ho",
+          "predicted_language": "en",
+          "confidence": 0.2228,
+          "correct": false,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "hinglish-joke",
+          "language": "hinglish",
+          "text": "mujhe ek chhoti si joke sunao",
+          "predicted_language": "en",
+          "confidence": 0.3189,
+          "correct": false,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "en-learn-hindi",
+          "language": "en",
+          "text": "What's a good way to learn Hindi quickly?",
+          "predicted_language": "en",
+          "confidence": 0.9604,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "en-schedule",
+          "language": "en",
+          "text": "What's on my schedule today?",
+          "predicted_language": "en",
+          "confidence": 0.9845,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "ml-weather",
+          "language": "ml",
+          "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "ml-capital",
+          "language": "ml",
+          "text": "ഇന്ത്യയുടെ തലസ്ഥാനം ഏതാണ്?",
+          "predicted_language": "ml",
+          "confidence": 1.0,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "ml-story",
+          "language": "ml",
+          "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ",
+          "predicted_language": "ml",
+          "confidence": 1.0001,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "ml-greeting",
+          "language": "ml",
+          "text": "നമസ്കാരം, സുഖമാണോ?",
+          "predicted_language": "ml",
+          "confidence": 0.9977,
+          "correct": true,
+          "latency_seconds": 0.0
+        }
+      ]
+    }
+  ]
+}

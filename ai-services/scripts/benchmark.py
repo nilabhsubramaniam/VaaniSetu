@@ -46,12 +46,21 @@ _BENCHMARK_SEED = 42
 # assistant's expected queries. Not a substitute for docs/EVALUATION.md's
 # held-out set (Phase 9) — deliberately small and hand-picked for a
 # one-time phase-scoped read, per the module docstring above.
+#
+# The two `ml` prompts (Milestone 6c) check the already-selected model's
+# real Malayalam output quality by reading it — docs/EVALUATION.md §3's
+# "multilingual quality" is a human-rated metric with no automated score,
+# so this is not a new model-selection exercise (no second LLM candidate
+# is evaluated here, unlike the Hindi/Hinglish/English set below, which
+# was used to choose between three).
 _PROMPTS = [
     {"language": "hi", "text": "आज मौसम कैसा है?"},
     {"language": "hi", "text": "भारत की राजधानी क्या है?"},
     {"language": "hinglish", "text": "kal ka weather kaisa rahega, bata sakte ho?"},
     {"language": "hinglish", "text": "mujhe ek chhoti si joke sunao"},
     {"language": "en", "text": "What's a good way to learn Hindi quickly?"},
+    {"language": "ml", "text": "ഇന്ന് കാലാവസ്ഥ എങ്ങനെയുണ്ട്?"},
+    {"language": "ml", "text": "എനിക്ക് ഒരു ചെറിയ കഥ പറയൂ"},
 ]
 
 

@@ -247,13 +247,20 @@ the latency model entirely). See `docs/CURRENT_STATE.md` and
 
 **Status:** IN PROGRESS — Milestone 6a (Go `langid` capability boundary
 against `FakeLangIDClient`, wired into `conversation.Service` so every
-turn — typed or spoken — gets a `detectedLanguage` tag) is complete.
-Milestone 6b (Python `langid` capability, benchmark against real
-candidates such as `ai4bharat/IndicLID`, model selection) has not started.
-The detected language is persisted and returned over the API but does not
-yet drive the LLM prompt, the TTS voice, or any UI — the manual language
-pin still wins throughout, per `docs/PROJECT_GOAL.md`. See
-`docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-026.
+turn — typed or spoken — gets a `detectedLanguage` tag), Milestone 6b
+(Python `langid` capability, benchmarked against real candidates —
+`ai4bharat/IndicLID` and the original fastText `lid.176` — and wired in
+for real; `fasttext-lid176` selected, see ADR-027), and Milestone 6c
+(Malayalam enabled end to end — the model registry's `tts` section
+gained a real per-language axis, `facebook/mms-tts-mal` added, and
+Malayalam turned on in the UI despite a known TTS quality gap, see
+ADR-028) are all complete. The detected language is persisted and
+returned over the API but does not yet drive the LLM prompt or the TTS
+voice — the manual language pin still wins throughout, per
+`docs/PROJECT_GOAL.md`. The phase's broader scope below (Bengali,
+Gujarati, Marathi, Tamil, Telugu, Kannada, Punjabi, Odia — each needing
+this same per-language treatment) has no milestone named or approved yet.
+See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md` ADR-026/ADR-027/ADR-028.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.
