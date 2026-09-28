@@ -12,6 +12,29 @@ describe('LandingPage', () => {
     TestBed.inject(SettingsStore).setPreferredLanguage('en');
   });
 
+  it('falls back to the plain CSS glow (never a static image) when WebGL is unsupported', () => {
+    // jsdom has no real WebGL, so supportsWebGL() is always false here —
+    // this is the real "unsupported browser" case, not simulated.
+    const fixture = TestBed.createComponent(LandingPage);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(fixture.componentInstance.showHeroCanvas()).toBe(false);
+    expect(el.querySelector('app-hero-canvas')).toBeNull();
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('.mic-art-fallback')).toBeTruthy();
+  });
+
+  it('renders the real mic control in the hero-stage regardless of which visual path is active', () => {
+    const fixture = TestBed.createComponent(LandingPage);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.mic-overlay')).toBeTruthy();
+    const micButton = el.querySelector<HTMLButtonElement>('.btn-mic');
+    expect(micButton?.getAttribute('aria-label')).toBe('Start speaking');
+  });
+
   it('renders exactly one h1 with the split hero headline', () => {
     const fixture = TestBed.createComponent(LandingPage);
     fixture.detectChanges();
@@ -58,6 +81,20 @@ describe('LandingPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
 
     expect(text).toContain('planned — not yet implemented');
+  });
+
+  it('heroRegions has real, distinct language codes matching demoLanguages entries', () => {
+    // Not rendered as DOM in this test environment (HeroCanvas never
+    // mounts — no WebGL in jsdom), but the data itself, which
+    // HeroCanvas's chips and hero-scene.ts's connection paths both
+    // depend on, should stay internally consistent.
+    const fixture = TestBed.createComponent(LandingPage);
+    const { heroRegions, demoLanguages } = fixture.componentInstance;
+
+    expect(heroRegions.length).toBe(6);
+    for (const region of heroRegions) {
+      expect(demoLanguages.some((l) => l.code === region.languageCode), region.region).toBe(true);
+    }
   });
 
   it('triggers the mic demo and shows the listening hint', () => {

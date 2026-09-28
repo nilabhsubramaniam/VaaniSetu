@@ -1,12 +1,13 @@
 <main class="landing">
-  <!-- Hero: inherits the shared reference design's mood (dark, glowing
-       cyan/gold backdrop) via a procedural CSS gradient rather than the
-       photo itself — see landing.page.scss's .hero rule for why pasting
-       the raw image in directly as a full-bleed background looked clumsy
-       (fixed-resolution cropping drift, duplicated UI already baked into
-       the photo). Real, working controls sit on top: the mic button, the
-       status panel (bound to real component state below), and the
-       headline/CTA as real, translatable HTML text. -->
+  <!-- Hero: one unified Three.js scene (<app-hero-canvas>, three/
+       hero-scene.ts) behind real HTML controls — a procedural mic, the
+       real India outline, and animated connection paths to the 6 hero
+       regions. No images anywhere (docs/DECISIONS.md's Three.js ADR and
+       its amendments); the no-WebGL path is a plain CSS glow, not a
+       static photo. The mic button, status panel, and headline/CTA are
+       real, translatable HTML in both paths — only the decorative
+       backdrop differs. -->
+
   <section class="hero">
     <div class="hero-copy">
       <p class="eyebrow">{{ copy().hero.eyebrow }}</p>
@@ -59,54 +60,65 @@
       }
     </ul>
 
-    <div class="mic-pedestal" [class.is-active]="isMicDemoActive()">
-      <span class="mic-waveform mic-waveform--left" aria-hidden="true">
-        @for (bar of waveformBars; track bar) {
-          <span class="bar" [style.--bar]="bar"></span>
-        }
-      </span>
+    <!-- A self-contained box for the scene + the real mic overlay,
+         positioned relative to THIS box (not the whole .hero) so the
+         overlay stays centered regardless of .hero-copy's own width. -->
+    <div class="hero-stage">
+      @if (showHeroCanvas()) {
+        <app-hero-canvas
+          class="hero-scene"
+          [heroRegions]="heroRegions"
+          [selectedRegion]="selectedDemoLanguage()"
+          [isMicDemoActive]="isMicDemoActive()"
+          [deviceTier]="deviceTier"
+          (regionHover)="hoveredDemoLanguage.set($event)"
+        />
+      } @else {
+        <!-- No WebGL / reduced-motion: a plain CSS glow, never a static
+             image (docs/DECISIONS.md's Three.js ADR). -->
+        <span class="mic-art-fallback" aria-hidden="true"></span>
+      }
 
-      <div class="mic-dial">
-        <svg class="mic-dial-ring" viewBox="0 0 120 120" aria-hidden="true">
-          <path id="micRingPath" fill="none" d="M 10,60 A 50,50 0 1,1 110,60.01" />
-          <text>
-            <textPath href="#micRingPath" startOffset="50%" text-anchor="middle">
-              {{ copy().hero.micHintIdle }}
-            </textPath>
-          </text>
-        </svg>
-
-        <button
-          type="button"
-          class="btn-mic"
-          [attr.aria-label]="copy().hero.micLabel"
-          (click)="triggerMicDemo()"
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22">
-            <path
-              d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
-              stroke="currentColor"
-              stroke-width="1.8"
-            />
-            <path
-              d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            />
+      <!-- The real, functional control in both paths above — clicking
+           this is what actually matters; the 3D scene (or its fallback
+           glow) is decoration behind it. -->
+      <div class="mic-overlay" [class.is-active]="isMicDemoActive()">
+        <div class="mic-dial">
+          <svg class="mic-dial-ring" viewBox="0 0 120 120" aria-hidden="true">
+            <path id="micRingPath" fill="none" d="M 10,60 A 50,50 0 1,1 110,60.01" />
+            <text>
+              <textPath href="#micRingPath" startOffset="50%" text-anchor="middle">
+                {{ copy().hero.micHintIdle }}
+              </textPath>
+            </text>
           </svg>
-        </button>
+
+          <button
+            type="button"
+            class="btn-mic"
+            [attr.aria-label]="copy().hero.micLabel"
+            (click)="triggerMicDemo()"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" width="22" height="22">
+              <path
+                d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <path
+                d="M6 11v1a6 6 0 0 0 12 0v-1M12 19v2"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <p class="mic-hint">
+          {{ isMicDemoActive() ? copy().hero.micHintListening : copy().hero.micHintIdle }}
+        </p>
       </div>
-
-      <span class="mic-waveform mic-waveform--right" aria-hidden="true">
-        @for (bar of waveformBars; track bar) {
-          <span class="bar" [style.--bar]="bar"></span>
-        }
-      </span>
-
-      <p class="mic-hint">
-        {{ isMicDemoActive() ? copy().hero.micHintListening : copy().hero.micHintIdle }}
-      </p>
     </div>
 
     <button type="button" class="scroll-cue" (click)="scrollToNext()">
@@ -137,6 +149,7 @@
               type="button"
               class="language-node-button"
               [class.is-selected]="node.code === selectedDemoLanguage()"
+              [class.is-hover-linked]="node.code === hoveredDemoLanguage()"
               (click)="selectDemoLanguage(node.code)"
             >
               <span aria-hidden="true">{{ node.flag }}</span>

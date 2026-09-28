@@ -1,0 +1,20 @@
+<canvas
+  #canvas
+  class="canvas"
+  aria-hidden="true"
+  (pointermove)="onPointerMove($event)"
+  (pointerleave)="onPointerLeave()"
+></canvas>
+
+<!-- Decorative only — positioned every frame from the scene's own 3D
+     node positions (hero-canvas.ts's writeChipPositions). The real,
+     keyboard-accessible control is .language-node-list further down
+     landing.page.html; these chips never gate any functionality. -->
+<div class="node-layer" aria-hidden="true">
+  @for (region of heroRegions(); track region.languageCode) {
+    <span #nodeChip class="node-chip" [attr.data-code]="region.languageCode" tabindex="-1">
+      <strong>{{ demoLanguage(region.languageCode)?.label }}</strong>
+      <span>{{ region.region }}</span>
+    </span>
+  }
+</div>

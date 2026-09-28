@@ -29,6 +29,19 @@ export const DEMO_LANGUAGE_NODES: readonly DemoLanguageNode[] = [
   { code: 'pa', label: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', greeting: 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ', flag: '🇮🇳' },
   { code: 'kn', label: 'ಕನ್ನಡ', englishName: 'Kannada', greeting: 'ನಮಸ್ಕಾರ', flag: '🇮🇳' },
   { code: 'or', label: 'ଓଡ଼ିଆ', englishName: 'Odia', greeting: 'ନମସ୍କାର', flag: '🇮🇳' },
+  // Assamese/Kashmiri/Konkani added for the hero's region cards
+  // (hero-region.model.ts) — composed directly, same basis as every
+  // other entry here, not verified against a native speaker.
+  { code: 'as', label: 'অসমীয়া', englishName: 'Assamese', greeting: 'নমস্কাৰ', flag: '🇮🇳' },
+  { code: 'ks', label: 'कॉशुर', englishName: 'Kashmiri', greeting: 'आदाब', flag: '🇮🇳' },
+  { code: 'kok', label: 'कोंकणी', englishName: 'Konkani', greeting: 'नमस्कार', flag: '🇮🇳' },
 ];
 
 export const DEFAULT_DEMO_LANGUAGE_CODE = 'en';
+
+/** Shared lookup, used by both `landing.page.ts` (the accessible list)
+ * and `hero-canvas.ts` (the 3D scene's DOM chips) — one place doing the
+ * `.find()`, not two copies drifting apart. */
+export function findDemoLanguage(code: string): DemoLanguageNode | undefined {
+  return DEMO_LANGUAGE_NODES.find((node) => node.code === code);
+}

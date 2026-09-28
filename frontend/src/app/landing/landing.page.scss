@@ -1,4 +1,3 @@
-@use 'sass:list';
 @use '../shared/styles/mixins';
 
 // No height:100% here (unlike assistant/settings) — natural page scroll.
@@ -137,64 +136,90 @@ h2 {
   }
 }
 
-// ---- mic pedestal ----
-$bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
+// ---- hero stage: a defined box the Three.js scene (or its fallback)
+// and the real mic overlay position against, instead of the whole .hero
+// (whose width varies with .hero-copy's own content) ----
+.hero-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 820px;
+  align-self: stretch;
+}
 
-.mic-pedestal {
+.hero-scene {
   position: absolute;
-  z-index: 1;
-  bottom: var(--vs-space-6);
+  inset: 0;
+  z-index: 0;
+}
+
+// The no-WebGL / reduced-motion path — a plain, procedural radial glow,
+// never a static image (a cropped photo here never sat right at every
+// viewport size, the same "clumsy" problem .hero's own background ran
+// into before it became a gradient).
+.mic-art-fallback {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: auto auto auto;
-  align-items: center;
-  gap: var(--vs-space-4);
-  padding: var(--vs-space-4) var(--vs-space-6);
-}
-
-.mic-waveform {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 2rem;
-
-  &--right {
-    flex-direction: row-reverse;
-  }
-
-  .bar {
-    width: 3px;
-    border-radius: 2px;
-    background: var(--vs-cyan);
-    opacity: 0.4;
-    transition: opacity 0.2s ease;
-
-    @for $i from 1 through list.length($bar-heights) {
-      &:nth-child(#{$i}) {
-        height: list.nth($bar-heights, $i);
-      }
-    }
-  }
-}
-
-.mic-pedestal.is-active .mic-waveform .bar {
-  opacity: 1;
-  background: var(--vs-cyan);
-  box-shadow: 0 0 6px var(--vs-cyan);
-  animation: mic-bar 0.9s ease-in-out infinite alternate;
-  animation-delay: calc(var(--bar) * 60ms);
+  transform: translate(-50%, -50%);
+  width: 18rem;
+  height: 18rem;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      color-mix(in srgb, var(--vs-cyan) 55%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 65% 70%,
+      color-mix(in srgb, var(--vs-gold) 40%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--vs-cyan) 25%, transparent), transparent 72%);
+  filter: blur(6px);
+  animation: mic-art-breathe 4.5s ease-in-out infinite;
 
   @include mixins.reduced-motion-off;
 }
 
-@keyframes mic-bar {
-  from {
-    transform: scaleY(0.6);
+@keyframes mic-art-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(1);
   }
-  to {
-    transform: scaleY(1);
+
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.08);
   }
+}
+
+// The real, functional mic control — overlaid centered on top of the 3D
+// scene (or its fallback glow) either way. No waveform bars here
+// anymore: the 3D scene's own pulsing rings/particles carry that role
+// when it's mounted, and the fallback path is calm on purpose.
+.mic-overlay {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vs-space-2);
+  // The flex box is much larger than the visible dial/hint (it reserves
+  // room for the hint text below), and it sits above the 3D scene — left
+  // at the default `auto`, its invisible padding blocks the canvas's own
+  // pointermove listener underneath, silently killing hover-highlight
+  // and parallax for anything behind it (found live: a hovered node
+  // chip near the mic never registered because this box, not the
+  // canvas, was catching the pointer). Only the real button opts back in.
+  pointer-events: none;
 }
 
 // The dial: the SVG ring is a purely decorative label (aria-hidden — the
@@ -203,6 +228,7 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
 // target or focus ring.
 .mic-dial {
   position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -234,6 +260,7 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   justify-content: center;
   width: 6.5rem;
   height: 6.5rem;
+  pointer-events: auto;
   border: 1px solid rgb(255 255 255 / 25%);
   border-radius: 50%;
   background: radial-gradient(
@@ -274,7 +301,8 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
 }
 
 .mic-hint {
-  grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
   margin: var(--vs-space-2) 0 0;
   font-size: var(--vs-font-size-sm);
   color: var(--hero-ink-faint);
@@ -369,6 +397,7 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   color: var(--hero-ink-soft);
 }
 
+
 .scroll-cue {
   position: absolute;
   bottom: var(--vs-space-4);
@@ -415,6 +444,13 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   &.is-selected {
     border-color: var(--vs-cyan);
     background: var(--vs-accent-soft);
+  }
+
+  // Decorative echo only — set when the hero's 3D scene reports its
+  // matching node is hovered (HeroCanvas's (regionHover) output). Never
+  // required: this list's own click/keyboard behavior is unaffected.
+  &.is-hover-linked:not(.is-selected) {
+    border-color: var(--vs-cyan);
   }
 }
 
@@ -545,15 +581,30 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   }
 }
 
-@media (max-width: 860px) {
-  // The background image is a wide (1408x768) landscape composition —
-  // at narrow widths `cover` crops most of its right-hand detail away
-  // regardless, so the decorative status panel and scroll cue (which
-  // would otherwise float over whatever's left) are hidden rather than
-  // shown against an arbitrary crop. The headline, mic button, and CTA
-  // — the actually-functional parts — stay exactly as they are.
+@media (max-width: 1024px) {
+  // Stack .hero-copy above .hero-stage instead of squeezing both into a
+  // shrinking flex row.
+  .hero {
+    flex-direction: column;
+  }
+
+  .hero-stage {
+    width: 100%;
+    min-height: 420px;
+  }
+
+  // The decorative status panel and scroll cue would otherwise float
+  // over whatever's left of a narrow stage — hidden rather than shown
+  // misaligned. The headline, mic button, and CTA — the
+  // actually-functional parts — stay exactly as they are. (The
+  // language-node chip count itself reduces via hero-canvas.scss's own
+  // media query, on the same breakpoint.)
   .phase-legend,
   .scroll-cue {
     display: none;
+  }
+
+  .mic-art-fallback {
+    width: 11rem;
   }
 }

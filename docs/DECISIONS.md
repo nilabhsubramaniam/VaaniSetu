@@ -2017,3 +2017,189 @@ Status**.
   ASR precedent) — real evidence gathered and honestly recorded, `mai`
   wired into every layer's config, but **not enabled**, pending the
   user's explicit call on whether to ship it anyway per `AGENTS.md` §14.
+
+## ADR-032 - Three.js returns for the hero's map strip, scoped to real India geography + connections
+
+- **Decision:** Reversed part of the landing-page hero rework
+  (commit `624f0ed`, which itself reversed ADR-019 by removing the
+  entire Three.js hero and dropping `three`/`@types/three` from
+  `package.json` — landing-page bundle ~113KB -> ~36KB): `three`
+  (`0.186.1`) and `@types/three` (`0.186.0`) are back as exact-pinned
+  dependencies, used for exactly one thing — a real Three.js scene
+  replacing the hero's static `map-scene.jpg` strip with a glowing
+  outline of India, 6 pulsing markers at the hero's own region-card
+  positions, and animated connection arcs between them.
+
+  This is a **user-approved, informed reversal**, not a silent one: the
+  request ("rebuild it in Three.js, connections should be seen")
+  was flagged as conflicting with the recent removal before any code was
+  written (`AGENTS.md` §14) — the bundle-size/complexity tradeoff was
+  explained, the user chose to proceed anyway, and explicitly said to
+  "remove what not needed" from the old system rather than restore it
+  wholesale. What actually got reused vs. left out, checked directly
+  against the removed code (`git show 624f0ed~1:frontend/src/app/
+  landing/three/`):
+  - **Not reused:** `core-system.ts`/`hero-runtime.ts`/`platform-system.
+    ts`/`interaction-controller.ts`/`project-to-screen.ts` (the abstract
+    "communication core" hero centerpiece and DOM-projected 3D pick
+    targets for demo language nodes — ADR-019's own reasoning for real
+    DOM buttons over 3D pick targets still holds, and the mic button/
+    region cards/status panel built this session already are real DOM,
+    verified live); `landmark-geometry.ts` (pagodas/colosseums/gates — a
+    world-culture "growing network of languages" motif already rejected
+    once in the 624f0ed removal as overstating language breadth VaaniSetu
+    doesn't have; this project is India-focused now).
+  - **Technique reused, data replaced:** `globe-network.ts`'s approach
+    (`BufferGeometry`/`LineSegments`/`Points`, `QuadraticBezierCurve3`
+    arcs between glowing nodes) was explicitly "non-geographic/
+    conceptual" — a random sphere. The new `india-map-scene.ts` uses the
+    same primitives against **real India geography** instead.
+  - **Kept as-is, untouched:** `environment-support.ts`
+    (`prefersReducedMotion`/`supportsWebGL`) — survived the removal
+    already; still the exact capability gate used here.
+  - **Revived, small and unchanged in substance:** `read-css-color.ts`
+    (8 lines) — reads `--vs-cyan`/`--vs-gold` off `:root` so the scene's
+    colors can't drift from `_tokens.scss`.
+
+  **Real geography, sourced and verified, not approximated:**
+  `datameet/maps`' `Country/india-composite.geojson` (MIT). The
+  mainland polygon's outer ring (242,146 raw points: full coastline +
+  land border) was simplified to 392 points (~0.3° minimum vertex
+  spacing), aspect-corrected (`cos(mean latitude)` on longitude), and
+  centered/scaled into a compact unit space — checked into
+  `three/india-outline-data.ts` with the exact processing steps
+  documented in its own header comment. A first attempt used that same
+  repo's `india-land-simplified.geojson`; its bounding box (lat
+  21.9°-37.1°) revealed it was a **land-border-only** line missing the
+  entire coastline and all of South India — caught by checking the
+  actual numbers against known geography (Kanyakumari is ~8°N), not
+  assumed correct because it downloaded successfully. The hero's 6
+  region cards' positions (`hero-region.model.ts`) are projected through
+  the identical formula from their real state-capital coordinates, so
+  they land correctly relative to the outline.
+
+  **A real technical correction made during implementation, not
+  assumed:** the plan's original "second, wider line for glow" idea
+  (mirroring what a literal reading of old code might suggest) doesn't
+  actually work — `LineBasicMaterial.linewidth` is ignored above 1px by
+  WebGL on most browsers, a well-known platform limitation. The glow is
+  a CSS `filter: drop-shadow(...)` on the `<canvas>` element instead
+  (`india-map.scss`), which genuinely works. A second real bug, found by
+  taking and looking at an actual live screenshot rather than trusting
+  the build: the canvas's initial `alpha: true`/transparent clear color
+  let the light section below the hero bleed starkly through the
+  `.hero-map` fade mask — the old static JPG had its own dark background
+  baked into the image, which is what made that same mask look fine
+  before. Fixed by rendering an opaque `--hero-bg`-matching clear color
+  instead of a transparent one.
+- **Reason:** The static photo didn't read as India and showed no sense
+  of connection between regions — the actual, stated purpose of this
+  strip. A real map with real regional connections is a genuine
+  visual upgrade the static image (or a CSS-only alternative, which was
+  offered first and set aside in favor of this) couldn't deliver.
+  Scoping to *only* the map strip — not the whole hero centerpiece, not
+  DOM-projected pick targets, not world landmarks — keeps this from
+  reintroducing the exact complexity/bundle cost the original removal
+  was about, while still delivering what was actually asked for.
+- **Alternatives considered:**
+  - **A CSS/SVG-only "connections" effect** (animated glowing lines
+    between the mic and region cards, no Three.js) — proposed first as
+    the option that wouldn't reverse the recent removal at all; the user
+    chose the Three.js rebuild instead once the tradeoff was explained.
+  - **Restoring the old hero wholesale** (`git revert` of 624f0ed) —
+    rejected per the user's own "remove what not needed": most of the
+    removed system was a different concept (a world-culture "global
+    network" hero centerpiece) that doesn't fit this project's current,
+    India-focused, real-DOM-controls hero.
+  - **`india-land-simplified.geojson`** as the outline source — rejected
+    once its bounding box showed it was land-border-only, missing the
+    coastline and all of South India.
+  - **A duplicate, wider Three.js line for the outline's glow** —
+    doesn't work (WebGL linewidth limitation, see above); replaced with
+    a CSS canvas filter.
+- **Impact:** `frontend/package.json` (`three`, `@types/three`, the only
+  new dependencies, exact-pinned per ADR-019's own precedent);
+  `frontend/src/app/landing/three/{india-outline-data,india-map-scene,
+  read-css-color}.ts` (new); `frontend/src/app/landing/components/
+  india-map/` (new wrapper component, `INDIA_MAP_SCENE_LOADER` DI token
+  so `three` stays dynamically imported — a separate ~113KB lazy chunk,
+  confirmed via `ng build`, that only downloads for visitors whose
+  browser passes the WebGL/reduced-motion gate; doesn't inflate the
+  initial bundle or even the `landing-page` chunk meaningfully, +2KB for
+  the wrapper itself); `landing.page.ts`/`.html`/`.scss` (`showMapScene`
+  gate, `@if`/`@else` between `<app-india-map>` and the unchanged
+  fallback `<img>`). New tests: `india-outline-data.spec.ts` (bounding-
+  box/geography sanity checks) and `india-map.spec.ts` (canvas renders,
+  scene mounts/disposes, selection forwarding — using the DI-token
+  override since Angular's vitest integration doesn't support `vi.mock`
+  for relative imports). Verified live with Playwright (installed into
+  the session scratchpad, not the project) at the real WebGL path and a
+  forced no-WebGL path (`--disable-webgl`), confirming the canvas and
+  the fallback `<img>` each render correctly in their respective case,
+  and that the two visual bugs above were real, found live, and fixed —
+  not just built and assumed correct.
+- **Status:** Accepted.
+
+**Amendment (same day):** The static fallback `<img>` (`images/landing/
+map-scene.jpg`) and its `@else` branch were removed at the user's
+explicit request ("remove image, redesign using threejs" — clarified via
+AskUserQuestion to mean specifically the map strip's fallback image, not
+the region-card photos or the mic backdrop, which are unchanged). The
+map strip is now Three.js-only: `landing.page.html`'s `@if
+(showMapScene())` has no `@else` — an unsupported browser (no WebGL, or
+`prefers-reduced-motion`) sees nothing in that strip at all, not a
+fallback photo, since there isn't one anymore. `showMapScene()` still
+exists and still gates the mount, purely so such a browser doesn't
+attempt a WebGL context creation that would fail — safety, not
+degradation-to-an-image. `frontend/public/images/landing/map-scene.jpg`
+deleted. New test in `landing.page.spec.ts` confirms the real
+"unsupported" case in this project's own test environment (jsdom has no
+WebGL, so `supportsWebGL()` is always false there — not simulated):
+neither `<app-india-map>` nor any `.hero-map` element renders.
+
+**Second amendment (same day):** The 6 region cards' cropped photos
+(Assam/Punjab/West Bengal/Kashmir/Tamil Nadu/Goa) were also removed, at
+the user's explicit follow-up request ("remove the .jpg and redesign
+completely based on our architecture" — clarified via AskUserQuestion to
+mean the region-card photos specifically, not the mic backdrop photo,
+which stays). No hero image is left that came from the original
+AI-mockup reference kit except `mic-stage.jpg`. Each card's visual is now
+its `DEMO_LANGUAGE_NODES` entry's own native-script `label` (real,
+translatable text — e.g. "অসমীয়া", "ਪੰਜਾਬੀ") on a gradient tinted with the
+hero's own `--vs-cyan`/`--vs-gold` tokens, not an image — genuinely
+data-driven, consistent with how every other decorative element in this
+hero (the status panel, the demo language nodes) already works.
+`hero-region.model.ts`'s `image` field was removed entirely (no longer
+referenced anywhere); `frontend/public/images/landing/{assam,punjab,
+west-bengal,kashmir,central,goa}.jpg` deleted. Updated test asserts no
+`<img>` renders inside a region card and that the glyph's text matches
+the linked demo language's label.
+
+**Third amendment (same day):** The mic backdrop photo (`mic-stage.jpg`)
+— the one image explicitly kept out of scope in both prior
+amendments — was also removed, at the user's final follow-up ("do not
+use image, use custom built, as image is not setting up as what we
+need"). `.mic-art` (`landing.page.html`/`.scss`) is now a `<span>`
+styled as a procedural CSS radial-gradient glow (cyan/gold, matching the
+hero's own tokens) with a slow breathing animation
+(`@keyframes mic-art-breathe`, disabled under `prefers-reduced-motion`
+via the existing `mixins.reduced-motion-off`), not an `<img>` — the same
+"a fixed-resolution photo never sits right at every size, a procedural
+gradient does" reasoning `.hero`'s own background already used.
+`frontend/public/images/landing/mic-stage.jpg` deleted, along with the
+now-empty `public/images/` directory tree. **No image asset from the
+original AI-mockup reference kit remains anywhere in the hero** — every
+visual is either real, translatable text, a procedural CSS effect, or
+the real Three.js map scene.
+
+## Template for future ADRs
+
+```
+## ADR-NNN - <short title>
+
+- **Decision:** <what was decided>
+- **Reason:** <why>
+- **Alternatives considered:** <options and why they lost>
+- **Impact:** <effect on architecture, phases, effort>
+- **Status:** Accepted | Superseded by ADR-NNN | Deprecated
+```
