@@ -35,7 +35,7 @@ export class TextInputBar {
     if (!this.canSend()) {
       return;
     }
-    this.conversation.sendUserTurn(this.draft(), this.settings.preferredLanguage());
+    this.conversation.sendUserTurn(this.draft(), this.settings.effectiveChatLanguage());
     this.draft.set('');
   }
 }

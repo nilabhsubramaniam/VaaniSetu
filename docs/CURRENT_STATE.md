@@ -11,15 +11,67 @@ project moves between milestones or a phase's status changes.
   — see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
   latency gap — see below). Phase 6 - Indian Language Support,
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
-  Malayalam enabled end to end — and 6d — Hinglish TTS fixed via
-  transliteration, Malayalam's real bottleneck diagnosed — all complete,
-  with known remaining gaps, see below; the phase's broader scope —
+  Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
+  transliteration, Malayalam's real bottleneck diagnosed —, 6e —
+  auto-detection now drives typed-chat behavior, opt-in —, and 6f —
+  Maithili real evidence gathered across all four capabilities, **not
+  enabled** (LLM never replies in Maithili, ADR-031) — all complete, with
+  known remaining gaps, see below; the phase's broader scope —
   Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — has no
   milestone named or approved yet).
 - **Current focus:** none active — no milestone is currently approved to
   start next. See `AGENTS.md` §5, "never advance to the next milestone
   automatically".
-- **Last updated:** 2026-09-25 (Phase 6 Milestone 6d: closed two known
+- **Last updated:** 2026-09-27 (Phase 6 Milestone 6f: Maithili added to
+  `AGENTS.md`/`docs/PROJECT_GOAL.md`'s long-term language list at the
+  user's request, then wired into the same per-language scaffolding
+  every prior language uses and measured for real across all four
+  capabilities — **not enabled**. **LLM**: `llama-3.2-3b-instruct`
+  understood every Maithili prompt correctly but replied in standard
+  Hindi every time (0/4 language fidelity) — categorically different
+  from Malayalam's "fluent, on-topic" result (ADR-028); comprehension
+  works, generation doesn't. **langid**: real but weak — the
+  already-selected `fasttext-lid176` scored 50% (2/4) on Maithili,
+  confusing it with Nepali and Hindi in short phrases. **TTS**: a real
+  candidate, `facebook/mms-tts-mai`, was found, downloaded, and
+  benchmarked — proxy WER 100-150%, the same failure range Malayalam's
+  own TTS candidate hit (ADR-028). **ASR**: a genuine capability gap, not
+  an accuracy one — `faster-whisper` has no Maithili language code at
+  all, and (checked directly, not assumed) this project's own engine
+  wrapper silently falls back to wrong-language auto-detection for an
+  unmapped code rather than erroring, so `/voice/turn` and
+  `/speech/transcribe` now explicitly reject `"mai"` with a clean 400.
+  Unlike Hinglish/Malayalam's "ship anyway" precedent (ADR-020/ADR-028),
+  the failure here is in the *primary* typed-chat channel, not a
+  secondary one — `LANGUAGE_OPTIONS`'s `mai.enabled` stays `false`
+  pending the user's explicit call. See `docs/DECISIONS.md` ADR-031.
+  The day before (2026-09-25): Phase 6 Milestone 6e: auto-detection now
+  drives typed-chat behavior — the deferred half of ADR-026. `POST
+  /api/v1/chat`'s `language` field accepts a new `"auto"` sentinel;
+  `conversation.Service.SendMessage` resolves it to the message's own
+  detected language (reusing the detection call already made for
+  `detectedLanguage`, no second `langid` call) before the LLM runs,
+  falling back to Hindi if detection fails or returns a language outside
+  the 12 supported codes. A manual, concrete `language` is unaffected.
+  Frontend: a new, persisted, **opt-in, off-by-default**
+  `SettingsStore.autoDetectLanguage` toggle — existing users see zero
+  behavior change unless they turn it on — surfaced as a new
+  "Auto-detect" entry in both the header language selector and the
+  Settings page, above the 12 language options. `speakReply` already read
+  the backend-returned turn's language rather than `SettingsStore` again,
+  so TTS voice selection auto-corrects with no TTS code change at all.
+  Fixed one real bug this surfaced along the way: the optimistically-
+  appended user turn would otherwise have displayed the literal string
+  `"auto"` as its language, permanently (it was never reconciled with the
+  server's response) — now it shows the current pin as a placeholder and
+  gets swapped for the server-resolved turn once the response arrives.
+  Deliberately **typed chat only**: `/voice/turn`, `/speech/transcribe`,
+  and `/speech/synthesize` all explicitly reject `"auto"` with a clean
+  400 — ADR-018 already found that un-hinted Whisper auto-detection
+  mistranscribes romanized Hinglish into the wrong script, a real,
+  separate problem deliberately left unsolved rather than worked around.
+  See `docs/DECISIONS.md` ADR-030.
+  The day before (2026-09-25, earlier): Phase 6 Milestone 6d closed two known
   gaps, on explicit direction. **Hinglish TTS** — total failure since
   ADR-021 — now transliterates romanized Hindi to Devanagari (ITRANS,
   `indic-transliteration`) before synthesis: both Hindi voices now
@@ -98,7 +150,7 @@ project moves between milestones or a phase's status changes.
   documented latency gap (measured p50 5.09s against a <3s target —
   see `docs/DECISIONS.md` ADR-024); Phase 4 gained a real Female/Male
   voice choice (ADR-022/ADR-023). See `docs/DECISIONS.md`
-  ADR-020 through ADR-029 and `docs/ROADMAP.md` Phases 4/5/6 for that full
+  ADR-020 through ADR-031 and `docs/ROADMAP.md` Phases 4/5/6 for that full
   history, including the still-open Hinglish English-loanword and langid
   detection gaps, the still-open Malayalam ASR/TTS gap (now properly
   diagnosed, not just measured), and the still-gated
@@ -680,17 +732,200 @@ project moves between milestones or a phase's status changes.
     alternatives considered (including why the heavier neural
     `ai4bharat-transliteration` and re-requesting `indic-parler-tts`'s
     gated access were not pursued this milestone).
+- **Phase 6, Milestone 6e - auto-detection drives typed-chat behavior,
+  opt-in:**
+  - `backend/internal/conversation`: new `resolveLanguage(language,
+    detected)` resolves the `"auto"` sentinel to a real, supported
+    language — reusing the `detectLanguage` call `SendMessage` already
+    made for `Turn.DetectedLanguage`, not a second `langid` call —
+    falling back to a `defaultLanguage` constant (`"hi"`) when detection
+    failed or returned a `fasttext-lid176` label outside this app's 12
+    supported codes. `Turn.DetectedLanguage` keeps recording the raw,
+    unclamped result regardless. A manual, concrete `language` is
+    completely unaffected.
+  - `backend/internal/api`: `isValidLanguage` now also accepts `"auto"`;
+    `handleVoiceTurn`, `handleTranscribe`, and `handleSynthesize` each
+    gained an explicit rejection (`400 invalid_request`) so the new,
+    more permissive check can't silently let `"auto"` reach any of the
+    three endpoints that need a concrete language.
+  - `docs/openapi/chat.yaml`: `"auto"` documented as an accepted
+    `ChatRequest.language` value (with a new example); the
+    `detectedLanguage` doc comment — stale since Milestone 6a, still
+    describing the original placeholder heuristic — corrected to
+    describe the real `fasttext-lid176` model (ADR-027).
+    `docs/openapi/voice.yaml`: explicit note + 400 case that `"auto"` is
+    rejected.
+  - Frontend: `SettingsStore` gained a persisted, **opt-in, off by
+    default** `autoDetectLanguage` signal and a computed
+    `effectiveChatLanguage()` (`"auto"` when on, else the pinned
+    `preferredLanguage`) — only `text-input-bar.ts` reads it;
+    `mic-button.ts` is unchanged (comment only), since voice-turn
+    auto-detection is out of scope (see Reason below). The header
+    `LanguageSelector` and the Settings page's `LanguagePreferences` each
+    gained one new "Auto-detect" entry above the 12 language options;
+    picking it sets `autoDetectLanguage(true)` without touching the
+    stored pin, so turning it back off restores the last concrete
+    choice. `speakReply` already read the backend-*returned* turn's
+    language rather than `SettingsStore` again, so TTS voice selection
+    auto-corrects with no TTS code change at all.
+  - **A real bug fixed along the way, not optional polish**:
+    `ConversationRealService.sendUserTurn` appends the user's turn to
+    the UI optimistically, before the backend responds. Passing the raw
+    `"auto"` value straight into that optimistic turn's `language` would
+    have made `message-bubble.ts` render the literal string `"auto"` —
+    and since that turn was never previously reconciled with the
+    server's response, it would have stayed wrong permanently. Fixed by
+    showing the current `preferredLanguage()` pin as a placeholder
+    instead (never the literal `"auto"` — `Turn.language` is typed
+    `LanguageCode` and never includes it), and adding a `replaceTurn`
+    step that swaps that placeholder for the server's resolved turn once
+    the response arrives.
+  - **Deliberately typed-chat only**: `POST /voice/turn` (and
+    `/speech/transcribe`, `/speech/synthesize`) reject `"auto"` outright.
+    ADR-018 already found that letting Whisper auto-detect the spoken
+    language transcribes romanized Hinglish into the wrong script —
+    voice auto-detection needs the language *before* transcription even
+    runs, a real, separate, harder problem left unsolved on purpose
+    rather than worked around.
+  - Tests: new Go unit tests for `resolveLanguage` (no Docker needed) in
+    a new `conversation_test.go`; 3 new Docker-gated integration tests in
+    `conversation_integration_test.go` (auto resolves to a real detected
+    language; falls back to the default on a detection failure; a
+    manual pin is provably unaffected); 4 new `internal/api` handler
+    tests (`/chat` accepts `"auto"`; `/voice/turn`, `/speech/transcribe`,
+    `/speech/synthesize` each reject it with a clean 400). All Go tests
+    pass; `go build/vet/test`, `gofmt` clean (`golangci-lint` not
+    installed in this environment, same as prior milestones). New/updated
+    frontend tests for `SettingsStore`, `LanguageSelector`,
+    `LanguagePreferences`, `TextInputBar`, and `ConversationRealService`
+    (including the optimistic-turn placeholder/reconciliation fix) — 143
+    total, all pass; `ng lint`/`build` clean.
+  - **Verified live, end to end** against the real, already-running
+    `ai-services` stack and a native `backend` (all four capabilities
+    real, `usesFake*:false`): `POST /api/v1/chat` with
+    `language: "auto"` and English text resolves to `userTurn.language:
+    "en"`/`assistantTurn.language: "en"` with a genuine, on-topic English
+    LLM reply; the same request with Hindi (Devanagari) text resolves to
+    `"hi"` with a genuine Hindi reply. A manual `language: "hi"` pin sent
+    alongside English text stays `"hi"` throughout (`detectedLanguage`
+    still honestly records `"en"`) — proving a pin is unaffected by
+    auto-resolution. `POST /voice/turn`, `/speech/transcribe`, and
+    `/speech/synthesize` each returned a clean 400 for `language=auto`,
+    not a crash. `POST /speech/synthesize` with the auto-resolved `"hi"`
+    produced a real, valid, non-silent WAV.
+  - **A real, honest finding from this live check, not a regression**:
+    `POST /speech/synthesize` with the auto-resolved `"en"` returned
+    `502 tts_unavailable` — English has no configured TTS voice at all
+    (`/healthz`'s `tts_models` only lists `hi`/`hinglish`/`ml`); the
+    frontend's language selector never exposes "en" as a pin, so this
+    path was previously unreachable in practice. Auto-detection makes it
+    newly reachable for genuinely English typed text. Non-fatal by
+    design (ADR-020, the same precedent Hinglish TTS already set before
+    ADR-029 fixed it) — the chat turn itself still fully succeeds, only
+    that turn's spoken output silently doesn't happen. Not fixed this
+    milestone; flagged below.
+  - See `docs/DECISIONS.md` ADR-030 for full reasoning and alternatives
+    considered (including why default-on and wiring `/voice/turn` too
+    were both rejected this milestone).
+- **Phase 6, Milestone 6f - Maithili: real evidence gathered, not
+  enabled:**
+  - Maithili was added to `AGENTS.md`/`docs/PROJECT_GOAL.md`'s long-term
+    language list at the user's request, then wired into the exact same
+    per-language scaffolding every prior language uses:
+    `backend/internal/api/dto.go`'s `validLanguages`,
+    `internal/conversation`'s `supportedLanguages`,
+    `docs/openapi/chat.yaml`'s `LanguageCode` enum, the frontend's
+    `LanguageCode` union (net-new, unlike the other still-disabled
+    languages, which were already listed) + `LANGUAGE_OPTIONS` (added
+    disabled), the compiler-forced `Record<LanguageCode, string>`
+    cascades in `example-prompt.model.ts`/`conversation.mock.service.ts`,
+    the `[lang='mai']` Devanagari font rule (Maithili uses the same
+    script as Hindi — no new font needed), and a new `mms-tts-mai`
+    candidate in `ai-services/models.yaml`.
+  - **Measured all four capabilities for real, not assumed** — the same
+    rigor every prior language got:
+    - **LLM: fails outright.** `llama-3.2-3b-instruct` understood every
+      Maithili prompt correctly (a factual answer, an on-topic story, an
+      appropriate greeting) but replied in standard Hindi every single
+      time — 0/4 language fidelity, against `docs/EVALUATION.md` §3's
+      >95% target. Categorically different from Malayalam's "fluent,
+      on-topic" result (ADR-028): comprehension works, generation
+      doesn't. (Also fixed a real gap found along the way:
+      `llama_cpp_engine.py`'s `_LANGUAGE_NAMES` map had no `"mai"` entry
+      — every language including `ml` needed one added when introduced.)
+    - **langid: real, but the weakest result measured with the selected
+      model.** Loaded `models/langid/lid.176.bin` directly and confirmed
+      it does have a real `mai` label; `fasttext-lid176` (ADR-027)
+      scored 50% (2/4) on real Maithili fixtures, confusing it with
+      Nepali and Hindi — plausible given how closely related those
+      languages are in short phrases.
+    - **TTS: a real candidate found, downloaded, and benchmarked —
+      fails the same way Malayalam's did.** `facebook/mms-tts-mai`
+      (CC-BY-NC-4.0) is real and was actually downloaded and run;
+      synthesize-then-transcribe proxy WER measured 100%, 125%, 100%,
+      150% (mean 118.75%) against the <10% target — the same 100-150%
+      failure range Malayalam's own TTS candidate hit.
+    - **ASR: a capability gap, and — checked directly — a silently
+      dangerous one.** `faster-whisper` has no `"mai"` language code at
+      all (confirmed against its tokenizer and upstream Whisper's own).
+      Checked, not assumed: this project's own ASR engine wrapper
+      doesn't error on an unmapped code — it silently falls back to
+      Whisper's own auto-detection, the exact wrong-script failure mode
+      ADR-018 already documented for un-hinted Hinglish. `/voice/turn`
+      and `/speech/transcribe` now explicitly reject `"mai"` with a
+      clean `400` because of this, rather than letting a request through
+      to produce a silently wrong-language transcript.
+  - **Not enabled, and why this differs from the Hinglish/Malayalam
+    "ship with a known gap" precedent** (ADR-020/ADR-028): that
+    precedent was always about a *secondary* channel (voice output, or
+    an ASR accuracy weakness) while the *primary* channel — typed chat
+    replying in the right language — still worked. Here the primary
+    channel is what fails. `LANGUAGE_OPTIONS`'s `mai.enabled` stays
+    `false`; the enable/don't-enable call is put to the user explicitly,
+    per `AGENTS.md` §14, rather than decided silently either way.
+  - Tests: no new Go/Python tests beyond what already generically
+    covers this (a deliberate choice, not an oversight — see below); 1
+    new frontend test for the `lang="mai"` attribute (mirroring
+    Malayalam's) — 144 total, all pass; `ng lint`/`build` clean.
+    `go build/vet/test`, `gofmt` clean; new Go handler tests confirming
+    `/chat`/`/speech/synthesize` accept `"mai"` and `/voice/turn`/
+    `/speech/transcribe` reject it with a clean 400. No new
+    `test_registry.py`/`test_main.py` coverage: the existing
+    `test_synthesize_dispatches_to_the_requested_language` test already
+    proves the language-dispatch mechanism generically (using `"ml"` as
+    its example second language); no registry/dispatch code changed
+    this milestone, so a `"mai"`-specific copy of that same test would
+    have added zero real coverage — `AGENTS.md` §4's anti-duplication
+    rule, applied rather than padding the test count.
+  - Real, honest provenance note: the plan intended to source benchmark
+    text from FLORES-200's `mai_Deva` split (Meta, CC-BY-SA-4.0,
+    professionally translated) — every hosting mirror checked
+    (`openlanguagedata/flores_plus`, `facebook/flores`) turned out to be
+    gated behind Hugging Face authentication unavailable in this
+    environment. Fell back to four directly-composed fixtures using
+    well-documented Maithili grammar instead, stated explicitly in
+    `eval_data/asr_fixtures.yaml` rather than overclaiming a source that
+    wasn't actually used — a native-speaker review of these four
+    sentences before treating any result above as fully final would be
+    a reasonable next step.
+  - See `docs/DECISIONS.md` ADR-031 for full reasoning, real numbers, and
+    alternatives considered.
 
 ## Next
 
-- No milestone is currently approved to start. Milestones 6a/6b/6c/6d
+- No milestone is currently approved to start. Milestones 6a/6b/6c/6d/6e/6f
   (`langid`, Malayalam end to end, Hinglish TTS fix + Malayalam
-  diagnostic) are complete; Phase 6's broader scope
+  diagnostic, auto-detection driving typed-chat behavior, Maithili
+  evidence gathering) are complete; Phase 6's broader scope
   (Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — each needs
   this same per-language ASR/TTS/LLM/UI treatment individually) has no
-  milestone named or approved yet. Per `AGENTS.md` §5, work does not begin
-  on it until the user decides to move the project there. Open
-  follow-ups, none blocking, whenever the user wants them: Malayalam's
+  milestone named or approved yet. Per `AGENTS.md` §5, work does not
+  begin on it until the user decides to move the project there.
+  **Awaiting a decision, not blocking**: whether to enable Maithili
+  anyway despite its LLM never replying in the language (0/4 fidelity,
+  ADR-031) — `LANGUAGE_OPTIONS`'s `mai.enabled` stays `false` until the
+  user says otherwise. Open follow-ups, none blocking, whenever the user
+  wants them: Malayalam's
   diagnosed ASR weakness (mean WER 0.96 on real speech, ADR-029) has no
   available fix within this project's current tools — would need a
   dedicated ASR-candidate re-benchmark for Malayalam specifically, a real,
@@ -701,14 +936,22 @@ project moves between milestones or a phase's status changes.
   access; re-benchmarking `indiclid` for `langid` against a larger fixture
   set, and specifically investigating the still-open Hinglish detection
   gap neither candidate closed (ADR-027); closing the Phase 5 latency gap
-  (ADR-024), most likely as part of Phase 11's streaming work; and a
-  hands-on browser/microphone/speaker smoke test (still not performed by
-  the agent in any phase so far — no interactive browser available).
+  (ADR-024), most likely as part of Phase 11's streaming work; **English
+  has no configured TTS voice at all** — newly reachable (not newly
+  created) by Milestone 6e's auto-detection for genuinely English typed
+  text, verified live to degrade non-fatally (`502 tts_unavailable`, text
+  reply unaffected) rather than break the turn, same precedent Hinglish
+  TTS set before ADR-029; voice-turn auto-detection (ADR-018's ASR-hint
+  problem, ADR-030); and a hands-on browser/microphone/speaker smoke test
+  (still not performed by the agent in any phase so far — no interactive
+  browser available).
 
 ## Not started
 
 - Indian language breadth beyond Hindi/Hinglish/English/Malayalam
-  (Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada, Punjabi, Odia)
+  (Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada, Punjabi, Odia) —
+  Maithili was evidence-gathered in Milestone 6f (ADR-031) but not
+  enabled, so it's tracked under "Next" above, not here
 - RAG
 - Dataset pipeline
 - Evaluation harness
@@ -720,7 +963,7 @@ project moves between milestones or a phase's status changes.
 
 - `AGENTS.md`, `docs/`, `LICENSE`, `frontend/`, `backend/`, `proto/`, and
   now `ai-services/` all exist.
-- `frontend/` builds, lints, and tests clean (136 tests). Its
+- `frontend/` builds, lints, and tests clean (144 tests). Its
   `ConversationService` runs against the real backend
   (`ConversationRealService`); `MicButton` now records audio and sends
   the whole spoken turn through `ConversationService.sendVoiceTurn` in
@@ -777,11 +1020,15 @@ project moves between milestones or a phase's status changes.
   `hinglish` (`female: mms-tts-hin-ft-female`, `male: mms-tts-hin`,
   ADR-021/ADR-022/ADR-023 — Hinglish now produces real audio via
   transliteration, ADR-029, though English-mixed portions still
-  mispronounce), and one voice (used for both) for `ml` (`mms-tts-mal`,
+  mispronounce), one voice (used for both) for `ml` (`mms-tts-mal`,
   ADR-028 — proxy WER 100-150%, now understood via ADR-029 to be at least
   partly an ASR-side weakness, not purely this candidate's synthesis
-  quality) — and `langid` (`fasttext-lid176`, ADR-027 — 100% accurate on
-  Malayalam, its own, different Hinglish gap noted above; `indiclid`
+  quality), and one voice (used for both) for `mai` (`mms-tts-mai`,
+  ADR-031 — proxy WER 100-150%, same failure range as Malayalam's;
+  configured but not enabled in the UI, since Maithili's LLM result
+  fails independently of TTS) — and `langid` (`fasttext-lid176`, ADR-027
+  — 100% accurate on Malayalam, 50% on Maithili (ADR-031), its own,
+  different Hinglish gap noted above; `indiclid`
   stays listed, unselected, as a real candidate for re-benchmarking).
 - `frontend/node_modules/`, `frontend/dist/`, `ai-services/.venv/`, local
   Postgres data, `/models/` (downloaded weights), and

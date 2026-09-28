@@ -81,7 +81,9 @@ asr:
 # supported). `ml` is Milestone 6c's new language: only one real
 # Malayalam voice was found (see ADR-028), so both `female` and `male`
 # point at the same checkpoint — a real, honestly-recorded asymmetry with
-# Hindi, not an oversight. `voices` maps a LanguageCode to an
+# Hindi, not an oversight. `mai` (Milestone 6f, Maithili) has the same
+# one-voice asymmetry for the same reason: `facebook/mms-tts-mai` is the
+# only Maithili TTS checkpoint found. `voices` maps a LanguageCode to an
 # engine-specific voice selector (docs/ARCHITECTURE.md §3.6's
 # "per-language voice configuration") — a natural-language description
 # for parler_tts, a built-in speaker name for xtts; mms_vits is a single
@@ -107,6 +109,9 @@ tts:
     ml:
       female: mms-tts-mal
       male: mms-tts-mal
+    mai:
+      female: mms-tts-mai
+      male: mms-tts-mai
   candidates:
     mms-tts-hin:
       engine: mms_vits
@@ -119,6 +124,10 @@ tts:
     mms-tts-mal:
       engine: mms_vits
       repo_id: facebook/mms-tts-mal
+      license: CC-BY-NC-4.0
+    mms-tts-mai:
+      engine: mms_vits
+      repo_id: facebook/mms-tts-mai
       license: CC-BY-NC-4.0
     indic-parler-tts:
       engine: parler_tts

@@ -25,9 +25,19 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ChatRequest"
-            example:
-              text: "आज मौसम कैसा है?"
-              language: hi
+            examples:
+              manualPin:
+                summary: A manually pinned language.
+                value:
+                  text: "आज मौसम कैसा है?"
+                  language: hi
+              autoDetect:
+                summary: >
+                  Auto-detect (docs/DECISIONS.md ADR-030) — the server
+                  resolves this to the text's own detected language.
+                value:
+                  text: "what's the weather like today?"
+                  language: auto
       responses:
         "200":
           description: Both the persisted user turn and the assistant's reply.
@@ -125,7 +135,7 @@ components:
         LanguageCode exactly — this list is the normative source of truth
         for both sides, since the type cannot be shared across TypeScript
         and Go.
-      enum: [hi, hinglish, en, bn, gu, mr, ta, te, kn, ml, pa, or]
+      enum: [hi, hinglish, en, bn, gu, mr, ta, te, kn, ml, pa, or, mai]
 
     Turn:
       type: object
@@ -156,15 +166,21 @@ components:
             (Phase 3, docs/DECISIONS.md ADR-017), not a language-ID model.
             Absent only on turns persisted before this field existed.
         detectedLanguage:
-          $ref: "#/components/schemas/LanguageCode"
+          type: string
           description: >
-            The `langid` capability's classification of `text` (Phase 6
-            Milestone 6a, docs/DECISIONS.md ADR-026) — currently
-            `langid.FakeLangIDClient`'s Devanagari-vs-not heuristic, not
-            real language identification (that's Milestone 6b). Not yet
-            used to drive any behavior; `language` above (the
-            manually-selected/ASR-hint value) still does. Absent only on
-            turns persisted before this field existed.
+            The `langid` capability's classification of `text` — the real
+            `fasttext-lid176` model (docs/DECISIONS.md ADR-027), not the
+            Milestone 6a placeholder heuristic. Deliberately typed as a
+            plain string, not `LanguageCode`: fasttext-lid176 can return
+            any of its 176 ISO-639 labels, which is a superset of this
+            app's 12 supported codes, and it can never emit "hinglish"
+            (not in its label space). When the request's `language` was
+            "auto", this is also what it resolved to for both turns'
+            `language` (docs/DECISIONS.md ADR-030); otherwise it's purely
+            observational alongside whatever concrete `language` was
+            manually pinned. Absent only on turns persisted before this
+            field existed, or when detection itself failed (non-fatal by
+            design — ADR-026).
 
     ChatRequest:
       type: object
@@ -174,7 +190,18 @@ components:
           type: string
           minLength: 1
         language:
-          $ref: "#/components/schemas/LanguageCode"
+          description: >
+            A concrete `LanguageCode` (a manual pin, used unchanged), or
+            the sentinel `"auto"` (docs/DECISIONS.md ADR-030): the server
+            resolves it to `text`'s own detected language before
+            generating a reply, falling back to a default if detection
+            fails or returns something outside the 12 supported codes.
+            `"auto"` is valid for this endpoint only — POST /voice/turn
+            (docs/openapi/voice.yaml) does not accept it.
+          oneOf:
+            - $ref: "#/components/schemas/LanguageCode"
+            - type: string
+              enum: [auto]
 
     ChatResponse:
       type: object

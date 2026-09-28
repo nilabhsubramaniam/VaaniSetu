@@ -93,7 +93,7 @@ Today, tapping the mic and speaking (or typing) sends real audio (or text) to th
 ## Supported languages
 
 - **Available in the current UI:** Hindi, Hinglish.
-- **Long-term direction** (not yet built): Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada, Malayalam, Punjabi, Odia.
+- **Long-term direction** (not yet built): Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada, Malayalam, Punjabi, Odia, Maithili.
 
 The architecture is intended to stay multilingual rather than Hindi-specific: language identity is a shared, typed model (`LanguageCode` in [`frontend/src/app/core/models/language.model.ts`](frontend/src/app/core/models/language.model.ts)) that the UI, and eventually the backend, both read from — adding a language is meant to be a configuration and evaluation exercise, not an architecture change. Each additional language is enabled in the product only once it passes the quality thresholds in [`docs/EVALUATION.md`](docs/EVALUATION.md) (see Phase 6 of the roadmap).
 

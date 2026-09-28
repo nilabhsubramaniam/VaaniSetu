@@ -124,6 +124,56 @@ func TestHandleChat_EmptyText(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
 }
 
+func TestHandleChat_AcceptsAutoLanguage(t *testing.T) {
+	// "auto" is a valid POST /api/v1/chat request value (docs/DECISIONS.md
+	// ADR-030) — conversation.Service resolves it, internal/api just has
+	// to let it through rather than reject it as an unknown language.
+	var sawLanguage string
+	fake := &fakeConversationService{
+		sendMessageFunc: func(_ context.Context, text, language string) (conversation.Turn, conversation.Turn, error) {
+			sawLanguage = language
+			return conversation.Turn{ID: "u1", Role: "user", Text: text, Language: "en"},
+				conversation.Turn{ID: "a1", Role: "assistant", Text: "reply", Language: "en"},
+				nil
+		},
+	}
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(chatRequest{Text: "hello", Language: "auto"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	if sawLanguage != "auto" {
+		t.Errorf("conversation.Service.SendMessage saw language = %q, want \"auto\" passed through unchanged", sawLanguage)
+	}
+}
+
+func TestHandleChat_AcceptsMaithili(t *testing.T) {
+	// "mai" is a concrete, valid LanguageCode (docs/DECISIONS.md ADR-031,
+	// Milestone 6f) — POST /api/v1/chat accepts it like any other.
+	fake := &fakeConversationService{
+		sendMessageFunc: func(_ context.Context, text, language string) (conversation.Turn, conversation.Turn, error) {
+			return conversation.Turn{ID: "u1", Role: "user", Text: text, Language: language},
+				conversation.Turn{ID: "a1", Role: "assistant", Text: "reply", Language: language},
+				nil
+		},
+	}
+	server := NewServer(fake, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(chatRequest{Text: "प्रणाम", Language: "mai"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleChat_UnknownLanguage(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
@@ -343,6 +393,31 @@ func TestHandleTranscribe_MissingLanguage(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
 }
 
+func TestHandleTranscribe_RejectsAutoLanguage(t *testing.T) {
+	// Transcription needs a real language hint before it even runs
+	// (ADR-018) — "auto" becoming a globally valid wire value for /chat
+	// (ADR-030) must not let it silently reach this handler too.
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=auto", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleTranscribe_RejectsMaithili(t *testing.T) {
+	// faster-whisper has no "mai" language code at all (ADR-031) — a
+	// capability gap, not the accuracy gap Malayalam has (ADR-029).
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=mai", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
 func TestHandleTranscribe_EmptyAudioBody(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
@@ -456,6 +531,29 @@ func TestHandleSynthesize_PassesThroughAnExplicitVoice(t *testing.T) {
 	}
 }
 
+func TestHandleSynthesize_AcceptsMaithili(t *testing.T) {
+	// "mai" is a concrete, valid LanguageCode (ADR-031) — speech synthesis
+	// isn't affected by Maithili's ASR gap, only ASR-facing endpoints are.
+	ttsFake := &fakeTTSClient{
+		synthesizeFunc: func(_ context.Context, req tts.SynthesizeRequest) (tts.SynthesizeResponse, error) {
+			if req.Language != "mai" {
+				t.Errorf("Language = %q, want mai", req.Language)
+			}
+			return tts.SynthesizeResponse{Audio: []byte("x"), ContentType: "audio/wav"}, nil
+		},
+	}
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), ttsFake, testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "प्रणाम", Language: "mai"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandleSynthesize_UnknownVoice(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
@@ -482,6 +580,19 @@ func TestHandleSynthesize_UnknownLanguage(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "fr"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleSynthesize_RejectsAutoLanguage(t *testing.T) {
+	// Synthesis needs one concrete language to pick a voice for — "auto"
+	// becoming valid for /chat (ADR-030) must not silently reach here too.
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	body, _ := json.Marshal(synthesizeRequest{Text: "hello", Language: "auto"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/synthesize", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	server.Routes().ServeHTTP(rec, req)
@@ -620,6 +731,31 @@ func TestHandleVoiceTurn_MissingLanguage(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_RejectsAutoLanguage(t *testing.T) {
+	// Voice-turn auto-detection is out of scope this milestone (ADR-018's
+	// ASR-hint problem) — "auto" becoming valid for /chat (ADR-030) must
+	// not silently let it reach here too; this is the scope boundary.
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=auto", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_RejectsMaithili(t *testing.T) {
+	// faster-whisper has no "mai" language code at all (ADR-031) — a
+	// capability gap, not the accuracy gap Malayalam has (ADR-029).
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=mai", bytes.NewReader([]byte("audio")))
 	rec := httptest.NewRecorder()
 	server.Routes().ServeHTTP(rec, req)
 

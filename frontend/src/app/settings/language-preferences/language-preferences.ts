@@ -1,5 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { LANGUAGE_OPTIONS } from '../../core/models/language.model';
+import {
+  AUTO_DETECT_OPTION,
+  LANGUAGE_OPTIONS,
+  type ChatLanguageRequest,
+} from '../../core/models/language.model';
 import { SettingsStore } from '../../core/services/settings.store';
 
 @Component({
@@ -11,10 +15,17 @@ import { SettingsStore } from '../../core/services/settings.store';
 export class LanguagePreferences {
   private readonly settings = inject(SettingsStore);
 
-  readonly options = LANGUAGE_OPTIONS;
+  readonly options = [AUTO_DETECT_OPTION, ...LANGUAGE_OPTIONS];
   readonly preferredLanguage = this.settings.preferredLanguage;
+  readonly autoDetectLanguage = this.settings.autoDetectLanguage;
+  readonly effectiveSelection = this.settings.effectiveChatLanguage;
 
-  select(code: (typeof LANGUAGE_OPTIONS)[number]['code']): void {
-    this.settings.setPreferredLanguage(code);
+  select(code: ChatLanguageRequest): void {
+    if (code === 'auto') {
+      this.settings.setAutoDetectLanguage(true);
+    } else {
+      this.settings.setAutoDetectLanguage(false);
+      this.settings.setPreferredLanguage(code);
+    }
   }
 }

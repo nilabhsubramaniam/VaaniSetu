@@ -23,6 +23,45 @@ import (
 // Check with errors.Is(err, conversation.ErrGenerateFailed).
 var ErrGenerateFailed = errors.New("conversation: llm generate failed")
 
+// autoLanguage is POST /api/v1/chat's sentinel for "detect this text's
+// language and use that" (docs/DECISIONS.md ADR-030) — internal/api's
+// isValidLanguage accepts it as valid input; SendMessage is what actually
+// resolves it.
+const autoLanguage = "auto"
+
+// defaultLanguage is what an "auto" request resolves to when detection
+// either fails (non-fatal, same as everywhere else langid is used) or
+// returns something outside supportedLanguages — mirrors the frontend's
+// own DEFAULT_LANGUAGE (frontend/src/app/core/services/settings.store.ts).
+const defaultLanguage = "hi"
+
+// supportedLanguages mirrors internal/api/dto.go's validLanguages (minus
+// the "auto" sentinel, which is only ever a request value, never a
+// resolved one) — kept here rather than imported to avoid conversation
+// depending on api, the same independent-list precedent dto.go's own
+// comment already documents for the frontend/Go split. Update both if
+// the supported language set ever changes.
+var supportedLanguages = map[string]bool{
+	"hi": true, "hinglish": true, "en": true,
+	"bn": true, "gu": true, "mr": true, "ta": true, "te": true,
+	"kn": true, "ml": true, "pa": true, "or": true, "mai": true,
+}
+
+// resolveLanguage turns an "auto" request into a real, supported
+// language: detected if it's non-nil and one of supportedLanguages,
+// defaultLanguage otherwise. Any other language value passes through
+// unchanged — a manual pin always wins, exactly as docs/PROJECT_GOAL.md
+// §6 requires.
+func resolveLanguage(language string, detected *string) string {
+	if language != autoLanguage {
+		return language
+	}
+	if detected != nil && supportedLanguages[*detected] {
+		return *detected
+	}
+	return defaultLanguage
+}
+
 // Turn is the domain representation of one utterance, decoupled from both
 // the sqlc-generated db.Turn (pgtype-based) and the HTTP-facing JSON DTO in
 // internal/api. It matches frontend/src/app/core/models/turn.model.ts field
@@ -42,8 +81,10 @@ type Turn struct {
 	// Text, computed at persist time for every turn (Phase 6 Milestone
 	// 6a). Nil for turns written before this column existed, and also
 	// nil (not an error) when detection itself failed — see SendMessage.
-	// Not yet used to drive the LLM prompt or TTS voice; Language (the
-	// manually-selected/ASR-hint value) still does that.
+	// When the request's language was the "auto" sentinel, this is also
+	// what Language got resolved to (ADR-030, resolveLanguage); when a
+	// concrete language was manually pinned, this stays purely
+	// observational alongside it.
 	DetectedLanguage *string
 }
 
@@ -76,20 +117,32 @@ func NewService(pool *pgxpool.Pool, llmClient llm.LLMClient, langIDClient langid
 // If the LLM call fails, the user turn is still persisted (the user really
 // did say that) but no assistant turn is created, and the error is
 // returned for the caller to map to the llm_unavailable API error code.
+//
+// language is either a concrete LanguageCode (a manual pin — used
+// unchanged, exactly as before Milestone 6c-2/ADR-030) or the "auto"
+// sentinel, in which case it's resolved from the user text's own
+// detected language (see resolveLanguage) before anything else happens:
+// the LLM is asked to reply in the resolved language, and both turns are
+// persisted with it as their Language. The detection call this needs is
+// the same one already made for DetectedLanguage — auto-resolution reuses
+// it rather than detecting the text twice.
 func (s *Service) SendMessage(ctx context.Context, text, language string) (userTurn Turn, assistantTurn Turn, err error) {
 	sessionID, err := s.getOrCreateSessionID(ctx)
 	if err != nil {
 		return Turn{}, Turn{}, fmt.Errorf("conversation: get or create session: %w", err)
 	}
 
+	detectedUserLanguage := s.detectLanguage(ctx, text)
+	resolvedLanguage := resolveLanguage(language, detectedUserLanguage)
+
 	userScript := DetectScript(text)
 	dbUserTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
 		SessionID:        sessionID,
 		Role:             "user",
-		Language:         language,
+		Language:         resolvedLanguage,
 		Text:             text,
 		Script:           &userScript,
-		DetectedLanguage: s.detectLanguage(ctx, text),
+		DetectedLanguage: detectedUserLanguage,
 	})
 	if err != nil {
 		return Turn{}, Turn{}, fmt.Errorf("conversation: persist user turn: %w", err)
@@ -97,7 +150,7 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 	userTurn = turnFromDB(dbUserTurn)
 
 	started := time.Now()
-	genResp, err := s.llmClient.Generate(ctx, llm.GenerateRequest{Text: text, Language: language})
+	genResp, err := s.llmClient.Generate(ctx, llm.GenerateRequest{Text: text, Language: resolvedLanguage})
 	if err != nil {
 		return userTurn, Turn{}, fmt.Errorf("%w: %v", ErrGenerateFailed, err)
 	}
@@ -107,7 +160,7 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 	dbAssistantTurn, err := s.queries.CreateTurn(ctx, db.CreateTurnParams{
 		SessionID:        sessionID,
 		Role:             "assistant",
-		Language:         language,
+		Language:         resolvedLanguage,
 		Text:             genResp.Reply,
 		LatencyMs:        &latencyMs,
 		Script:           &assistantScript,

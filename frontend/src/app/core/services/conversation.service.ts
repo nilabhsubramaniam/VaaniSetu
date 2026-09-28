@@ -1,5 +1,5 @@
 import type { Signal } from '@angular/core';
-import type { LanguageCode } from '../models/language.model';
+import type { ChatLanguageRequest, LanguageCode } from '../models/language.model';
 import type { Turn } from '../models/turn.model';
 import type { VoiceCode } from '../models/voice.model';
 
@@ -21,15 +21,18 @@ export abstract class ConversationService {
    * Records a user turn and produces the assistant's reply.
    * The mock implementation simulates the `processing` → `responding`
    * cycle; a real implementation would call the Go backend instead.
+   * `language` accepts the "auto" sentinel (docs/DECISIONS.md ADR-030) in
+   * addition to a concrete pin — only typed chat supports it so far.
    */
-  abstract sendUserTurn(text: string, language: LanguageCode): void;
+  abstract sendUserTurn(text: string, language: ChatLanguageRequest): void;
 
   /**
    * Runs a full spoken turn from recorded audio: transcribe, generate a
    * reply, and speak it — one orchestrated call (Phase 5,
    * docs/DECISIONS.md ADR-024), not three sequential ones. The real
    * implementation drives processing -> responding -> idle itself, same
-   * as `sendUserTurn`.
+   * as `sendUserTurn`. Unlike `sendUserTurn`, `language` here is always a
+   * concrete pin — voice-turn auto-detection is out of scope (ADR-030).
    */
   abstract sendVoiceTurn(audio: Blob, language: LanguageCode, voice: VoiceCode): void;
 

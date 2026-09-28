@@ -8,7 +8,7 @@
     (click)="toggle()"
     (keydown)="onButtonKeydown($event)"
   >
-    <span class="trigger-label">{{ currentOption().label }}</span>
+    <span class="trigger-label">{{ triggerLabel() }}</span>
     <svg class="trigger-caret" viewBox="0 0 12 8" aria-hidden="true" width="10" height="7">
       <path d="M1 1.5 6 6.5 11 1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
     </svg>
@@ -27,6 +27,7 @@
           #optionEl
           [id]="'lang-option-' + i"
           class="option"
+          [class.is-auto]="option.code === 'auto'"
           role="option"
           [class.is-selected]="option.code === currentOption().code"
           [class.is-disabled]="!option.enabled"
@@ -41,6 +42,9 @@
             <span class="option-badge">Coming soon</span>
           }
         </li>
+        @if (option.code === 'auto') {
+          <li class="options-divider" role="separator" aria-hidden="true"></li>
+        }
       }
     </ul>
   }

@@ -260,14 +260,34 @@ instead of failing outright; Malayalam's real bottleneck properly
 diagnosed with the project's first real, human-recorded audio fixtures —
 `faster-whisper-large-v3-turbo` itself measures a real 0.96 WER on real
 Malayalam speech, so the gap is at least partly ASR, not purely TTS
-quality, see ADR-029) are all complete. The detected language is
-persisted and returned over the API but does not yet drive the LLM prompt
-or the TTS voice — the manual language pin still wins throughout, per
-`docs/PROJECT_GOAL.md`. The phase's broader scope below (Bengali,
-Gujarati, Marathi, Tamil, Telugu, Kannada, Punjabi, Odia — each needing
-this same per-language treatment) has no milestone named or approved yet.
+quality, see ADR-029), and Milestone 6e (auto-detection now drives
+behavior for typed chat, opt-in and off by default — `POST /api/v1/chat`
+accepts a new `"auto"` language sentinel that resolves to the message's
+own detected language before the LLM call, reusing the detection already
+made for `detectedLanguage` rather than a second call; a manual pin still
+wins whenever one is set. Voice turns are unaffected and still require a
+concrete language — un-hinted auto-detection was already found to
+mistranscribe romanized Hinglish speech into the wrong script, ADR-018 —
+so this is deliberately typed-chat-only, see ADR-030), and Milestone 6f
+(Maithili — added to the long-term language list, then wired into the
+same per-language scaffolding every prior language uses and measured for
+real across all four capabilities, but **not enabled**: the LLM
+understood every Maithili prompt but replied in Hindi every time (0/4
+language fidelity), a real candidate TTS checkpoint measured the same
+100-150% proxy-WER failure Malayalam's did, langid scored only 50% with
+the already-selected model, and the ASR gap turned out to be a silent
+wrong-language auto-detect fallback rather than a clean error — unlike
+Hinglish/Malayalam's "ship with a known gap" precedent, this failure is
+in the *primary* typed-chat channel, not a secondary one, so the
+enable/don't-enable call was put to the user rather than decided
+silently, see ADR-031) are all complete. A manual language pin still
+wins whenever the user sets one, per `docs/PROJECT_GOAL.md`. The phase's
+broader scope below (Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada,
+Punjabi, Odia — each needing this same per-language treatment, plus
+Maithili's own enablement decision still pending) has no milestone named
+or approved yet.
 See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md`
-ADR-026/ADR-027/ADR-028/ADR-029.
+ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.

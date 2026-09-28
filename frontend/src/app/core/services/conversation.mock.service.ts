@@ -30,6 +30,7 @@ const CANNED_REPLIES: Record<LanguageCode, string> = {
   ml: 'നമസ്കാരം! ഇത് ഒരു ഡെമോ മറുപടിയാണ്.',
   pa: 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ! ਇਹ ਇੱਕ ਡੈਮੋ ਜਵਾਬ ਹੈ।',
   or: 'ନମସ୍କାର! ଏହା ଏକ ଡେମୋ ଉତ୍ତର।',
+  mai: 'प्रणाम! हम VaaniSetu छी। ई अखन एकटा डेमो जवाब अछि।',
 };
 
 let nextId = 1;

@@ -7,7 +7,7 @@ import type { Turn } from '../../core/models/turn.model';
 // global styles.scss's `[lang='...']` rules) — every other LanguageCode
 // (Hinglish included, since it's Latin-script) renders fine in the
 // default Latin stack and needs no `lang` attribute override.
-const SCRIPT_SPECIFIC_LANGUAGES: ReadonlySet<LanguageCode> = new Set(['hi', 'ml']);
+const SCRIPT_SPECIFIC_LANGUAGES: ReadonlySet<LanguageCode> = new Set(['hi', 'ml', 'mai']);
 
 @Component({
   selector: 'app-message-bubble',

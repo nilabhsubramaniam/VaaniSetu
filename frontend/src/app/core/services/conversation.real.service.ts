@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import type { LanguageCode } from '../models/language.model';
+import type { ChatLanguageRequest, LanguageCode } from '../models/language.model';
 import type { Turn, TurnRole } from '../models/turn.model';
 import type { VoiceCode } from '../models/voice.model';
 import { AudioPlaybackService } from './audio-playback.service';
@@ -87,7 +87,7 @@ export class ConversationRealService implements ConversationService {
     });
   }
 
-  sendUserTurn(text: string, language: LanguageCode): void {
+  sendUserTurn(text: string, language: ChatLanguageRequest): void {
     const trimmed = text.trim();
     if (!trimmed) {
       return;
@@ -96,11 +96,15 @@ export class ConversationRealService implements ConversationService {
     const mySequence = ++this.sequence;
     this.currentRequest?.unsubscribe();
 
+    const localUserTurnId = makeLocalId();
     this.appendTurn({
-      id: makeLocalId(),
+      id: localUserTurnId,
       role: 'user',
       text: trimmed,
-      language,
+      // "auto" isn't a real LanguageCode (Turn.language never is one) — the
+      // pinned language is shown as a placeholder until replaceTurn below
+      // swaps this optimistic turn for the server's resolved one.
+      language: language === 'auto' ? this.settings.preferredLanguage() : language,
       createdAt: new Date(),
     });
 
@@ -114,6 +118,7 @@ export class ConversationRealService implements ConversationService {
             return; // superseded by a newer turn or an error simulation
           }
 
+          this.replaceTurn(localUserTurnId, turnFromWire(res.userTurn));
           this.appendTurn(turnFromWire(res.assistantTurn));
           this.voiceSession.setState('responding');
           this.speakReply(res.assistantTurn.text, res.assistantTurn.language);
@@ -194,6 +199,15 @@ export class ConversationRealService implements ConversationService {
 
   private appendTurn(turn: Turn): void {
     this._turns.update((turns) => [...turns, turn]);
+  }
+
+  /** Swaps an optimistically-appended turn (matched by its local id) for
+   * the server-confirmed one — used only for the user turn in
+   * `sendUserTurn`, whose real id and resolved `language` (relevant when
+   * the request was "auto", docs/DECISIONS.md ADR-030) aren't known until
+   * the response arrives. */
+  private replaceTurn(id: string, turn: Turn): void {
+    this._turns.update((turns) => turns.map((t) => (t.id === id ? turn : t)));
   }
 
   /** Decodes a base64 audio payload from POST /v1/voice/turn and plays it.

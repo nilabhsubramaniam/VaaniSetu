@@ -30,6 +30,7 @@ _LANGUAGE_NAMES = {
     "ml": "Malayalam",
     "pa": "Punjabi",
     "or": "Odia",
+    "mai": "Maithili",
 }
 
 _SYSTEM_PROMPT_TEMPLATE = (

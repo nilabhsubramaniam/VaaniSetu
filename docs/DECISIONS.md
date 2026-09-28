@@ -1752,14 +1752,268 @@ Status**.
   Malayalam's.
 - **Status:** Accepted.
 
-## Template for future ADRs
+## ADR-030 - Auto-detect drives typed-chat behavior, opt-in, chat-only
 
-```
-## ADR-NNN - <short title>
+- **Decision:** `POST /api/v1/chat`'s `language` field accepts a new
+  sentinel value, `"auto"`, in addition to a concrete `LanguageCode`.
+  When a request sends `"auto"`, `conversation.Service.SendMessage`
+  reuses the `langid` detection call it already makes for the user's
+  text (Milestone 6a, ADR-026) to resolve a real language *before*
+  calling the LLM: if detection succeeded and returned one of this app's
+  12 supported codes, that becomes `resolvedLanguage`; otherwise
+  (detection failed, or returned a `fasttext-lid176` label outside the
+  supported set) it falls back to a `defaultLanguage` constant (`"hi"`).
+  `resolvedLanguage` drives the LLM's reply language and is persisted as
+  both turns' `Turn.Language` — `Turn.DetectedLanguage` keeps recording
+  the raw, unclamped detection result exactly as before, unaffected by
+  the fallback. A manual, concrete `language` value behaves exactly as
+  it always has; only `"auto"` triggers resolution.
 
-- **Decision:** <what was decided>
-- **Reason:** <why>
-- **Alternatives considered:** <options and why they lost>
-- **Impact:** <effect on architecture, phases, effort>
-- **Status:** Accepted | Superseded by ADR-NNN | Deprecated
-```
+  On the frontend, this is strictly opt-in: `SettingsStore` gets a new
+  `autoDetectLanguage` boolean signal (persisted, default `false`) and a
+  computed `effectiveChatLanguage()` (`"auto"` when the toggle is on,
+  else the pinned `preferredLanguage`) that only `text-input-bar.ts`
+  reads. Turning auto-detect on leaves the stored `preferredLanguage`
+  untouched, so turning it back off restores the last concrete pin. The
+  header `LanguageSelector` and the Settings page's `LanguagePreferences`
+  both gained one new "Auto-detect" entry, above the 12 language options,
+  that sets `autoDetectLanguage(true)` without touching the pin; picking
+  any concrete language does the reverse.
+
+  `POST /api/v1/voice/turn` (and, by the same reasoning, `/speech/
+  transcribe` and `/speech/synthesize`) explicitly reject `"auto"` with a
+  clean `400 invalid_request` rather than silently accepting it — `mic-
+  button.ts` keeps sending `preferredLanguage()` directly, unchanged.
+  This is deliberate and scoped, not an oversight: see Reason.
+
+- **Reason:** `docs/PROJECT_GOAL.md` §6 already states detection driving
+  behavior, with a manual pin overriding it, as the intended long-term
+  design — Milestone 6a's ADR-026 built the detection capability but
+  explicitly deferred wiring it into anything, "does not yet drive the
+  LLM prompt language or the TTS voice," as a smaller first step. This
+  milestone is that deferred step, scoped down twice on evidence already
+  in this project's own history:
+  1. **Opt-in, not a default-on behavior change**: every existing session
+     has a concretely pinned language today (the frontend's `preferred
+     Language` signal is non-nullable). Flipping detection on by default
+     would silently change reply language for existing users on upgrade;
+     opt-in keeps today's behavior identical unless a user deliberately
+     turns the new setting on.
+  2. **Typed chat only, not voice**: ADR-018 already found that letting
+     Whisper auto-detect the spoken language (no forced hint) transcribes
+     romanized Hinglish speech into the *wrong script* (Devanagari
+     instead of Latin) — voice-turn auto-detection needs the language
+     *before* transcription even runs, which is a real, separate,
+     harder chicken-and-egg problem (a cheap first-pass hint, or a
+     two-pass transcribe) deliberately left unsolved rather than worked
+     around. Typed text has no equivalent problem: the text already
+     exists before detection runs.
+  3. **A defined, honest fallback for out-of-scope detection**: the real
+     `fasttext-lid176` model (ADR-027) can return any of its 176
+     ISO-639 labels, a strict superset of this app's 12 supported codes,
+     and can never emit `"hinglish"` (not in its label space). Letting an
+     out-of-scope label reach the LLM call or get persisted as `Turn.
+     Language` would be silently wrong; falling back to `defaultLanguage`
+     keeps behavior defined while `Turn.DetectedLanguage` still honestly
+     records whatever langid actually returned.
+  4. **Reusing the existing detection call, not adding a second one**:
+     `SendMessage` already called `detectLanguage` on the user's text for
+     `Turn.DetectedLanguage` before this change; resolving `"auto"` reads
+     that same result rather than invoking `langid` twice per turn.
+  5. **Zero TTS-trigger code change needed**: `speakReply` already reads
+     the *returned* `assistantTurn.language` from the backend, not
+     `SettingsStore` again — once Go resolves `"auto"` into a concrete
+     language before persisting/returning the turn, the existing,
+     unmodified TTS call site picks the correct voice automatically.
+  6. **The optimistic user-turn append needed a real fix, not a
+     workaround**: `ConversationRealService.sendUserTurn` appends the
+     user's turn to the UI immediately, before the backend responds. If
+     the raw `"auto"` request value were used as that optimistic turn's
+     `language`, `message-bubble.ts`'s `languageLabel(turn.language)`
+     would render the literal string "auto" — and, since that user turn
+     was never previously reconciled with the server's response, would
+     have shown it *permanently*. Fixed two ways: the optimistic turn
+     now shows the current `preferredLanguage()` pin as a placeholder
+     (never the literal `"auto"`, since `Turn.language: LanguageCode`
+     never includes it), and a new `replaceTurn` swaps that placeholder
+     for the server's resolved turn once the response arrives — a real
+     correctness fix this milestone's frontend work exposed, not
+     optional polish.
+- **Alternatives considered:**
+  - **Default auto-detect to on for everyone** — rejected: a silent
+    behavior change for existing users on upgrade, contrary to this
+    project's privacy/control-first principles (`AGENTS.md` §10).
+  - **Also wire `/voice/turn`** — rejected this milestone: needs its own
+    design for the ASR-hint chicken-and-egg problem (ADR-018), which is
+    a separate, harder effort than typed chat's detect-after-text-exists
+    case; explicitly deferred rather than worked around with something
+    fragile.
+  - **Silently clamping an out-of-scope detected language to `"en"`
+    instead of a named `defaultLanguage` fallback** — rejected in favor
+    of a named constant mirroring the frontend's own `DEFAULT_LANGUAGE`
+    (`"hi"`), so the fallback is one documented, greppable value instead
+    of an incidental default.
+- **Impact:** `backend/internal/conversation/conversation.go`
+  (`autoLanguage`, `defaultLanguage`, `supportedLanguages`,
+  `resolveLanguage`, `SendMessage` rewritten to resolve before
+  generating); `backend/internal/api/dto.go` (`isValidLanguage` accepts
+  `"auto"`); `backend/internal/api/server.go` (`handleVoiceTurn`,
+  `handleTranscribe`, `handleSynthesize` each explicitly reject `"auto"`
+  — the latter two beyond `/voice/turn` alone because `isValidLanguage`
+  becoming globally permissive to `"auto"` would otherwise let it reach
+  them too); `docs/openapi/chat.yaml` (`"auto"` documented, plus a stale
+  `detectedLanguage` doc comment fixed to describe the real
+  `fasttext-lid176` model instead of Milestone 6a's placeholder);
+  `docs/openapi/voice.yaml` (explicit note + 400 case that `"auto"` is
+  rejected). Frontend: `core/models/language.model.ts`
+  (`ChatLanguageRequest`, `AUTO_DETECT_OPTION`); `core/services/
+  settings.store.ts` (`autoDetectLanguage`, `effectiveChatLanguage`);
+  `core/services/conversation.service.ts` (`sendUserTurn`'s `language`
+  widened to `ChatLanguageRequest`); `core/services/
+  conversation.real.service.ts` (optimistic-turn placeholder +
+  `replaceTurn` reconciliation, described above); `assistant/
+  text-input-bar/text-input-bar.ts` (sends `effectiveChatLanguage()`);
+  `assistant/mic-button/mic-button.ts` (comment only, no functional
+  change); `shared/components/language-selector/` and `settings/
+  language-preferences/` (new "Auto-detect" entry, both places a
+  language pin is set). New Go tests in `conversation_test.go`
+  (`resolveLanguage`, no Docker needed) and `conversation_integration
+  _test.go` (`SendMessage` auto-mode, Docker-gated like its neighbors);
+  new `internal/api` handler tests for all four endpoints' `"auto"`
+  acceptance/rejection. New/updated frontend tests for `SettingsStore`,
+  `LanguageSelector`, `LanguagePreferences`, `TextInputBar`, and
+  `ConversationRealService`. No `ai-services` change — Go resolves
+  `"auto"` before Python ever sees a request; no change to which model
+  `langid` uses (`fasttext-lid176` stays as ADR-027 selected it).
+- **Status:** Accepted.
+
+## ADR-031 - Phase 6 Milestone 6f: Maithili — real evidence gathered, not enabled
+
+- **Decision:** Wired Maithili (`mai`) into the same per-language
+  scaffolding every prior language uses — `backend/internal/api/dto.go`'s
+  `validLanguages`, `internal/conversation`'s `supportedLanguages`,
+  `docs/openapi/chat.yaml`'s `LanguageCode` enum, the frontend's
+  `LanguageCode` union and `LANGUAGE_OPTIONS` (disabled), the Devanagari
+  `[lang='mai']` font-stack rule, and a new `mms-tts-mai` TTS candidate in
+  `models.yaml` — then measured all four capabilities against real
+  fixtures rather than assuming any of them would work. **Left
+  `LANGUAGE_OPTIONS`'s `mai.enabled` at `false`**: the results below are
+  real, not marginal, and materially different in kind from every
+  language enabled so far.
+- **Reason — four real, measured findings, each checked directly against
+  the actual installed code/model, not assumed:**
+  1. **LLM: fails outright, not just weakly.** Ran the already-selected
+     `llama-3.2-3b-instruct` directly against all four Maithili fixtures.
+     It understood every prompt correctly (answered "capital of India"
+     correctly, told an on-topic story, greeted appropriately) but
+     **replied in standard Hindi every single time, never Maithili** —
+     0/4, against `docs/EVALUATION.md` §3's ">95% of turns" language-
+     fidelity target. This is categorically different from Malayalam's
+     result (ADR-028: "fluent, on-topic Malayalam, no code change
+     needed") — comprehension works, generation defaults to the nearest
+     language the model actually has real training data for. (Also
+     fixed a real, necessary gap found along the way: `llama_cpp_engine.
+     py`'s `_LANGUAGE_NAMES` display-name map had no `"mai"` entry either
+     — every prior language including `ml` needed one added when it was
+     introduced; without it the system prompt would have said "reply in
+     mai" verbatim, an even weaker signal than "reply in Maithili".)
+  2. **langid: real, but the weakest result any language has measured
+     with the selected model.** Loaded `models/langid/lid.176.bin`
+     directly and confirmed `mai` is one of its 176 labels (unlike
+     Whisper, fastText does have real Maithili training data) — then ran
+     `scripts/benchmark_langid.py` for real: `fasttext-lid176` (the
+     already-selected model, ADR-027) scored **50% (2/4)** on Maithili,
+     misclassifying `mai-story` as `ne` (Nepali) and `mai-greeting` as
+     `hi` — plausible confusions given how closely Maithili, Nepali, and
+     Hindi share vocabulary in short phrases, not a technical failure.
+     Below every other configured language's accuracy with this model
+     except Hinglish's already-documented 0% (ADR-027).
+  3. **TTS: a real candidate exists, and fails the same way Malayalam's
+     did.** `facebook/mms-tts-mai` (CC-BY-NC-4.0) is a real, published
+     MMS checkpoint — added to `models.yaml` and downloaded for real.
+     `scripts/benchmark_tts.py`'s synthesize-then-transcribe proxy
+     measured WER **100%, 125%, 100%, 150%** across the four fixtures
+     (mean 118.75%) — same 100–150% range Malayalam's own TTS candidate
+     failed at (ADR-028), against the `docs/EVALUATION.md` §5 target of
+     <10%. The proxy itself is doubly unreliable here in a way it wasn't
+     for Malayalam: the transcription half of the proxy can't force
+     Whisper into a Maithili mode either (see finding 4), so even this
+     100–150% number is measuring transcribed-back *something*, not
+     cleanly isolating TTS quality — stated as a real limitation, not
+     hidden.
+  4. **ASR: a capability gap, and — checked directly, not assumed —
+     silently the *wrong kind* of gap.** `faster-whisper`'s language
+     table has no `"mai"` entry (confirmed against its tokenizer, and
+     upstream OpenAI Whisper's own on GitHub) — a capability gap, unlike
+     Malayalam's accuracy gap (ADR-029), which at least had a valid `"ml"`
+     code. The real, checked-not-assumed part: this project's own
+     `FasterWhisperEngine._WHISPER_LANGUAGE_HINTS` dict doesn't propagate
+     an unmapped code into a call that would raise a clean error — `.get()`
+     returns `None` for `"mai"`, and `WhisperModel.transcribe(language=
+     None, ...)` falls back to Whisper's own auto-detection, exactly
+     ADR-018's already-documented wrong-script failure mode for
+     un-hinted Hinglish. `backend/internal/api/server.go`'s
+     `handleVoiceTurn`/`handleTranscribe` reject `"mai"` outright with a
+     clean `400` specifically *because* of this — an unrejected request
+     would silently produce a wrong-language transcript, not fail loudly.
+  - **Why not enable anyway, on the Hinglish/Malayalam "ship with a known
+    gap" precedent (ADR-020/ADR-028)?** That precedent was always about a
+    *secondary* channel (voice output, or an ASR quality weakness) while
+    the *primary* channel — typed chat replying in the right language —
+    still worked. Here the primary channel is what fails: the LLM never
+    replies in Maithili at all. Enabling `mai` today would mean shipping
+    a language selector entry where every single typed reply comes back
+    in Hindi instead — not a degraded experience, a non-functional one.
+    That distinction, not a numeric threshold, is why this milestone
+    stops short of flipping `enabled: true` and instead puts the decision
+    to the user explicitly, per `AGENTS.md` §14.
+- **Alternatives considered:**
+  - **Source Maithili benchmark text from FLORES-200's `mai_Deva` split**
+    (Meta, CC-BY-SA-4.0, professionally translated) as originally
+    planned — every hosting mirror checked (`openlanguagedata/
+    flores_plus`, `facebook/flores`) is gated behind Hugging Face
+    authentication unavailable in this environment. Fell back to four
+    directly-composed fixtures using well-documented Maithili grammar
+    (the `अछि`/`छी` copulas, `टा` classifier, `अहाँ`/`हमरा` pronouns, `क`
+    genitive) — the same "written directly, not sourced from a certified
+    corpus" basis the pre-existing Hindi/Malayalam fixtures already have,
+    stated explicitly in `eval_data/asr_fixtures.yaml` rather than
+    implied. A native-speaker review of these four sentences before
+    treating any result above as final would be a reasonable next step.
+  - **Add a `"mai"` entry to `_WHISPER_LANGUAGE_HINTS` pointing at a
+    close relative's code (e.g. `"hi"`)** so voice input at least
+    produces *some* transcript — rejected: this would silently transcribe
+    Maithili speech as if it were Hindi, actively misleading rather than
+    honestly unsupported, worse than the clean 400 shipped instead.
+  - **Duplicate `test_synthesize_dispatches_to_the_requested_language`'s
+    pattern for `"mai"` specifically** — rejected: that test already
+    proves the language-dispatch mechanism generically using a synthetic
+    second language (it already used `"ml"` as its example); a `"mai"`
+    copy would exercise the identical generic code path a third time for
+    zero additional coverage, the kind of duplication `AGENTS.md` §4
+    warns against. No registry/dispatch code changed this milestone at
+    all, so there was nothing new at that layer to test.
+- **Impact:** `backend/internal/api/dto.go` (`validLanguages`,
+  `maithiliLanguage`), `internal/api/server.go` (`handleVoiceTurn`/
+  `handleTranscribe` reject `mai`), `internal/conversation/
+  conversation.go` (`supportedLanguages`); `docs/openapi/{chat,voice,
+  speech}.yaml`; `ai-services/models.yaml` (`mai` TTS entry,
+  `mms-tts-mai` candidate), `ai-services/eval_data/asr_fixtures.yaml`
+  (four `mai-*` fixtures), `ai-services/app/engines/llama_cpp_engine.py`
+  (`_LANGUAGE_NAMES["mai"]`); `benchmark_results/langid_milestone_6b.json`
+  and `benchmark_results/tts_milestone_4b.json` re-run and updated (both
+  are living, re-run-per-milestone artifacts, not frozen snapshots — same
+  convention Milestone 6c/6d already established). Frontend:
+  `core/models/language.model.ts` (`LanguageCode`, `LANGUAGE_OPTIONS`
+  disabled entry), `core/models/example-prompt.model.ts` and
+  `core/services/conversation.mock.service.ts` (compiler-forced `Record<
+  LanguageCode, string>` cascades), `assistant/message-bubble/
+  message-bubble.ts` (`SCRIPT_SPECIFIC_LANGUAGES`), `styles.scss`
+  (`[lang='mai']`, reuses the Devanagari stack — no new font). No change
+  to `langid`/`llm`/`asr` model *selection* (ADR-016/ADR-018/ADR-027 all
+  unchanged) — this milestone only measured whether Maithili works with
+  what's already selected.
+- **Status:** Accepted (as a diagnostic, matching Milestone 6d's Malayalam-
+  ASR precedent) — real evidence gathered and honestly recorded, `mai`
+  wired into every layer's config, but **not enabled**, pending the
+  user's explicit call on whether to ship it anyway per `AGENTS.md` §14.

@@ -28,6 +28,13 @@ paths:
           required: true
           schema:
             $ref: "./chat.yaml#/components/schemas/LanguageCode"
+          description: >
+            A concrete language only. Rejects the "auto" sentinel
+            (docs/DECISIONS.md ADR-030 — POST /chat accepts it, this
+            endpoint needs a real hint before transcription even runs)
+            and rejects `mai` (Maithili, docs/DECISIONS.md ADR-031 —
+            `faster-whisper` has no Maithili language code at all, a
+            capability gap, not an accuracy one), both with a 400.
       requestBody:
         required: true
         content:
@@ -50,9 +57,10 @@ paths:
                 transcript: "आज मौसम कैसा है?"
         "400":
           description: >
-            Missing/unrecognized language code, empty or oversized audio
-            body, or no speech was recognized in the recording (e.g.
-            silence) — the call succeeded but produced nothing to send.
+            Missing/unrecognized language code (including "auto" and
+            "mai" — see above), empty or oversized audio body, or no
+            speech was recognized in the recording (e.g. silence) — the
+            call succeeded but produced nothing to send.
           content:
             application/json:
               schema:

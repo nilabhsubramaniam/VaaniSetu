@@ -24,4 +24,5 @@ export const EXAMPLE_PROMPTS: Record<LanguageCode, string> = {
   ml: 'ഇന്നത്തെ കാലാവസ്ഥ എങ്ങനെയുണ്ട്?',
   pa: 'ਅੱਜ ਦਾ ਮੌਸਮ ਕਿਵੇਂ ਹੈ?',
   or: 'ଆଜିର ପାଣିପାଗ କେମିତି?',
+  mai: 'आइ मौसम कहन अछि?',
 };

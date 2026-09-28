@@ -1,5 +1,5 @@
-import { Injectable, signal } from '@angular/core';
-import type { LanguageCode } from '../models/language.model';
+import { Injectable, computed, signal } from '@angular/core';
+import type { ChatLanguageRequest, LanguageCode } from '../models/language.model';
 import type { VoiceCode } from '../models/voice.model';
 
 const STORAGE_KEY = 'vaanisetu.settings.preferredLanguage';
@@ -7,6 +7,9 @@ const DEFAULT_LANGUAGE: LanguageCode = 'hi';
 
 const VOICE_STORAGE_KEY = 'vaanisetu.settings.preferredVoice';
 const DEFAULT_VOICE: VoiceCode = 'female';
+
+const AUTO_DETECT_STORAGE_KEY = 'vaanisetu.settings.autoDetectLanguage';
+const DEFAULT_AUTO_DETECT = false;
 
 /**
  * The pieces of state that genuinely need to persist and be shared across
@@ -30,6 +33,20 @@ export class SettingsStore {
   private readonly _preferredVoice = signal<VoiceCode>(readStoredVoice());
   readonly preferredVoice = this._preferredVoice.asReadonly();
 
+  private readonly _autoDetectLanguage = signal<boolean>(readStoredAutoDetect());
+  readonly autoDetectLanguage = this._autoDetectLanguage.asReadonly();
+
+  /**
+   * What a *typed* chat message should send as its `language` (Phase 6
+   * Milestone 6e, `docs/DECISIONS.md` ADR-030): the "auto" sentinel when
+   * auto-detect is on, otherwise the pinned `preferredLanguage` exactly as
+   * before. Voice turns are out of scope this milestone and keep reading
+   * `preferredLanguage()` directly — see `mic-button.ts`.
+   */
+  readonly effectiveChatLanguage = computed<ChatLanguageRequest>(() =>
+    this._autoDetectLanguage() ? 'auto' : this._preferredLanguage(),
+  );
+
   setPreferredLanguage(code: LanguageCode): void {
     this._preferredLanguage.set(code);
     try {
@@ -37,6 +54,19 @@ export class SettingsStore {
     } catch {
       // Private browsing / storage disabled — the preference just won't
       // survive a reload. Not a functional requirement for Phase 1.
+    }
+  }
+
+  /**
+   * Turning auto-detect on leaves the stored `preferredLanguage` untouched
+   * so turning it back off restores the user's last concrete pin.
+   */
+  setAutoDetectLanguage(enabled: boolean): void {
+    this._autoDetectLanguage.set(enabled);
+    try {
+      localStorage.setItem(AUTO_DETECT_STORAGE_KEY, String(enabled));
+    } catch {
+      // Same fallback as setPreferredLanguage above.
     }
   }
 
@@ -65,5 +95,14 @@ function readStoredVoice(): VoiceCode {
     return (stored as VoiceCode | null) ?? DEFAULT_VOICE;
   } catch {
     return DEFAULT_VOICE;
+  }
+}
+
+function readStoredAutoDetect(): boolean {
+  try {
+    const stored = localStorage.getItem(AUTO_DETECT_STORAGE_KEY);
+    return stored === null ? DEFAULT_AUTO_DETECT : stored === 'true';
+  } catch {
+    return DEFAULT_AUTO_DETECT;
   }
 }

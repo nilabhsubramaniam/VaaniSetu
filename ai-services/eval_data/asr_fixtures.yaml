@@ -32,6 +32,24 @@
 # original) — the only Malayalam ASR+TTS evidence available in this
 # environment, and a real, stated limitation (docs/DECISIONS.md ADR-028),
 # not something hidden.
+#
+# Milestone 6f added the four `mai-*` (Maithili) fixtures below, same
+# no-`voice`-field situation as Malayalam (no macOS Maithili `say` voice
+# either). Note on provenance, stated plainly rather than overclaimed: a
+# real, licensed parallel corpus (FLORES-200's `mai_Deva` split, Meta,
+# CC-BY-SA-4.0) was the intended source, but every hosting mirror checked
+# (`openlanguagedata/flores_plus`, `facebook/flores`) is gated behind
+# Hugging Face authentication not available in this environment. These
+# four sentences were composed directly instead, mirroring the existing
+# Hindi/Malayalam fixtures' own themes and using well-documented Maithili
+# grammar (the `अछि`/`छी` copulas, the `टा` classifier, `अहाँ`/`हमरा`
+# pronouns, the `क` genitive) — the same "written directly, not sourced
+# from a certified corpus" basis the pre-existing Hindi/Malayalam fixtures
+# already have, made explicit here rather than implied. `benchmark_tts.py`
+# and `benchmark_langid.py` measure whether the already-selected models
+# can produce/detect genuine Maithili at all; a native-speaker review of
+# these exact four sentences before treating any result as final would be
+# a reasonable next step, not assumed done here.
 fixtures:
   - id: hi-weather
     language: hi
@@ -77,3 +95,15 @@ fixtures:
   - id: ml-greeting
     language: ml
     text: "നമസ്കാരം, സുഖമാണോ?"
+  - id: mai-weather
+    language: mai
+    text: "आइ मौसम कहन अछि?"
+  - id: mai-capital
+    language: mai
+    text: "भारतक राजधानी की अछि?"
+  - id: mai-story
+    language: mai
+    text: "हमरा एकटा छोट कथा सुनाउ"
+  - id: mai-greeting
+    language: mai
+    text: "प्रणाम, अहाँ कोना छी?"

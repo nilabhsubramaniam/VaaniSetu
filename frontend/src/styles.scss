@@ -59,8 +59,10 @@ body {
 
 // Any element holding Hindi/Hinglish text should prefer the Devanagari
 // stack so mixed-script text (Hinglish included) renders correctly without
-// component-by-component font decisions.
+// component-by-component font decisions. Maithili (Milestone 6f) is
+// written in Devanagari too, so it reuses this same stack — no new font.
 [lang='hi'],
+[lang='mai'],
 .vs-devanagari {
   font-family: var(--vs-font-devanagari);
 }

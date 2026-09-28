@@ -1,7 +1,7 @@
 <fieldset class="card">
   <legend>Language preference</legend>
   <p class="hint">
-    Your pick always wins over automatic detection once detection exists (Phase 3+).
+    Auto-detect picks up the language from what you type; a manual pin always wins over it.
   </p>
 
   <ul class="list" role="radiogroup" aria-label="Preferred language">
@@ -10,10 +10,11 @@
         <button
           type="button"
           class="option"
+          [class.is-auto]="option.code === 'auto'"
           role="radio"
-          [attr.aria-checked]="preferredLanguage() === option.code"
+          [attr.aria-checked]="effectiveSelection() === option.code"
           [disabled]="!option.enabled"
-          [attr.data-selected]="preferredLanguage() === option.code"
+          [attr.data-selected]="effectiveSelection() === option.code"
           (click)="select(option.code)"
         >
           <span [attr.lang]="option.code === 'hi' ? 'hi' : null">{{ option.label }}</span>
@@ -23,6 +24,9 @@
           }
         </button>
       </li>
+      @if (option.code === 'auto') {
+        <li class="list-divider" role="separator" aria-hidden="true"></li>
+      }
     }
   </ul>
 </fieldset>

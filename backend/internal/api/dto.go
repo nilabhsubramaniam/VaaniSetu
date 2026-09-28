@@ -13,13 +13,39 @@ import (
 var validLanguages = map[string]bool{
 	"hi": true, "hinglish": true, "en": true,
 	"bn": true, "gu": true, "mr": true, "ta": true, "te": true,
-	"kn": true, "ml": true, "pa": true, "or": true,
+	"kn": true, "ml": true, "pa": true, "or": true, "mai": true,
 }
 
+// autoLanguage is the sentinel POST /api/v1/chat accepts in place of a
+// concrete LanguageCode, asking conversation.Service to resolve the
+// user's text's own detected language instead (docs/DECISIONS.md
+// ADR-030). It is deliberately not a member of validLanguages — a
+// concrete LanguageCode is never "auto", so isConcreteLanguage below
+// keeps that check separate from "is this valid input at all".
+const autoLanguage = "auto"
+
+// maithiliLanguage is a concrete, valid LanguageCode (unlike
+// autoLanguage) that POST /api/v1/chat and POST /api/v1/speech/synthesize
+// accept normally, but that handleVoiceTurn and handleTranscribe reject
+// outright: faster-whisper's language table has no "mai" entry at all
+// (confirmed against its tokenizer, and upstream OpenAI Whisper's own).
+// Measured, not assumed (docs/DECISIONS.md ADR-031): this project's own
+// FasterWhisperEngine wrapper doesn't propagate an unmapped code into a
+// call that would raise — its hint dict silently returns nil for "mai",
+// which makes the underlying model fall back to its own auto-detection
+// instead of failing cleanly, the exact same wrong-script failure mode
+// ADR-018 already found for un-hinted Hinglish. A capability gap, not
+// the accuracy gap Malayalam had (ADR-029) — voice input for Maithili
+// needs a different ASR engine, out of scope here.
+const maithiliLanguage = "mai"
+
 // isValidLanguage reports whether code is one of the frontend's known
-// LanguageCode values.
+// LanguageCode values, or the "auto" sentinel (valid input for
+// POST /api/v1/chat only — handleVoiceTurn rejects "auto" itself with
+// its own explicit check, since voice turns can't support it yet;
+// ADR-030).
 func isValidLanguage(code string) bool {
-	return validLanguages[code]
+	return validLanguages[code] || code == autoLanguage
 }
 
 // validVoices mirrors the two voices ai-services' models.yaml `tts`
@@ -51,9 +77,10 @@ type turnDTO struct {
 	LatencyMs *int32  `json:"latencyMs,omitempty"`
 	Script    *string `json:"script,omitempty"`
 	// DetectedLanguage is the langid capability's classification (Phase 6
-	// Milestone 6a, docs/DECISIONS.md ADR-026) — not yet used to drive any
-	// behavior, carried through for a future milestone the same way
-	// Script was before any UI used it.
+	// Milestone 6a, docs/DECISIONS.md ADR-026). When the request's
+	// Language was "auto", this is also what conversation.Service
+	// resolved Language to (ADR-030) — otherwise it's purely observational,
+	// alongside whatever concrete Language was manually pinned.
 	DetectedLanguage *string `json:"detectedLanguage,omitempty"`
 }
 
@@ -70,7 +97,10 @@ func turnToDTO(t conversation.Turn) turnDTO {
 	}
 }
 
-// chatRequest is the POST /api/v1/chat request body.
+// chatRequest is the POST /api/v1/chat request body. Language accepts the
+// "auto" sentinel (docs/DECISIONS.md ADR-030) in addition to a concrete
+// LanguageCode — conversation.Service resolves it to the user's text's
+// own detected language before generating a reply.
 type chatRequest struct {
 	Text     string `json:"text"`
 	Language string `json:"language"`

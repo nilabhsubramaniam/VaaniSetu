@@ -33,6 +33,25 @@ paths:
           required: true
           schema:
             $ref: "./chat.yaml#/components/schemas/LanguageCode"
+          description: >
+            A concrete language only — unlike POST /chat
+            (docs/openapi/chat.yaml), this endpoint does not accept the
+            "auto" sentinel (docs/DECISIONS.md ADR-030) and rejects it
+            with a 400 if sent. Automatic detection needs the language
+            *before* transcription runs, and un-hinted Whisper
+            auto-detection was already found to transcribe romanized
+            Hinglish speech into the wrong script (docs/DECISIONS.md
+            ADR-018) — a real problem this milestone deliberately leaves
+            unsolved rather than working around it. Also rejects `mai`
+            (Maithili) with a 400: the underlying `faster-whisper` engine
+            has no Maithili language code at all, a capability gap rather
+            than an accuracy one (docs/DECISIONS.md ADR-031). Measured,
+            not assumed: this project's own ASR wrapper silently falls
+            back to Whisper's own auto-detection for an unmapped code
+            rather than erroring, so leaving `mai` unrejected would
+            produce a wrong-language transcript, not a clean failure —
+            the same failure mode ADR-018 already found for un-hinted
+            Hinglish.
         - name: voice
           in: query
           required: false
@@ -85,8 +104,10 @@ paths:
                           docs/DECISIONS.md ADR-024.
         "400":
           description: >
-            Missing/unrecognized language code or voice, malformed/empty
-            audio body, or no speech was recognized in the recording.
+            Missing/unrecognized language code (including the "auto"
+            sentinel and "mai"/Maithili, both of which POST /chat accepts
+            but this endpoint does not) or voice, malformed/empty audio
+            body, or no speech was recognized in the recording.
           content:
             application/json:
               schema:

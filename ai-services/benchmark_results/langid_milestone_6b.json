@@ -67,6 +67,26 @@
       "id": "ml-greeting",
       "language": "ml",
       "text": "നമസ്കാരം, സുഖമാണോ?"
+    },
+    {
+      "id": "mai-weather",
+      "language": "mai",
+      "text": "आइ मौसम कहन अछि?"
+    },
+    {
+      "id": "mai-capital",
+      "language": "mai",
+      "text": "भारतक राजधानी की अछि?"
+    },
+    {
+      "id": "mai-story",
+      "language": "mai",
+      "text": "हमरा एकटा छोट कथा सुनाउ"
+    },
+    {
+      "id": "mai-greeting",
+      "language": "mai",
+      "text": "प्रणाम, अहाँ कोना छी?"
     }
   ],
   "results": [
@@ -74,23 +94,27 @@
       "key": "indiclid",
       "repo_id": "ai4bharat/IndicLID",
       "license": "MIT",
-      "load_seconds": 5.365,
-      "overall_accuracy": 0.6667,
+      "load_seconds": 7.64,
+      "overall_accuracy": 0.5,
       "per_language_accuracy": {
+        "en": {
+          "count": 2,
+          "accuracy": 1.0
+        },
         "hi": {
           "count": 4,
           "accuracy": 0.5
+        },
+        "hinglish": {
+          "count": 2,
+          "accuracy": 0.0
         },
         "ml": {
           "count": 4,
           "accuracy": 1.0
         },
-        "en": {
-          "count": 2,
-          "accuracy": 1.0
-        },
-        "hinglish": {
-          "count": 2,
+        "mai": {
+          "count": 4,
           "accuracy": 0.0
         }
       },
@@ -117,11 +141,11 @@
           "hi": 0,
           "hinglish": 0,
           "en": 0,
-          "other": 4
+          "other": 8
         }
       },
       "failed_fixture_count": 0,
-      "peak_rss_mb": 3025.8,
+      "peak_rss_mb": 2503.1,
       "runs": [
         {
           "fixture_id": "hi-weather",
@@ -130,7 +154,7 @@
           "predicted_language": "",
           "confidence": 1.0,
           "correct": false,
-          "latency_seconds": 0.0003
+          "latency_seconds": 0.0002
         },
         {
           "fixture_id": "hi-capital",
@@ -166,7 +190,7 @@
           "predicted_language": "bn",
           "confidence": 0.9041,
           "correct": false,
-          "latency_seconds": 0.0003
+          "latency_seconds": 0.0002
         },
         {
           "fixture_id": "hinglish-joke",
@@ -175,7 +199,7 @@
           "predicted_language": "",
           "confidence": 0.964,
           "correct": false,
-          "latency_seconds": 0.0002
+          "latency_seconds": 0.0001
         },
         {
           "fixture_id": "en-learn-hindi",
@@ -184,7 +208,7 @@
           "predicted_language": "en",
           "confidence": 0.9717,
           "correct": true,
-          "latency_seconds": 0.0003
+          "latency_seconds": 0.0002
         },
         {
           "fixture_id": "en-schedule",
@@ -193,7 +217,7 @@
           "predicted_language": "en",
           "confidence": 0.9953,
           "correct": true,
-          "latency_seconds": 0.0393
+          "latency_seconds": 0.0346
         },
         {
           "fixture_id": "ml-weather",
@@ -202,7 +226,7 @@
           "predicted_language": "ml",
           "confidence": 1.0,
           "correct": true,
-          "latency_seconds": 0.0003
+          "latency_seconds": 0.0002
         },
         {
           "fixture_id": "ml-capital",
@@ -230,6 +254,42 @@
           "confidence": 1.0,
           "correct": true,
           "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "mai-weather",
+          "language": "mai",
+          "text": "आइ मौसम कहन अछि?",
+          "predicted_language": "",
+          "confidence": 1.0,
+          "correct": false,
+          "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "mai-capital",
+          "language": "mai",
+          "text": "भारतक राजधानी की अछि?",
+          "predicted_language": "",
+          "confidence": 1.0,
+          "correct": false,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "mai-story",
+          "language": "mai",
+          "text": "हमरा एकटा छोट कथा सुनाउ",
+          "predicted_language": "",
+          "confidence": 1.0,
+          "correct": false,
+          "latency_seconds": 0.0001
+        },
+        {
+          "fixture_id": "mai-greeting",
+          "language": "mai",
+          "text": "प्रणाम, अहाँ कोना छी?",
+          "predicted_language": "",
+          "confidence": 1.0,
+          "correct": false,
+          "latency_seconds": 0.0001
         }
       ]
     },
@@ -237,23 +297,27 @@
       "key": "fasttext-lid176",
       "repo_id": "facebook/fastText (lid.176)",
       "license": "CC-BY-SA-3.0",
-      "load_seconds": 0.058,
-      "overall_accuracy": 0.8333,
+      "load_seconds": 0.055,
+      "overall_accuracy": 0.75,
       "per_language_accuracy": {
-        "hinglish": {
-          "count": 2,
-          "accuracy": 0.0
-        },
-        "en": {
-          "count": 2,
-          "accuracy": 1.0
-        },
         "ml": {
           "count": 4,
           "accuracy": 1.0
         },
+        "mai": {
+          "count": 4,
+          "accuracy": 0.5
+        },
+        "hinglish": {
+          "count": 2,
+          "accuracy": 0.0
+        },
         "hi": {
           "count": 4,
+          "accuracy": 1.0
+        },
+        "en": {
+          "count": 2,
           "accuracy": 1.0
         }
       },
@@ -277,14 +341,14 @@
           "other": 0
         },
         "other": {
-          "hi": 0,
+          "hi": 1,
           "hinglish": 0,
           "en": 0,
-          "other": 4
+          "other": 7
         }
       },
       "failed_fixture_count": 0,
-      "peak_rss_mb": 174.5,
+      "peak_rss_mb": 174.8,
       "runs": [
         {
           "fixture_id": "hi-weather",
@@ -392,6 +456,42 @@
           "predicted_language": "ml",
           "confidence": 0.9977,
           "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "mai-weather",
+          "language": "mai",
+          "text": "आइ मौसम कहन अछि?",
+          "predicted_language": "mai",
+          "confidence": 0.78,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "mai-capital",
+          "language": "mai",
+          "text": "भारतक राजधानी की अछि?",
+          "predicted_language": "mai",
+          "confidence": 0.5013,
+          "correct": true,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "mai-story",
+          "language": "mai",
+          "text": "हमरा एकटा छोट कथा सुनाउ",
+          "predicted_language": "ne",
+          "confidence": 0.4801,
+          "correct": false,
+          "latency_seconds": 0.0
+        },
+        {
+          "fixture_id": "mai-greeting",
+          "language": "mai",
+          "text": "प्रणाम, अहाँ कोना छी?",
+          "predicted_language": "hi",
+          "confidence": 0.718,
+          "correct": false,
           "latency_seconds": 0.0
         }
       ]

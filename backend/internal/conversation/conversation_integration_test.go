@@ -165,6 +165,69 @@ func TestService_SendMessage_LangIDFailureDoesNotFailTheTurn(t *testing.T) {
 	}
 }
 
+func TestService_SendMessage_AutoResolvesToDetectedLanguage(t *testing.T) {
+	// The fake langid client (internal/langid/fake.go) detects "en" for
+	// Latin-script text with no Devanagari — real enough to prove "auto"
+	// drives the LLM call and both turns' Language (docs/DECISIONS.md
+	// ADR-030), without needing the real fasttext-lid176 model here.
+	svc := newTestService(t, llm.NewFakeLLMClient())
+	ctx := context.Background()
+
+	userTurn, assistantTurn, err := svc.SendMessage(ctx, "hello there", "auto")
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+	if userTurn.Language != "en" {
+		t.Errorf("userTurn.Language = %q, want %q (resolved from detection)", userTurn.Language, "en")
+	}
+	if assistantTurn.Language != "en" {
+		t.Errorf("assistantTurn.Language = %q, want %q (resolved from detection)", assistantTurn.Language, "en")
+	}
+	if userTurn.DetectedLanguage == nil || *userTurn.DetectedLanguage != "en" {
+		t.Errorf("userTurn.DetectedLanguage = %v, want \"en\"", userTurn.DetectedLanguage)
+	}
+}
+
+func TestService_SendMessage_AutoFallsBackToDefaultWhenDetectionFails(t *testing.T) {
+	// A langid failure is non-fatal (ADR-026) — "auto" must still resolve
+	// to something usable rather than sending "auto" itself to the LLM.
+	svc := newTestServiceWithLangID(t, llm.NewFakeLLMClient(), failingLangIDClient{})
+	ctx := context.Background()
+
+	userTurn, assistantTurn, err := svc.SendMessage(ctx, "hello", "auto")
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+	if userTurn.Language != "hi" {
+		t.Errorf("userTurn.Language = %q, want the default \"hi\" fallback", userTurn.Language)
+	}
+	if assistantTurn.Language != "hi" {
+		t.Errorf("assistantTurn.Language = %q, want the default \"hi\" fallback", assistantTurn.Language)
+	}
+}
+
+func TestService_SendMessage_ManualPinUnaffectedByAutoLogic(t *testing.T) {
+	// A concrete language must pass through unchanged even though the
+	// fake langid client would detect something different for this text —
+	// a manual pin always wins (docs/PROJECT_GOAL.md §6).
+	svc := newTestService(t, llm.NewFakeLLMClient())
+	ctx := context.Background()
+
+	userTurn, assistantTurn, err := svc.SendMessage(ctx, "hello there", "hi")
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+	if userTurn.Language != "hi" {
+		t.Errorf("userTurn.Language = %q, want the manually pinned \"hi\"", userTurn.Language)
+	}
+	if assistantTurn.Language != "hi" {
+		t.Errorf("assistantTurn.Language = %q, want the manually pinned \"hi\"", assistantTurn.Language)
+	}
+	if userTurn.DetectedLanguage == nil || *userTurn.DetectedLanguage != "en" {
+		t.Errorf("userTurn.DetectedLanguage = %v, want the fake client's real detection (\"en\") to still be recorded, unclamped", userTurn.DetectedLanguage)
+	}
+}
+
 type failingLangIDClient struct{}
 
 func (failingLangIDClient) Detect(context.Context, langid.DetectRequest) (langid.DetectResponse, error) {
