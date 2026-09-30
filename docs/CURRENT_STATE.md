@@ -24,18 +24,20 @@ project moves between milestones or a phase's status changes.
   Maithili has — ADR-035) — all complete, with known remaining gaps, see
   below; this closes evidence-gathering for all eight of the phase's
   originally-named languages. Milestone 6g (closing Maithili's
-  LLM-generation and ASR-capability blockers) is **in progress, paused
-  mid-milestone** — see below; it is the only work remaining in Phase 6's
-  currently-scoped work, with no milestone approved yet to resume it.
-- **Current focus:** none of Phase 6's remaining scope is currently
-  approved to start (Milestone 6g's resume is the only thing left named)
-  — see `AGENTS.md` §5. Milestone 6g is paused, not abandoned — its
-  LLM-generation experiments concluded negative (see below); its
-  ASR-capability search found two real, MIT-licensed candidates
-  (`ai4bharat/indic-conformer-600m-multilingual`, `ARTPARK-IISc/
-  SraVaani-1.0`), both gated on Hugging Face, paused pending a decision
-  on whether a real account/token is available to attempt access (the
-  same wall `indic-parler-tts` hit in ADR-021).
+  LLM-generation and ASR-capability blockers) is **deferred at the
+  user's explicit request** (2026-09-30), not abandoned — see below for
+  the real evidence gathered before deferring.
+- **Current focus:** none. Phase 6 has no approved work in progress.
+  Milestone 6g's real ASR-candidate search reached a confirmed dead end
+  for now: a valid Hugging Face login was obtained, but both
+  `ai4bharat/indic-conformer-600m-multilingual` and `ARTPARK-IISc/
+  SraVaani-1.0` returned `403 GatedRepoError` — "not in the authorized
+  list" — the same wall `indic-parler-tts` hit in ADR-021. Unlike
+  ADR-021's outright denial, this is an *unresolved* access request
+  (neither approved nor explicitly denied), so it may be worth
+  revisiting later if access is ever granted; the user chose to defer
+  rather than wait on it. Maithili's `LANGUAGE_OPTIONS.mai.enabled`
+  stays `false`.
 - **Last updated:** 2026-09-29 (Phase 6 Milestone 6j: evaluated Odia, the
   last of the phase's originally-named eight languages — **not enabled**,
   a genuinely different outcome from Milestones 6h/6i's six enabled

@@ -312,15 +312,17 @@ degraded" category Maithili is in, so it stays disabled, see ADR-035)
 is complete too. This closes evidence-gathering for all eight of Phase
 6's originally-named languages (seven enabled, Odia not). Milestone 6g
 (closing Maithili's real LLM-generation and ASR-capability blockers) is
-**in progress, paused mid-milestone**: a strengthened system prompt and
-two alternate already-benchmarked LLM candidates were tested and found
-not to fix Maithili's generation gap (worse than the original, in fact —
-see ADR-033's Milestone 6g notes in `docs/CURRENT_STATE.md`); an ASR
-capability search found two real, MIT-licensed candidates, both gated on
-Hugging Face access this environment doesn't yet have confirmed. A
-manual language pin still wins whenever the user sets one, per
-`docs/PROJECT_GOAL.md`. Milestone 6g's resume is the only work remaining
-in Phase 6's currently-scoped work, with no milestone approved yet.
+**deferred at the user's explicit request (2026-09-30)**, not abandoned:
+a strengthened system prompt and two alternate already-benchmarked LLM
+candidates were tested and found not to fix Maithili's generation gap
+(worse than the original, in fact); an ASR capability search found two
+real, MIT-licensed candidates and got as far as a valid Hugging Face
+login, but both returned a `403` "not in the authorized list" — an
+unresolved access request, not an outright denial, so worth revisiting
+if access is ever granted (see ADR-033's Milestone 6g notes in
+`docs/CURRENT_STATE.md`). A manual language pin still wins whenever the
+user sets one, per `docs/PROJECT_GOAL.md`. Phase 6 has no approved work
+in progress.
 See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md`
 ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
@@ -336,9 +338,21 @@ ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 - **Testing / evaluation:** Per-language WER / CER, language-ID accuracy
   (including Hinglish confusion matrix), TTS MOS-proxy, end-to-end task
   success, per `docs/EVALUATION.md`.
-- **Definition of Done:** Every language exposed in the UI has passed its
-  `docs/EVALUATION.md` thresholds and has recorded results; languages that fail
-  stay disabled; docs updated.
+- **Definition of Done:** Every language exposed in the UI has recorded, real
+  results (not assumed) for langid / LLM / ASR / TTS against
+  `docs/EVALUATION.md`'s thresholds. **Updated from the original wording**
+  ("languages that fail stay disabled") to match the policy actually applied,
+  repeatedly, starting with Malayalam (ADR-028) and confirmed again for seven
+  more languages since (ADR-033/034): a language stays disabled only when a
+  **primary-channel capability is broken** — the LLM cannot reliably produce
+  the language at all (Maithili, ADR-031; Odia, ADR-035), or ASR has no real
+  support for the language whatsoever (same two). A language ships enabled
+  despite failing WER/TTS *quality* thresholds — voice output/input staying
+  weak while typed chat works fully is a degraded experience, not a
+  non-functional one (ADR-020's non-fatal-TTS precedent, extended to ASR
+  quality the same way). Every enable/disable call is still put to the user
+  rather than decided silently (`AGENTS.md` §14), and recorded as an ADR
+  either way; docs updated in the same task.
 - **Explicitly deferred:** Fine-tuning to fix weak languages (Phase 10).
 
 ---
