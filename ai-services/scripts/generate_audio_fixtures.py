@@ -35,6 +35,15 @@ def main() -> int:
     os.makedirs(_OUTPUT_DIR, exist_ok=True)
 
     for fixture in manifest["fixtures"]:
+        if "voice" not in fixture:
+            # Milestone 6c: Malayalam fixtures have no macOS `say` voice
+            # to generate from (none exists — verified via `say -v '?'`)
+            # — they carry no independent audio at all, only
+            # scripts/benchmark_tts.py's synthesize-then-transcribe proxy
+            # measures them (see docs/DECISIONS.md ADR-028).
+            print(f"[skip] {fixture['id']}: no macOS voice available for {fixture['language']!r}")
+            continue
+
         wav_path = os.path.join(_OUTPUT_DIR, f"{fixture['id']}.wav")
         if os.path.isfile(wav_path):
             print(f"[skip] {fixture['id']}: already present")

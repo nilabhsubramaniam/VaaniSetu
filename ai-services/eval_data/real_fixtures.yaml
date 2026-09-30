@@ -1,0 +1,53 @@
+# Phase 6 Milestone 6i's real-audio Gujarati/Marathi ASR diagnostic (see
+# docs/DECISIONS.md ADR-034). Every fixture in asr_fixtures.yaml except
+# `ml-*`/`mai-*` is synthetic, single-speaker, TTS-generated audio — a
+# real, stated limitation that file calls out itself. This one is
+# different: real, human-recorded speech, four short sentences per
+# language hand-picked from the same "Google Speech Corpus" family
+# Milestone 6d already used for Malayalam (eval_data/
+# malayalam_real_fixtures.yaml, kept separate rather than merged in here
+# — it's already shipped and cited by ADR-029, and rewriting a settled
+# milestone's own file to fold it into a later one's naming isn't this
+# milestone's job). This file combines both new languages instead of one
+# small file each, since they share the exact same corpus family,
+# download mechanism, and diagnostic purpose — a real second use of the
+# same pattern, not speculative.
+#
+# Sources, both CC-BY-SA-4.0, cite as:
+#   He, Chu, Kjartansson, Rivera, Katanova, Gutkin, Demirsahin, Johny,
+#   Jansche, Sarin, Pipatsrisawat. "Open-source Multi-speaker Speech
+#   Corpora for Building Gujarati, Kannada, Malayalam, Marathi, Tamil and
+#   Telugu Speech Synthesis Systems." LREC 2020.
+#   - Marathi: OpenSLR resource 64 (https://www.openslr.org/64/)
+#   - Gujarati: OpenSLR resource 78 (https://www.openslr.org/78/)
+#
+# The audio itself is never committed (a dataset, AGENTS.md §12) — this
+# manifest (fixture id + real transcript, both freely reusable under the
+# corpus's CC-BY-SA-4.0 license) is what's committed.
+# scripts/download_real_fixtures.py downloads each corpus (one time) and
+# extracts only these clips into the git-ignored eval_data/audio_real/.
+fixtures:
+  - id: mrt_02436_01445823883
+    language: mr
+    text: "ओह . मी काय मदत करू ?"
+  - id: mrt_09697_00476676389
+    language: mr
+    text: "आता मी ऐकतेय"
+  - id: mrt_09697_01157410292
+    language: mr
+    text: "आपण चॅट करू शकतो"
+  - id: mrt_02624_01936911566
+    language: mr
+    text: "खरंच ? धन्यवाद"
+  - id: guf_01906_00985663318
+    language: gu
+    text: "ઉત્તર દિશામાં જાઓ"
+  - id: guf_01906_02048738580
+    language: gu
+    text: "જમણે વળો"
+  - id: guf_01906_01371727905
+    language: gu
+    text: "જંક્શનને અનુસરો"
+  - id: guf_01906_01600766818
+    language: gu
+    text: "તમે આવી પહોંચ્યાં."

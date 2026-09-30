@@ -24,18 +24,19 @@ func (q *Queries) CreateSession(ctx context.Context) (Session, error) {
 }
 
 const createTurn = `-- name: CreateTurn :one
-INSERT INTO turns (session_id, role, language, text, latency_ms, script)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, session_id, role, language, text, latency_ms, created_at, script
+INSERT INTO turns (session_id, role, language, text, latency_ms, script, detected_language)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, session_id, role, language, text, latency_ms, created_at, script, detected_language
 `
 
 type CreateTurnParams struct {
-	SessionID pgtype.UUID `json:"session_id"`
-	Role      string      `json:"role"`
-	Language  string      `json:"language"`
-	Text      string      `json:"text"`
-	LatencyMs *int32      `json:"latency_ms"`
-	Script    *string     `json:"script"`
+	SessionID        pgtype.UUID `json:"session_id"`
+	Role             string      `json:"role"`
+	Language         string      `json:"language"`
+	Text             string      `json:"text"`
+	LatencyMs        *int32      `json:"latency_ms"`
+	Script           *string     `json:"script"`
+	DetectedLanguage *string     `json:"detected_language"`
 }
 
 func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, error) {
@@ -46,6 +47,7 @@ func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, e
 		arg.Text,
 		arg.LatencyMs,
 		arg.Script,
+		arg.DetectedLanguage,
 	)
 	var i Turn
 	err := row.Scan(
@@ -57,6 +59,7 @@ func (q *Queries) CreateTurn(ctx context.Context, arg CreateTurnParams) (Turn, e
 		&i.LatencyMs,
 		&i.CreatedAt,
 		&i.Script,
+		&i.DetectedLanguage,
 	)
 	return i, err
 }
@@ -75,7 +78,7 @@ func (q *Queries) GetMostRecentSession(ctx context.Context) (Session, error) {
 }
 
 const listTurnsBySession = `-- name: ListTurnsBySession :many
-SELECT id, session_id, role, language, text, latency_ms, created_at, script FROM turns
+SELECT id, session_id, role, language, text, latency_ms, created_at, script, detected_language FROM turns
 WHERE session_id = $1
 ORDER BY created_at ASC
 `
@@ -98,6 +101,7 @@ func (q *Queries) ListTurnsBySession(ctx context.Context, sessionID pgtype.UUID)
 			&i.LatencyMs,
 			&i.CreatedAt,
 			&i.Script,
+			&i.DetectedLanguage,
 		); err != nil {
 			return nil, err
 		}

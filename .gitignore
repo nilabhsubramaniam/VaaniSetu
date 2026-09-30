@@ -42,6 +42,24 @@ venv/
 # does.
 /ai-services/eval_data/audio/
 
+# --- Malayalam real-audio ASR diagnostic (ai-services/, Phase 6 Milestone 6d) ---
+# Real, human-recorded clips extracted from Google's IndicTTS Malayalam
+# corpus (OpenSLR resource 63, CC-BY-SA-4.0) by
+# scripts/download_malayalam_real_fixtures.py — a dataset, per AGENTS.md
+# §12 ("never commit... datasets"), regenerable from the committed
+# eval_data/malayalam_real_fixtures.yaml manifest. The downloaded corpus
+# archive itself (~710MB) is cached here too, not committed.
+/ai-services/eval_data/audio_malayalam_real/
+/ai-services/.cache/
+
+# --- Gujarati/Marathi real-audio ASR diagnostic (ai-services/, Phase 6 Milestone 6i) ---
+# Same reasoning as the Malayalam directory above — real, human-recorded
+# clips from OpenSLR resources 78/64 (CC-BY-SA-4.0) via
+# scripts/download_real_fixtures.py, regenerable from the committed
+# eval_data/real_fixtures.yaml manifest. Downloaded corpus archives are
+# cached in the already-ignored /ai-services/.cache/ above.
+/ai-services/eval_data/audio_real/
+
 # --- Go (backend/, Phase 2+) ---
 # Compiled output and test binaries; go.sum/go.mod stay tracked. `go build
 # ./...` from backend/ with no -o flag names the binary after the cmd/

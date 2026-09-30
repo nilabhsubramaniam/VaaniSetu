@@ -34,7 +34,7 @@ Microphone -> VAD -> Speech-to-Text -> Language Detection -> Local LLM
 
 - **MVP language focus:** Hindi, Hinglish.
 - **Long-term languages:** Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada,
-  Malayalam, Punjabi, Odia.
+  Malayalam, Punjabi, Odia, Maithili.
 
 ## 3. Source-of-truth hierarchy
 

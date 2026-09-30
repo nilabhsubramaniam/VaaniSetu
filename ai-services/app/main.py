@@ -1,9 +1,10 @@
 """VaaniSetu's Python AI service HTTP surface: the `llm` capability
 (proto/llm.openapi.yaml, `POST /v1/generate`), the `asr` capability
-(proto/asr.openapi.yaml, `POST /v1/transcribe`), and the `tts` capability
-(proto/tts.openapi.yaml, `POST /v1/synthesize`), hosted in one FastAPI app
-per docs/DECISIONS.md ADR-017 — "one module per capability" is a
-code-organization convention (docs/DEVELOPMENT.md §5), not a
+(proto/asr.openapi.yaml, `POST /v1/transcribe`), the `tts` capability
+(proto/tts.openapi.yaml, `POST /v1/synthesize`), and the `langid`
+capability (proto/langid.openapi.yaml, `POST /v1/detect`), hosted in one
+FastAPI app per docs/DECISIONS.md ADR-017 — "one module per capability" is
+a code-organization convention (docs/DEVELOPMENT.md §5), not a
 one-process-per-capability deployment rule. Plus an operational
 `/healthz` that neither contract requires but
 docs/ARCHITECTURE.md §3.3 asks every AI service to expose ("model warm /
@@ -25,6 +26,7 @@ from pydantic import BaseModel
 from . import config, registry
 from .engines.asr.base import ASREngine, TranscribeRequest
 from .engines.base import GenerateRequest, LLMEngine
+from .engines.langid.base import DetectRequest, LangIDEngine
 from .engines.tts.base import SynthesizeRequest, TTSEngine
 
 logger = logging.getLogger("vaanisetu.ai_services")
@@ -48,8 +50,11 @@ class _AppState:
     llm_model_key: str | None = None
     asr_engine: ASREngine | None = None
     asr_model_key: str | None = None
-    tts_engines: dict[str, TTSEngine] | None = None
-    tts_model_keys: dict[str, str] | None = None
+    # Nested by language, then voice (Milestone 6c) — {language: {voice: engine}}.
+    tts_engines: dict[str, dict[str, TTSEngine]] | None = None
+    tts_model_keys: dict[str, dict[str, str]] | None = None
+    langid_engine: LangIDEngine | None = None
+    langid_model_key: str | None = None
 
 
 @asynccontextmanager
@@ -65,15 +70,42 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.state.asr_model_key = asr_entry.key
         logger.info("asr model loaded: %s (%s)", asr_entry.key, asr_entry.repo_id)
 
-        tts_engines: dict[str, TTSEngine] = {}
-        tts_model_keys: dict[str, str] = {}
-        for voice in _TTS_VOICES:
-            tts_entry = registry.load_selected_entry(_cfg.model_registry_path, "tts", voice=voice)
-            tts_engines[voice] = registry.build_engine(tts_entry, _cfg.tts_model_store_dir)
-            tts_model_keys[voice] = tts_entry.key
-            logger.info("tts model loaded (%s): %s (%s)", voice, tts_entry.key, tts_entry.repo_id)
+        tts_engines: dict[str, dict[str, TTSEngine]] = {}
+        tts_model_keys: dict[str, dict[str, str]] = {}
+        # A candidate key can be shared by more than one language (e.g.
+        # `hinglish` reuses the Hindi checkpoints — there is no separate
+        # Hinglish model) — cache by key so it loads into memory once, not
+        # once per language that references it.
+        loaded_by_key: dict[str, TTSEngine] = {}
+        for language in registry.tts_languages(_cfg.model_registry_path):
+            tts_engines[language] = {}
+            tts_model_keys[language] = {}
+            for voice in _TTS_VOICES:
+                tts_entry = registry.load_selected_entry(
+                    _cfg.model_registry_path, "tts", voice=voice, language=language
+                )
+                if tts_entry.key not in loaded_by_key:
+                    loaded_by_key[tts_entry.key] = registry.build_engine(
+                        tts_entry, _cfg.tts_model_store_dir
+                    )
+                    logger.info(
+                        "tts model loaded (%s/%s): %s (%s)",
+                        language,
+                        voice,
+                        tts_entry.key,
+                        tts_entry.repo_id,
+                    )
+                tts_engines[language][voice] = loaded_by_key[tts_entry.key]
+                tts_model_keys[language][voice] = tts_entry.key
         app.state.state.tts_engines = tts_engines
         app.state.state.tts_model_keys = tts_model_keys
+
+        langid_entry = registry.load_selected_entry(_cfg.model_registry_path, "langid")
+        app.state.state.langid_engine = registry.build_engine(
+            langid_entry, _cfg.langid_model_store_dir
+        )
+        app.state.state.langid_model_key = langid_entry.key
+        logger.info("langid model loaded: %s (%s)", langid_entry.key, langid_entry.repo_id)
     except registry.RegistryError as e:
         # Fail loudly at startup rather than on the first request — an
         # operator finds out immediately that a configured model isn't
@@ -102,19 +134,38 @@ def get_asr_engine() -> ASREngine:
     return engine
 
 
-def get_tts_engine(voice: str) -> TTSEngine:
-    """Looks up the loaded engine for `voice` directly (not a `Depends`
-    default, since the caller only knows `voice` once it has parsed the
-    request body — see the `synthesize` handler)."""
+def get_tts_engine(language: str, voice: str) -> TTSEngine:
+    """Looks up the loaded engine for `(language, voice)` directly (not a
+    `Depends` default, since the caller only knows both once it has parsed
+    the request body — see the `synthesize` handler). An unconfigured
+    `language` is a 400, not a 503 — it's not a transient loading state,
+    the capability was never told how to speak that language (Milestone
+    6c; before it, every language silently reused the Hindi engine and
+    failed inside it instead of getting this clear response)."""
     engines = app.state.state.tts_engines
     if not engines:
         raise HTTPException(status_code=503, detail="tts models not loaded")
-    if voice not in engines:
+    engines_by_voice = engines.get(language)
+    if not engines_by_voice:
         raise HTTPException(
             status_code=400,
-            detail=f"unknown voice {voice!r}, expected one of {sorted(engines)}",
+            detail=(
+                f"tts not available for language {language!r}, expected one of {sorted(engines)}"
+            ),
         )
-    return engines[voice]
+    if voice not in engines_by_voice:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown voice {voice!r}, expected one of {sorted(engines_by_voice)}",
+        )
+    return engines_by_voice[voice]
+
+
+def get_langid_engine() -> LangIDEngine:
+    engine = app.state.state.langid_engine
+    if engine is None:
+        raise HTTPException(status_code=503, detail="langid model not loaded")
+    return engine
 
 
 class GenerateRequestBody(BaseModel):
@@ -179,7 +230,7 @@ class SynthesizeRequestBody(BaseModel):
 
 @app.post("/v1/synthesize")
 def synthesize(body: SynthesizeRequestBody) -> Response:
-    engine = get_tts_engine(body.voice)
+    engine = get_tts_engine(body.language, body.voice)
     try:
         result = engine.synthesize(SynthesizeRequest(text=body.text, language=body.language))
     except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
@@ -189,13 +240,43 @@ def synthesize(body: SynthesizeRequestBody) -> Response:
     return Response(content=result.audio, media_type=result.content_type)
 
 
+class DetectRequestBody(BaseModel):
+    text: str
+
+
+class DetectResponseBody(BaseModel):
+    language: str
+    confidence: float
+
+
+@app.post("/v1/detect", response_model=DetectResponseBody)
+def detect(
+    body: DetectRequestBody, engine: LangIDEngine = Depends(get_langid_engine)
+) -> DetectResponseBody:
+    try:
+        result = engine.detect(DetectRequest(text=body.text))
+    except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
+        logger.error("detect failed: %s", e)
+        raise HTTPException(status_code=500, detail="detection failed") from e
+
+    return DetectResponseBody(language=result.language, confidence=result.confidence)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, object]:
     state = app.state.state
-    tts_ready = bool(state.tts_engines) and set(state.tts_engines) == set(_TTS_VOICES)
+    tts_ready = bool(state.tts_engines) and all(
+        set(voices) == set(_TTS_VOICES) for voices in state.tts_engines.values()
+    )
     return {
-        "ready": state.llm_engine is not None and state.asr_engine is not None and tts_ready,
+        "ready": (
+            state.llm_engine is not None
+            and state.asr_engine is not None
+            and tts_ready
+            and state.langid_engine is not None
+        ),
         "llm_model": state.llm_model_key,
         "asr_model": state.asr_model_key,
         "tts_models": state.tts_model_keys or {},
+        "langid_model": state.langid_model_key,
     }

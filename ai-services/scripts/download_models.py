@@ -9,19 +9,43 @@ service or running a benchmark:
 `llama_cpp` candidates (the "llm" capability) are a single GGUF file;
 `faster_whisper` (the "asr" capability) and `mms_vits`/`parler_tts`/`xtts`
 (the "tts" capability) candidates are each a full repo snapshot downloaded
-as a directory — see app/registry.py for how each is resolved back into a
-model path. Weights are never committed (root .gitignore's `/models/`,
-`*.gguf`).
+as a directory; `fasttext_lid` (the "langid" capability) is a single file
+fetched from a direct URL (not a HF repo); `indiclid` (also "langid") is
+three separate direct-URL zip files, extracted in place, plus one HF
+snapshot for its BERT fallback stage's tokenizer — see app/registry.py for
+how each is resolved back into a model path. Weights are never committed
+(root .gitignore's `/models/`, `*.gguf`).
 """
 
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import sys
+import zipfile
 
+import requests
 import yaml
 from huggingface_hub import hf_hub_download, snapshot_download
+
+
+def _download_url_to_file(url: str, dest: str) -> None:
+    response = requests.get(url, stream=True, timeout=60)
+    response.raise_for_status()
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            f.write(chunk)
+
+
+def _download_and_extract_zip(url: str, dest_dir: str) -> None:
+    response = requests.get(url, timeout=60)
+    response.raise_for_status()
+    os.makedirs(dest_dir, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        zf.extractall(dest_dir)
+
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_REGISTRY = os.path.join(_HERE, "..", "models.yaml")
@@ -49,6 +73,36 @@ def _download_one(capability: str, key: str, entry: dict, store_dir: str) -> Non
         print(f"[download] {capability}/{key}: {entry['repo_id']} (full snapshot)")
         path = snapshot_download(repo_id=entry["repo_id"], local_dir=dest_dir)
         print(f"[done] {capability}/{key}: {path}")
+        return
+
+    if entry["engine"] == "fasttext_lid":
+        dest = os.path.join(store_dir, entry["filename"])
+        if os.path.isfile(dest):
+            print(f"[skip] {capability}/{key}: already present at {dest}")
+            return
+        print(f"[download] {capability}/{key}: {entry['download_url']}")
+        _download_url_to_file(entry["download_url"], dest)
+        print(f"[done] {capability}/{key}: {dest}")
+        return
+
+    if entry["engine"] == "indiclid":
+        base_dir = os.path.join(store_dir, key)
+        for part, url in entry["download_urls"].items():
+            part_dir = os.path.join(base_dir, part)
+            if os.path.isdir(part_dir) and os.listdir(part_dir):
+                print(f"[skip] {capability}/{key}/{part}: already present at {part_dir}")
+                continue
+            print(f"[download] {capability}/{key}/{part}: {url}")
+            _download_and_extract_zip(url, part_dir)
+            print(f"[done] {capability}/{key}/{part}: {part_dir}")
+
+        tokenizer_dir = os.path.join(base_dir, "tokenizer")
+        if os.path.isdir(tokenizer_dir) and os.listdir(tokenizer_dir):
+            print(f"[skip] {capability}/{key}/tokenizer: already present at {tokenizer_dir}")
+            return
+        print(f"[download] {capability}/{key}/tokenizer: {entry['bert_tokenizer']}")
+        path = snapshot_download(repo_id=entry["bert_tokenizer"], local_dir=tokenizer_dir)
+        print(f"[done] {capability}/{key}/tokenizer: {path}")
         return
 
     print(f"[skip] {capability}/{key}: unknown engine {entry['engine']!r}")

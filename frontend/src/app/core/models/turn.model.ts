@@ -29,6 +29,16 @@ export interface Turn {
    * per-script font choice) doesn't need a backend change to use it.
    */
   readonly script?: string;
+  /**
+   * The `langid` capability's classification of `text` (Phase 6 Milestone
+   * 6a, docs/DECISIONS.md ADR-026) — currently a placeholder heuristic on
+   * the backend, not real language identification (that's Milestone 6b).
+   * Not rendered anywhere yet and not used to drive any behavior;
+   * `language` above still does. Carried through so a future UI doesn't
+   * need a backend change to use it, the same way `script` was before any
+   * UI used it.
+   */
+  readonly detectedLanguage?: LanguageCode;
   /** Reserved for a future multi-agent backend. Not used in Phase 1. */
   readonly agentId?: string;
 }

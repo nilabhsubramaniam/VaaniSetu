@@ -29,6 +29,16 @@ from .base import ASREngine, TranscribeRequest, TranscribeResponse
 # orthography, which is Latin-script by construction regardless of the
 # accent — see benchmark_results/asr_milestone_3b.json for the measured
 # effect of this change.
+#
+# "mai" (Maithili) and "or" (Odia) are deliberately absent: neither is a
+# real Whisper language (confirmed directly against
+# faster_whisper.tokenizer._LANGUAGE_CODES, Milestone 6h) despite both
+# being valid VaaniSetu LanguageCodes. An "or": "or" entry was here until
+# Milestone 6h found it was wrong — passing an unrecognized code makes
+# Tokenizer.__init__ raise ValueError, which app/main.py's blanket
+# exception handler turns into an opaque 500 rather than a clean
+# rejection. The Go layer now rejects both before a transcribe request
+# ever reaches this engine (backend/internal/api's noASRLanguages).
 _WHISPER_LANGUAGE_HINTS = {
     "hi": "hi",
     "en": "en",
@@ -41,7 +51,6 @@ _WHISPER_LANGUAGE_HINTS = {
     "kn": "kn",
     "ml": "ml",
     "pa": "pa",
-    "or": "or",
 }
 
 _CONTENT_TYPE_SUFFIXES = {

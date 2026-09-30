@@ -37,6 +37,13 @@ type Config struct {
 	// empty, the backend uses FakeTTSClient instead.
 	TTSServiceURL string
 
+	// LangIDServiceURL, when set, points HTTPLangIDClient at the Python
+	// `langid` capability (see internal/langid) — typically the same
+	// host:port as the other three service URLs (docs/DEVELOPMENT.md §5).
+	// When empty, the backend uses FakeLangIDClient instead (Phase 6
+	// Milestone 6a's default — no Python `langid` capability exists yet).
+	LangIDServiceURL string
+
 	// LogLevel is one of "debug", "info", "warn", "error" (see
 	// internal/logging). Defaults to "info".
 	LogLevel string
@@ -52,19 +59,20 @@ type Config struct {
 //
 // Required: VAANISETU_DATABASE_URL.
 // Optional: VAANISETU_PORT (default "8080"), VAANISETU_LLM_SERVICE_URL,
-// VAANISETU_ASR_SERVICE_URL, and VAANISETU_TTS_SERVICE_URL (each default
-// "", meaning use the corresponding fake client), VAANISETU_LOG_LEVEL
-// (default "info"), VAANISETU_ALLOWED_ORIGIN (default
-// "http://localhost:4200").
+// VAANISETU_ASR_SERVICE_URL, VAANISETU_TTS_SERVICE_URL, and
+// VAANISETU_LANGID_SERVICE_URL (each default "", meaning use the
+// corresponding fake client), VAANISETU_LOG_LEVEL (default "info"),
+// VAANISETU_ALLOWED_ORIGIN (default "http://localhost:4200").
 func Load() (Config, error) {
 	cfg := Config{
-		Port:          getEnvDefault("VAANISETU_PORT", "8080"),
-		DatabaseURL:   os.Getenv("VAANISETU_DATABASE_URL"),
-		LLMServiceURL: os.Getenv("VAANISETU_LLM_SERVICE_URL"),
-		ASRServiceURL: os.Getenv("VAANISETU_ASR_SERVICE_URL"),
-		TTSServiceURL: os.Getenv("VAANISETU_TTS_SERVICE_URL"),
-		LogLevel:      getEnvDefault("VAANISETU_LOG_LEVEL", "info"),
-		AllowedOrigin: getEnvDefault("VAANISETU_ALLOWED_ORIGIN", "http://localhost:4200"),
+		Port:             getEnvDefault("VAANISETU_PORT", "8080"),
+		DatabaseURL:      os.Getenv("VAANISETU_DATABASE_URL"),
+		LLMServiceURL:    os.Getenv("VAANISETU_LLM_SERVICE_URL"),
+		ASRServiceURL:    os.Getenv("VAANISETU_ASR_SERVICE_URL"),
+		TTSServiceURL:    os.Getenv("VAANISETU_TTS_SERVICE_URL"),
+		LangIDServiceURL: os.Getenv("VAANISETU_LANGID_SERVICE_URL"),
+		LogLevel:         getEnvDefault("VAANISETU_LOG_LEVEL", "info"),
+		AllowedOrigin:    getEnvDefault("VAANISETU_ALLOWED_ORIGIN", "http://localhost:4200"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -93,6 +101,13 @@ func (c Config) UsesFakeASR() bool {
 // tts.HTTPTTSClient.
 func (c Config) UsesFakeTTS() bool {
 	return c.TTSServiceURL == ""
+}
+
+// UsesFakeLangID reports whether no real langid service has been
+// configured, in which case the caller should wire up
+// langid.FakeLangIDClient instead of langid.HTTPLangIDClient.
+func (c Config) UsesFakeLangID() bool {
+	return c.LangIDServiceURL == ""
 }
 
 func getEnvDefault(key, fallback string) string {

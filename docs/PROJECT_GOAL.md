@@ -81,7 +81,7 @@ built stage by stage across the roadmap, not all at once.
 - **MVP languages:** Hindi and Hinglish (Hindi-English code-switching, including
   romanized Hindi).
 - **Long-term languages:** Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada,
-  Malayalam, Punjabi, Odia.
+  Malayalam, Punjabi, Odia, Maithili.
 - Detected language and script travel with every turn through the pipeline and
   are stored per turn, because users code-switch mid-conversation.
 - A manual language preference always overrides automatic detection.

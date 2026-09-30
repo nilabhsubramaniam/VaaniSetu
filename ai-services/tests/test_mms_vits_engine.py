@@ -85,13 +85,43 @@ def test_synthesize_raises_a_clear_error_for_text_the_vocabulary_cannot_represen
     # Measured against the real downloaded tokenizer (docs/DECISIONS.md
     # ADR-021): Latin-script text tokenizes to a genuinely empty sequence
     # for this Devanagari-only checkpoint, not just poor-quality output.
+    # "en" (not "hinglish" — see the transliteration tests below,
+    # Milestone 6d) never gets transliterated, so this still represents a
+    # genuinely unsupported request.
     model = _FakeVitsModel(np.array([0.0]))
     engine = _engine_with_fakes(model, _FakeTokenizer(input_id_count=0))
 
     with pytest.raises(UnsupportedTextError, match="fake-checkpoint"):
-        engine.synthesize(SynthesizeRequest(text="kaisa hai", language="hinglish"))
+        engine.synthesize(SynthesizeRequest(text="what is the weather", language="en"))
 
     assert model.calls == []  # never reaches the model
+
+
+def test_synthesize_transliterates_hinglish_text_to_devanagari_before_tokenizing() -> None:
+    # Milestone 6d (docs/DECISIONS.md ADR-029): a Devanagari-only
+    # checkpoint can't read Latin script at all (ADR-021) — romanized
+    # Hindi is transliterated to real Devanagari first, rather than
+    # immediately failing.
+    model = _FakeVitsModel(np.array([0.0, 0.5, -0.5], dtype=np.float32))
+    tokenizer = _FakeTokenizer()
+    engine = _engine_with_fakes(model, tokenizer)
+
+    engine.synthesize(SynthesizeRequest(text="namaste", language="hinglish"))
+
+    assert tokenizer.calls == ["नमस्ते"]
+
+
+def test_synthesize_does_not_transliterate_non_hinglish_requests() -> None:
+    # Only "hinglish" is transliterated — real Hindi (already Devanagari)
+    # and English text are passed through unchanged, same as before
+    # Milestone 6d.
+    model = _FakeVitsModel(np.array([0.0, 0.5, -0.5], dtype=np.float32))
+    tokenizer = _FakeTokenizer()
+    engine = _engine_with_fakes(model, tokenizer)
+
+    engine.synthesize(SynthesizeRequest(text="namaste", language="hi"))
+
+    assert tokenizer.calls == ["namaste"]
 
 
 def test_synthesize_returns_a_valid_wav_at_the_models_sample_rate() -> None:

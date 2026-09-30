@@ -41,6 +41,87 @@ describe('MessageBubble', () => {
     expect(bubble?.getAttribute('lang')).toBe('hi');
   });
 
+  it('sets lang="ml" for Malayalam text so the Malayalam font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'ml', text: 'നമസ്കാരം' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('ml');
+  });
+
+  it('sets lang="mai" for Maithili text so the Devanagari font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'mai', text: 'प्रणाम' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('mai');
+  });
+
+  it('sets lang="bn" for Bengali text so the Bengali font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'bn', text: 'নমস্কার' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('bn');
+  });
+
+  it('sets lang="ta" for Tamil text so the Tamil font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'ta', text: 'வணக்கம்' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('ta');
+  });
+
+  it('sets lang="te" for Telugu text so the Telugu font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'te', text: 'నమస్కారం' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('te');
+  });
+
+  it('sets lang="kn" for Kannada text so the Kannada font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'kn', text: 'ನಮಸ್ಕಾರ' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('kn');
+  });
+
+  it('sets lang="gu" for Gujarati text so the Gujarati font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'gu', text: 'નમસ્તે' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('gu');
+  });
+
+  it('sets lang="mr" for Marathi text so the Devanagari font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'mr', text: 'नमस्कार' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('mr');
+  });
+
+  it('sets lang="pa" for Punjabi text so the Gurmukhi font stack applies', async () => {
+    const fixture = TestBed.createComponent(MessageBubble);
+    fixture.componentRef.setInput('turn', makeTurn({ language: 'pa', text: 'ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ' }));
+    fixture.detectChanges();
+
+    const bubble = (fixture.nativeElement as HTMLElement).querySelector('.bubble');
+    expect(bubble?.getAttribute('lang')).toBe('pa');
+  });
+
   it('does not set a lang attribute for Hinglish text', async () => {
     const fixture = TestBed.createComponent(MessageBubble);
     fixture.componentRef.setInput('turn', makeTurn({ language: 'hinglish', text: 'Kaise ho?' }));

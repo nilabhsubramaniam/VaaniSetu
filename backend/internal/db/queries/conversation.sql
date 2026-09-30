@@ -8,8 +8,8 @@ ORDER BY started_at DESC
 LIMIT 1;
 
 -- name: CreateTurn :one
-INSERT INTO turns (session_id, role, language, text, latency_ms, script)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO turns (session_id, role, language, text, latency_ms, script, detected_language)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: ListTurnsBySession :many

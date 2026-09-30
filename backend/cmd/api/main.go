@@ -1,7 +1,8 @@
 // Command api is the VaaniSetu backend's entrypoint: load configuration,
-// open the database pool, wire the configured LLM/ASR/TTS clients (each
-// fake or real, per config.Config.UsesFakeLLM/UsesFakeASR/UsesFakeTTS),
-// and serve the chat, transcription, and synthesis API.
+// open the database pool, wire the configured LLM/ASR/TTS/langid clients
+// (each fake or real, per
+// config.Config.UsesFakeLLM/UsesFakeASR/UsesFakeTTS/UsesFakeLangID), and
+// serve the chat, transcription, synthesis, and voice-turn API.
 package main
 
 import (
@@ -19,6 +20,7 @@ import (
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/config"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/tts"
@@ -79,7 +81,15 @@ func run() error {
 		ttsClient = tts.NewHTTPTTSClient(cfg.TTSServiceURL)
 	}
 
-	convService := conversation.NewService(pool, llmClient)
+	var langIDClient langid.LangIDClient
+	if cfg.UsesFakeLangID() {
+		logger.Warn("no VAANISETU_LANGID_SERVICE_URL set — using FakeLangIDClient (Milestone 6a behavior)")
+		langIDClient = langid.NewFakeLangIDClient()
+	} else {
+		langIDClient = langid.NewHTTPLangIDClient(cfg.LangIDServiceURL)
+	}
+
+	convService := conversation.NewService(pool, llmClient, langIDClient, logger)
 	server := api.NewServer(convService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
 
 	httpServer := &http.Server{
@@ -102,6 +112,7 @@ func run() error {
 		"usesFakeLLM", cfg.UsesFakeLLM(),
 		"usesFakeASR", cfg.UsesFakeASR(),
 		"usesFakeTTS", cfg.UsesFakeTTS(),
+		"usesFakeLangID", cfg.UsesFakeLangID(),
 		"allowedOrigin", cfg.AllowedOrigin,
 	)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

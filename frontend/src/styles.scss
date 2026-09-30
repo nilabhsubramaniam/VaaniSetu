@@ -13,6 +13,87 @@
     U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF;
 }
 
+// Self-hosted Malayalam font (Milestone 6c; SIL OFL 1.1 — see
+// public/fonts/OFL-Malayalam.txt, a separate file from the Devanagari
+// one above since each Noto script repo carries its own copyright line).
+// Same "only the weight/script range actually used ships" rule.
+@font-face {
+  font-family: 'Noto Sans Malayalam';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansMalayalam-Regular.woff2') format('woff2');
+  unicode-range:
+    U+0307, U+0323, U+0951-0952, U+0964-0965, U+0D00-0D7F, U+1CDA, U+1CF2, U+200C-200D, U+20B9,
+    U+25CC, U+A830-A832;
+}
+
+// Self-hosted Bengali/Tamil/Telugu/Kannada fonts (Milestone 6h; SIL OFL
+// 1.1 — see public/fonts/OFL-{script}.txt, one file per Noto script repo
+// per its own copyright line). Same "only the weight/script range
+// actually used ships" rule as Devanagari/Malayalam above.
+@font-face {
+  font-family: 'Noto Sans Bengali';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansBengali-Regular.woff2') format('woff2');
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0980-09FE, U+1CD0, U+1CD2, U+1CD5-1CD6, U+1CD8, U+1CE1, U+1CEA,
+    U+1CED, U+1CF2, U+1CF5-1CF7, U+200C-200D, U+20B9, U+25CC, U+A8F1;
+}
+
+@font-face {
+  font-family: 'Noto Sans Tamil';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansTamil-Regular.woff2') format('woff2');
+  unicode-range: U+0964-0965, U+0B82-0BFA, U+200C-200D, U+20B9, U+25CC;
+}
+
+@font-face {
+  font-family: 'Noto Sans Telugu';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansTelugu-Regular.woff2') format('woff2');
+  unicode-range: U+0951-0952, U+0964-0965, U+0C00-0C7F, U+1CDA, U+1CF2, U+200C-200D, U+25CC;
+}
+
+@font-face {
+  font-family: 'Noto Sans Kannada';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansKannada-Regular.woff2') format('woff2');
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0C80-0CF3, U+1CD0, U+1CD2-1CD3, U+1CDA, U+1CF2, U+1CF4, U+200C-200D,
+    U+20B9, U+25CC, U+A830-A835;
+}
+
+// Self-hosted Gujarati/Gurmukhi fonts (Milestone 6i; SIL OFL 1.1 — see
+// public/fonts/OFL-{script}.txt). Same rule as every script above: only
+// the weight/script range actually used ships.
+@font-face {
+  font-family: 'Noto Sans Gujarati';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansGujarati-Regular.woff2') format('woff2');
+  unicode-range: U+0951-0952, U+0964-0965, U+0A80-0AFF, U+200C-200D, U+20B9, U+25CC, U+A830-A839;
+}
+
+@font-face {
+  font-family: 'Noto Sans Gurmukhi';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/NotoSansGurmukhi-Regular.woff2') format('woff2');
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0A01-0A76, U+200C-200D, U+20B9, U+25CC, U+262C, U+A830-A839;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -44,10 +125,52 @@ body {
 
 // Any element holding Hindi/Hinglish text should prefer the Devanagari
 // stack so mixed-script text (Hinglish included) renders correctly without
-// component-by-component font decisions.
+// component-by-component font decisions. Maithili (Milestone 6f) and
+// Marathi (Milestone 6i) are written in Devanagari too, so both reuse
+// this same stack — no new font for either.
 [lang='hi'],
+[lang='mai'],
+[lang='mr'],
 .vs-devanagari {
   font-family: var(--vs-font-devanagari);
+}
+
+// Same reasoning, Malayalam script (Milestone 6c).
+[lang='ml'],
+.vs-malayalam {
+  font-family: var(--vs-font-malayalam);
+}
+
+// Same reasoning, Bengali/Tamil/Telugu/Kannada scripts (Milestone 6h).
+[lang='bn'],
+.vs-bengali {
+  font-family: var(--vs-font-bengali);
+}
+
+[lang='ta'],
+.vs-tamil {
+  font-family: var(--vs-font-tamil);
+}
+
+[lang='te'],
+.vs-telugu {
+  font-family: var(--vs-font-telugu);
+}
+
+[lang='kn'],
+.vs-kannada {
+  font-family: var(--vs-font-kannada);
+}
+
+// Same reasoning, Gujarati/Gurmukhi (Punjabi) scripts (Milestone 6i).
+[lang='gu'],
+.vs-gujarati {
+  font-family: var(--vs-font-gujarati);
+}
+
+[lang='pa'],
+.vs-gurmukhi {
+  font-family: var(--vs-font-gurmukhi);
 }
 
 button,

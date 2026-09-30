@@ -79,3 +79,14 @@
   color: var(--vs-ink-faint);
   white-space: nowrap;
 }
+
+.option.is-auto .option-label {
+  font-weight: 600;
+  color: var(--vs-accent-ink);
+}
+
+.options-divider {
+  height: 1px;
+  margin: var(--vs-space-1) var(--vs-space-2);
+  background: var(--vs-line);
+}

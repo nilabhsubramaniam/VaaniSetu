@@ -1,0 +1,60 @@
+:host {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.node-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.node-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--hero-line, rgb(255 255 255 / 14%));
+  border-radius: var(--vs-radius-pill, 999px);
+  background: var(--hero-panel, rgb(18 22 28 / 70%));
+  backdrop-filter: blur(6px);
+  color: var(--hero-ink, #f3f5f7);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  transition: opacity 0.2s ease;
+
+  strong {
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+
+  span {
+    color: var(--hero-ink-faint, rgb(243 245 247 / 52%));
+    font-size: 0.6rem;
+  }
+}
+
+// Fewer visible chips on narrow viewports — the scene itself still
+// computes all 6 connections regardless; only the decorative labels
+// thin out, matching how the region cards used to degrade.
+@media (max-width: 1024px) {
+  .node-chip:nth-child(n + 5) {
+    display: none;
+  }
+}

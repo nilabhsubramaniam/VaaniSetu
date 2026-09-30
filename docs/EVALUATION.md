@@ -110,4 +110,24 @@ are the phase-scoped model benchmarks in Phase 2 (LLM), Phase 3 (ASR), and
 Phase 4 (TTS), plus Phase 5's real end-to-end response-latency measurement
 (section 6's "Response latency" row) — see `docs/DECISIONS.md` ADR-024 for
 the actual p50/p95 numbers and root-cause breakdown; **that target is
-currently not met**. The automated, repeatable harness is Phase 9.
+currently not met**, and a real, measured attempt to close it with
+non-streaming ASR tuning (`beam_size`, VAD filtering, batched inference —
+none reduced latency; the ~4s cost is Whisper's fixed per-request encoder
+pass on this CPU-only hardware, not the decoder) found no available fix
+short of a model swap (re-opening ADR-018's accuracy tradeoff) or Phase 11
+streaming. The automated, repeatable harness is Phase 9.
+
+Phase 6 (Indian Language Support) has, since, run real phase-scoped
+evaluations per this section's own metrics for every language it has
+touched — langid (§2's "Language identification accuracy" row), LLM
+language fidelity (§3), and ASR/TTS intelligibility (§2/§5) — against real
+audio and text, not simulated. Results are stored in
+`ai-services/benchmark_results/` (`langid_milestone_6b.json`,
+`tts_milestone_4b.json`, `asr_milestone_3b.json`,
+`malayalam_real_asr_diagnostic.json`, `real_asr_diagnostic_6i.json`) and
+cited in `docs/DECISIONS.md` ADR-026 through ADR-035. This is still each
+milestone's own lightweight, phase-scoped check, per this section's opening
+note — not Phase 9's automated, repeatable, regression-tracked harness,
+which still does not exist. No Phase 6 language has a stored report that
+gets re-run automatically on a model-registry change; every number here is
+a point-in-time measurement from when that language was evaluated.

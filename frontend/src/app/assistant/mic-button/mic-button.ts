@@ -83,6 +83,10 @@ export class MicButton {
       return;
     }
 
+    // Deliberately preferredLanguage(), not effectiveChatLanguage() — voice
+    // auto-detection is out of scope this milestone (ADR-018's ASR-hint
+    // problem: un-hinted Whisper mistranscribes Hinglish into the wrong
+    // script), and POST /voice/turn rejects "auto" outright (ADR-030).
     const language = this.settings.preferredLanguage();
     const voice = this.settings.preferredVoice();
     // sendVoiceTurn takes it from here — one orchestrated call runs

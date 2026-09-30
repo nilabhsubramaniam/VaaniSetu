@@ -2,19 +2,17 @@ import type { LandingCopy } from './landing-i18n.types';
 
 export const EN_COPY: LandingCopy = {
   hero: {
-    eyebrow: 'Real-time voice translation',
+    eyebrow: 'Your local AI voice assistant',
     titleLine1: { lead: 'Speak', accent: 'naturally.' },
-    titleLine2: { lead: 'Connect', accent: 'globally.' },
+    titleLine2: { lead: 'Connect', accent: 'across India.' },
     description:
-      'VaaniSetu listens in your language and speaks back in theirs — no typing, no delay, no barrier.',
+      'VaaniSetu is being built as your voice bridge across India’s languages — understanding and replying to you, entirely on your own device.',
     cta: 'Try VaaniSetu',
     micLabel: 'Start speaking',
     micHintIdle: 'Tap to speak',
     micHintListening: 'Listening…',
-    outputLabel: 'Translated output',
-    fallbackDescription:
-      'A voice bridge between languages: speak in yours, and be understood in anyone else’s.',
-    infoCard: 'Global communication, made simple.',
+    outputLabel: 'Assistant’s reply',
+    visionNote: 'Live today: Hindi, Hinglish, Malayalam · Building toward every Indian language.',
     scrollCue: 'Scroll to explore',
   },
   languageNodes: {
@@ -22,8 +20,9 @@ export const EN_COPY: LandingCopy = {
     description: 'VaaniSetu is built to grow across India’s languages and beyond.',
   },
   transform: {
-    heading: 'Say it once. Understood everywhere.',
-    description: 'Your words carry their meaning across the language barrier, instantly.',
+    heading: 'Say it your way. Understood as you meant it.',
+    description:
+      'Hindi, English, or both mixed together — VaaniSetu follows how you actually speak.',
   },
   howItWorks: {
     heading: 'How it works',
@@ -33,18 +32,14 @@ export const EN_COPY: LandingCopy = {
         description: 'Talk naturally in your own language — no commands or special phrasing.',
       },
       {
-        title: 'Translate',
-        description: 'VaaniSetu detects the language and translates meaning, not just words.',
+        title: 'Understand',
+        description:
+          'VaaniSetu detects your language and understands your intent, not just the words.',
       },
       {
-        title: 'Connect',
-        description: 'The response comes back spoken aloud, in the language your listener uses.',
+        title: 'Reply',
+        description: 'The assistant answers back spoken aloud, in the language you spoke.',
       },
     ],
-  },
-  globalNetwork: {
-    heading: 'A growing network of languages',
-    description: 'Every added language brings VaaniSetu closer to a world without a voice barrier.',
-    disclaimer: 'Illustrative network — not a live user map.',
   },
 };

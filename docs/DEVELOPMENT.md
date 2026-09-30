@@ -85,10 +85,13 @@ VaaniSetu/
     cmd/api/                        entrypoint
     internal/
       api/                          HTTP handlers, DTOs, CORS
-      conversation/                 turn persistence, LLM call, script tagging
+      conversation/                 turn persistence, LLM call, script +
+                                     detected-language tagging
       llm/                          LLMClient interface: Fake + HTTP clients
       asr/                          ASRClient interface: Fake + HTTP clients
       tts/                          TTSClient interface: Fake + HTTP clients
+      langid/                       LangIDClient interface: Fake + HTTP
+                                     clients (Phase 6 Milestone 6a)
       orchestrator/                 Phase 5 turn orchestrator: composes
                                      asr/llm/tts into one voice turn
       config/, db/, logging/
@@ -101,17 +104,30 @@ VaaniSetu/
       engines/                     LLMEngine + llama_cpp implementation
         asr/                       ASREngine + faster_whisper implementation
         tts/                       TTSEngine + mms_vits/parler_tts/xtts implementations
+        langid/                    LangIDEngine + indiclid/fasttext_lid
+                                    implementations (Phase 6 Milestone 6b)
     scripts/                       download_models.py, benchmark.py, benchmark_asr.py,
-                                    benchmark_tts.py, wer.py (shared WER calc),
-                                    generate_audio_fixtures.py (macOS-only, ASR fixtures)
+                                    benchmark_tts.py, benchmark_langid.py, wer.py (shared
+                                    WER calc), generate_audio_fixtures.py (macOS-only,
+                                    synthetic ASR fixtures), download_malayalam_real_
+                                    fixtures.py + benchmark_malayalam_real_asr.py
+                                    (Milestone 6d, one real-corpus language), download_
+                                    real_fixtures.py + benchmark_real_asr.py (Milestone
+                                    6i, generalized to any language with a real OpenSLR
+                                    corpus — see eval_data/real_fixtures.yaml)
     tests/
     eval_data/                     asr_fixtures.yaml (committed manifest, reused as the
-                                    TTS benchmark's text prompts too); audio/ (generated,
-                                    git-ignored)
+                                    TTS/langid benchmarks' text prompts too); audio/
+                                    (generated, git-ignored); malayalam_real_fixtures.yaml
+                                    + audio_malayalam_real/ (git-ignored) and
+                                    real_fixtures.yaml + audio_real/ (git-ignored) — real,
+                                    human-recorded clips from OpenSLR corpora, for
+                                    languages that have one
     models.yaml                    model registry (docs/ARCHITECTURE.md §3.6)
     benchmark_results/             stored phase-scoped benchmark reports
     Makefile, .env.example, Dockerfile
-  proto/                           llm.openapi.yaml, asr.openapi.yaml, tts.openapi.yaml
+  proto/                           llm.openapi.yaml, asr.openapi.yaml, tts.openapi.yaml,
+                                    langid.openapi.yaml
                                     (Go<->Python contracts)
   docker-compose.yml               postgres + backend + ai-services
   models/                          local weights, git-ignored (not in git)
@@ -310,6 +326,10 @@ service, wiring it into the backend, troubleshooting): see
 | `uv run scripts/benchmark.py` (or `make benchmark`) | Run the `llm` phase-scoped latency/memory/quality benchmark |
 | `uv run scripts/generate_audio_fixtures.py` | macOS-only: synthesize `eval_data/asr_fixtures.yaml`'s text into test WAV files |
 | `uv run scripts/benchmark_asr.py` | Run the `asr` phase-scoped WER/latency/memory benchmark |
+| `uv run scripts/benchmark_tts.py` | Run the `tts` phase-scoped intelligibility-proxy/RTF benchmark |
+| `uv run scripts/benchmark_langid.py` | Run the `langid` phase-scoped per-language accuracy benchmark |
+| `uv run scripts/download_real_fixtures.py` | Download real, human-recorded clips for languages with an OpenSLR corpus (`eval_data/real_fixtures.yaml`) into git-ignored `eval_data/audio_real/` |
+| `uv run scripts/benchmark_real_asr.py` | Run the already-selected ASR engine against those real clips, per language |
 | `uv run pytest` (or `make test`) | Unit + contract tests |
 | `uv run ruff check .` (or `make lint`) | Lint |
 | `uv run ruff format --check .` (or `make fmt-check`) | Formatting check (`make fmt` to fix) |

@@ -15,8 +15,9 @@ export interface LandingCopy {
     readonly micHintIdle: string;
     readonly micHintListening: string;
     readonly outputLabel: string;
-    readonly fallbackDescription: string;
-    readonly infoCard: string;
+    /** The honest "today vs. vision" signal, same spirit as the
+     * "Available now / Coming next" language section further down. */
+    readonly visionNote: string;
     readonly scrollCue: string;
   };
   readonly languageNodes: {
@@ -30,10 +31,5 @@ export interface LandingCopy {
   readonly howItWorks: {
     readonly heading: string;
     readonly steps: readonly { readonly title: string; readonly description: string }[];
-  };
-  readonly globalNetwork: {
-    readonly heading: string;
-    readonly description: string;
-    readonly disclaimer: string;
   };
 }

@@ -9,11 +9,13 @@ import { SpeechService } from './speech.service';
 import { AudioPlaybackService } from './audio-playback.service';
 import { environment } from '../../../environments/environment';
 import type { VoiceState } from '../models/voice-state.model';
+import type { LanguageCode } from '../models/language.model';
 import type { VoiceCode } from '../models/voice.model';
 
 describe('ConversationRealService', () => {
   const voiceState = signal<VoiceState>('idle');
   const preferredVoice = signal<VoiceCode>('female');
+  const preferredLanguage = signal<LanguageCode>('hi');
   let httpMock: HttpTestingController;
   let service: ConversationRealService;
   let speechFake: { transcribe: ReturnType<typeof vi.fn>; synthesize: ReturnType<typeof vi.fn> };
@@ -26,6 +28,7 @@ describe('ConversationRealService', () => {
     vi.useFakeTimers();
     voiceState.set('idle');
     preferredVoice.set('female');
+    preferredLanguage.set('hi');
     speechFake = {
       transcribe: vi.fn(),
       synthesize: vi.fn().mockResolvedValue(new Blob(['fake audio'])),
@@ -40,7 +43,7 @@ describe('ConversationRealService', () => {
           provide: VoiceSessionService,
           useValue: { state: voiceState, setState: (s: VoiceState) => voiceState.set(s) },
         },
-        { provide: SettingsStore, useValue: { preferredVoice } },
+        { provide: SettingsStore, useValue: { preferredVoice, preferredLanguage } },
         { provide: SpeechService, useValue: speechFake },
         { provide: AudioPlaybackService, useValue: audioPlaybackFake },
       ],
@@ -318,6 +321,60 @@ describe('ConversationRealService', () => {
       .filter((t) => t.role === 'assistant')
       .map((t) => t.text);
     expect(assistantTexts).toEqual(['fresh reply']);
+  });
+
+  it('sends "auto" through to the backend unchanged (docs/DECISIONS.md ADR-030)', () => {
+    service.sendUserTurn('what is the weather', 'auto');
+
+    const req = httpMock.expectOne(chatUrl);
+    expect(req.request.body).toEqual({ text: 'what is the weather', language: 'auto' });
+    req.flush({
+      userTurn: {
+        id: 'u1',
+        role: 'user',
+        text: 'what is the weather',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      assistantTurn: {
+        id: 'a1',
+        role: 'assistant',
+        text: 'reply',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    });
+  });
+
+  it('shows the pinned language as a placeholder for an "auto" request, then swaps in the server-resolved one', () => {
+    preferredLanguage.set('ml');
+    service.sendUserTurn('what is the weather', 'auto');
+
+    // Before the response arrives, the optimistic turn can't know the real
+    // detected language yet — it shows the current pin, never the literal
+    // "auto" string (Turn.language is never "auto").
+    expect(service.turns()).toHaveLength(1);
+    expect(service.turns()[0]).toMatchObject({ role: 'user', language: 'ml' });
+
+    httpMock.expectOne(chatUrl).flush({
+      userTurn: {
+        id: 'u1',
+        role: 'user',
+        text: 'what is the weather',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      assistantTurn: {
+        id: 'a1',
+        role: 'assistant',
+        text: 'reply',
+        language: 'en',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    });
+
+    // Reconciled with the server's resolved language and real id.
+    expect(service.turns()[0]).toMatchObject({ id: 'u1', role: 'user', language: 'en' });
   });
 
   it('simulateError sets the error state', () => {

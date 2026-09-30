@@ -1,0 +1,67 @@
+# The Go<->Python `langid` capability contract (docs/ARCHITECTURE.md §5).
+#
+# Both sides are JSON — text in, a classification out — unlike
+# proto/asr.openapi.yaml's binary-in or proto/tts.openapi.yaml's
+# binary-out shapes, since neither side of this capability is audio. See
+# docs/DECISIONS.md ADR-026.
+#
+# backend/internal/langid.HTTPLangIDClient is the Go-side implementation
+# of this contract; the Python `langid` capability module (Phase 6
+# Milestone 6b, not yet built) is the server side, hosted in the same
+# ai-services process as the other capabilities (docs/DEVELOPMENT.md §5,
+# "one module per capability" — not necessarily one deployable service
+# per capability).
+openapi: 3.0.3
+info:
+  title: VaaniSetu — langid capability contract
+  version: "1.0.0"
+servers:
+  - url: http://ai-services:8090/v1
+
+paths:
+  /detect:
+    post:
+      summary: >
+        Classify a single piece of already-transcribed or typed text by
+        language. No conversation context — one text in, one
+        classification out.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: The detected language.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [language, confidence]
+                properties:
+                  language:
+                    type: string
+                    description: >
+                      Same LanguageCode values as docs/openapi/chat.yaml.
+                  confidence:
+                    type: number
+                    format: double
+                    minimum: 0
+                    maximum: 1
+                    description: >
+                      Not yet used by Go to drive any decision
+                      (docs/DECISIONS.md ADR-026) — carried through for a
+                      future milestone.
+        "5XX":
+          description: >
+            Any failure (model not loaded, OOM, timeout, empty/unsupported
+            text). Go treats any non-200 response identically — it does
+            not need a typed error envelope from Python for Phase 6, only
+            the HTTP status. A detection failure is non-fatal to the
+            caller's own operation (ADR-026), same as a TTS failure
+            (ADR-020) — Go simply proceeds with no detected language.

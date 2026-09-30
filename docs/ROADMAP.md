@@ -18,7 +18,7 @@ Milestone-based plan for VaaniSetu.
 | 3 | Speech-to-Text | DONE |
 | 4 | Text-to-Speech | DONE |
 | 5 | End-to-End Voice MVP | DONE |
-| 6 | Indian Language Support | NOT STARTED |
+| 6 | Indian Language Support | IN PROGRESS |
 | 7 | RAG | NOT STARTED |
 | 8 | Dataset Pipeline | NOT STARTED |
 | 9 | Evaluation & Benchmarking | NOT STARTED |
@@ -245,7 +245,86 @@ the latency model entirely). See `docs/CURRENT_STATE.md` and
 
 ## Phase 6 - Indian Language Support
 
-**Status:** NOT STARTED
+**Status:** IN PROGRESS — Milestone 6a (Go `langid` capability boundary
+against `FakeLangIDClient`, wired into `conversation.Service` so every
+turn — typed or spoken — gets a `detectedLanguage` tag), Milestone 6b
+(Python `langid` capability, benchmarked against real candidates —
+`ai4bharat/IndicLID` and the original fastText `lid.176` — and wired in
+for real; `fasttext-lid176` selected, see ADR-027), Milestone 6c
+(Malayalam enabled end to end — the model registry's `tts` section
+gained a real per-language axis, `facebook/mms-tts-mal` added, and
+Malayalam turned on in the UI despite a known TTS quality gap, see
+ADR-028), and Milestone 6d (Hinglish TTS fixed via romanized-to-Devanagari
+transliteration — both Hindi voices now produce real audio for Hinglish
+instead of failing outright; Malayalam's real bottleneck properly
+diagnosed with the project's first real, human-recorded audio fixtures —
+`faster-whisper-large-v3-turbo` itself measures a real 0.96 WER on real
+Malayalam speech, so the gap is at least partly ASR, not purely TTS
+quality, see ADR-029), and Milestone 6e (auto-detection now drives
+behavior for typed chat, opt-in and off by default — `POST /api/v1/chat`
+accepts a new `"auto"` language sentinel that resolves to the message's
+own detected language before the LLM call, reusing the detection already
+made for `detectedLanguage` rather than a second call; a manual pin still
+wins whenever one is set. Voice turns are unaffected and still require a
+concrete language — un-hinted auto-detection was already found to
+mistranscribe romanized Hinglish speech into the wrong script, ADR-018 —
+so this is deliberately typed-chat-only, see ADR-030), and Milestone 6f
+(Maithili — added to the long-term language list, then wired into the
+same per-language scaffolding every prior language uses and measured for
+real across all four capabilities, but **not enabled**: the LLM
+understood every Maithili prompt but replied in Hindi every time (0/4
+language fidelity), a real candidate TTS checkpoint measured the same
+100-150% proxy-WER failure Malayalam's did, langid scored only 50% with
+the already-selected model, and the ASR gap turned out to be a silent
+wrong-language auto-detect fallback rather than a clean error — unlike
+Hinglish/Malayalam's "ship with a known gap" precedent, this failure is
+in the *primary* typed-chat channel, not a secondary one, so the
+enable/don't-enable call was put to the user rather than decided
+silently, see ADR-031) are complete, and Milestone 6h (Bengali, Tamil,
+Telugu, and Kannada evaluated across all four capabilities — LLM fluent
+and langid 100% accurate for all four, matching or beating Malayalam's
+own result, but real, uneven ASR/TTS quality gaps in the same shippable
+class Malayalam/Hinglish already have; a real, independent, previously-
+live Odia ASR bug found and fixed along the way, unrelated to Odia's own
+still-pending evaluation; enablement put to the user rather than decided
+silently, and accepted — all four enabled, with matching self-hosted
+fonts added the same way Malayalam's was, see ADR-033) and Milestone 6i
+(Gujarati, Marathi, and Punjabi evaluated the same way — LLM fluent and
+langid 100% accurate for all three, Marathi correctly distinguished from
+Hindi despite sharing Devanagari; Gujarati and Marathi had real,
+human-recorded OpenSLR corpora to measure real-audio ASR against (0.333/
+0.5375 WER), Punjabi didn't so its evidence rests on the TTS-proxy metric
+alone (0.983); two new failure modes found — one Marathi clip
+transcribed into romanized Latin script instead of Devanagari, one
+Punjabi TTS-proxy transcript hallucinated unrelated-script characters —
+enabled all three directly on the now-established precedent, see
+ADR-034) are complete too, and Milestone 6j (Odia evaluated — **not
+enabled**, breaking the pattern 6h/6i just set on real evidence, not by
+default: langid 100% accurate, but the LLM's Odia output degenerates
+into repetitive token loops with occasional cross-script contamination
+rather than producing coherent replies, and Whisper has no real Odia
+support at all — demonstrated starkly when its auto-detection fallback
+hallucinated a different, unrelated script for every TTS-proxy clip
+transcribed (Latin, Devanagari, Gujarati, Arabic). Unlike the six
+languages just enabled, which had a working LLM and a real, if
+imperfect, ASR path, Odia has neither — the same "non-functional, not
+degraded" category Maithili is in, so it stays disabled, see ADR-035)
+is complete too. This closes evidence-gathering for all eight of Phase
+6's originally-named languages (seven enabled, Odia not). Milestone 6g
+(closing Maithili's real LLM-generation and ASR-capability blockers) is
+**deferred at the user's explicit request (2026-09-30)**, not abandoned:
+a strengthened system prompt and two alternate already-benchmarked LLM
+candidates were tested and found not to fix Maithili's generation gap
+(worse than the original, in fact); an ASR capability search found two
+real, MIT-licensed candidates and got as far as a valid Hugging Face
+login, but both returned a `403` "not in the authorized list" — an
+unresolved access request, not an outright denial, so worth revisiting
+if access is ever granted (see ADR-033's Milestone 6g notes in
+`docs/CURRENT_STATE.md`). A manual language pin still wins whenever the
+user sets one, per `docs/PROJECT_GOAL.md`. Phase 6 has no approved work
+in progress.
+See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md`
+ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.
@@ -259,9 +338,21 @@ the latency model entirely). See `docs/CURRENT_STATE.md` and
 - **Testing / evaluation:** Per-language WER / CER, language-ID accuracy
   (including Hinglish confusion matrix), TTS MOS-proxy, end-to-end task
   success, per `docs/EVALUATION.md`.
-- **Definition of Done:** Every language exposed in the UI has passed its
-  `docs/EVALUATION.md` thresholds and has recorded results; languages that fail
-  stay disabled; docs updated.
+- **Definition of Done:** Every language exposed in the UI has recorded, real
+  results (not assumed) for langid / LLM / ASR / TTS against
+  `docs/EVALUATION.md`'s thresholds. **Updated from the original wording**
+  ("languages that fail stay disabled") to match the policy actually applied,
+  repeatedly, starting with Malayalam (ADR-028) and confirmed again for seven
+  more languages since (ADR-033/034): a language stays disabled only when a
+  **primary-channel capability is broken** — the LLM cannot reliably produce
+  the language at all (Maithili, ADR-031; Odia, ADR-035), or ASR has no real
+  support for the language whatsoever (same two). A language ships enabled
+  despite failing WER/TTS *quality* thresholds — voice output/input staying
+  weak while typed chat works fully is a degraded experience, not a
+  non-functional one (ADR-020's non-fatal-TTS precedent, extended to ASR
+  quality the same way). Every enable/disable call is still put to the user
+  rather than decided silently (`AGENTS.md` §14), and recorded as an ADR
+  either way; docs updated in the same task.
 - **Explicitly deferred:** Fine-tuning to fix weak languages (Phase 10).
 
 ---

@@ -14,12 +14,13 @@ type Session struct {
 }
 
 type Turn struct {
-	ID        pgtype.UUID        `json:"id"`
-	SessionID pgtype.UUID        `json:"session_id"`
-	Role      string             `json:"role"`
-	Language  string             `json:"language"`
-	Text      string             `json:"text"`
-	LatencyMs *int32             `json:"latency_ms"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	Script    *string            `json:"script"`
+	ID               pgtype.UUID        `json:"id"`
+	SessionID        pgtype.UUID        `json:"session_id"`
+	Role             string             `json:"role"`
+	Language         string             `json:"language"`
+	Text             string             `json:"text"`
+	LatencyMs        *int32             `json:"latency_ms"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	Script           *string            `json:"script"`
+	DetectedLanguage *string            `json:"detected_language"`
 }

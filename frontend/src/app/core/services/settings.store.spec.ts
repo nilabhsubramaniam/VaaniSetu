@@ -42,4 +42,46 @@ describe('SettingsStore', () => {
     const store = new SettingsStore();
     expect(store.preferredVoice()).toBe('male');
   });
+
+  it('defaults auto-detect to off when nothing is stored', () => {
+    const store = new SettingsStore();
+    expect(store.autoDetectLanguage()).toBe(false);
+  });
+
+  it('updates the auto-detect signal and persists the choice', () => {
+    const store = new SettingsStore();
+    store.setAutoDetectLanguage(true);
+
+    expect(store.autoDetectLanguage()).toBe(true);
+    expect(localStorage.getItem('vaanisetu.settings.autoDetectLanguage')).toBe('true');
+  });
+
+  it('reads a previously stored auto-detect preference on construction', () => {
+    localStorage.setItem('vaanisetu.settings.autoDetectLanguage', 'true');
+    const store = new SettingsStore();
+    expect(store.autoDetectLanguage()).toBe(true);
+  });
+
+  it('effectiveChatLanguage() is the pinned language when auto-detect is off', () => {
+    const store = new SettingsStore();
+    store.setPreferredLanguage('hinglish');
+    expect(store.effectiveChatLanguage()).toBe('hinglish');
+  });
+
+  it('effectiveChatLanguage() is "auto" when auto-detect is on, regardless of the pin', () => {
+    const store = new SettingsStore();
+    store.setPreferredLanguage('hinglish');
+    store.setAutoDetectLanguage(true);
+    expect(store.effectiveChatLanguage()).toBe('auto');
+  });
+
+  it('turning auto-detect off restores the last concrete pin', () => {
+    const store = new SettingsStore();
+    store.setPreferredLanguage('ml');
+    store.setAutoDetectLanguage(true);
+    store.setAutoDetectLanguage(false);
+
+    expect(store.effectiveChatLanguage()).toBe('ml');
+    expect(store.preferredLanguage()).toBe('ml');
+  });
 });

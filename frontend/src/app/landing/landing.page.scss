@@ -1,4 +1,3 @@
-@use 'sass:list';
 @use '../shared/styles/mixins';
 
 // No height:100% here (unlike assistant/settings) — natural page scroll.
@@ -34,77 +33,55 @@ h2 {
 }
 
 // ---- hero ----
+// The shared reference image is used as design inspiration, not pasted in
+// directly as a full-bleed background: a fixed-resolution photo stretched/
+// cropped via `background-size: cover` drifted out of alignment with the
+// real controls (mic button, status panel, headline) at most viewport
+// sizes, and duplicated visual elements the image already draws into
+// itself (its own mic pedestal graphic, its own HUD box) — genuinely
+// clumsy, not just a style preference. This procedural gradient inherits
+// the image's mood instead (deep near-black base, cyan glow suggesting
+// the network/globe, gold glow suggesting the pedestal's warm light) and
+// scales cleanly at every viewport size. A fixed-dark micro-theme,
+// deliberately independent of the sitewide --vs-* tokens (so unaffected
+// by the visitor's light/dark preference), drives the real controls'
+// chrome on top of it — only the hero and its own children read these
+// --hero-* tokens; nothing below it does.
 .hero {
+  --hero-bg: #0a0d12;
+  --hero-panel: rgb(18 22 28 / 70%);
+  --hero-panel-strong: rgb(18 22 28 / 88%);
+  --hero-line: rgb(255 255 255 / 14%);
+  --hero-ink: #f3f5f7;
+  --hero-ink-soft: rgb(243 245 247 / 74%);
+  --hero-ink-faint: rgb(243 245 247 / 52%);
+
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
   min-height: calc(100dvh - var(--app-header-height));
-  padding: var(--vs-space-6) var(--vs-space-4);
+  padding: var(--vs-space-6) var(--vs-space-5);
   overflow: hidden;
-  text-align: center;
+  text-align: left;
   background:
     radial-gradient(
-      ellipse 60% 50% at 52% 68%,
+      ellipse 60% 45% at 30% 85%,
       color-mix(in srgb, var(--vs-gold) 16%, transparent),
       transparent
     ),
     radial-gradient(
-      ellipse 55% 45% at 50% 30%,
-      color-mix(in srgb, var(--vs-cyan) 14%, transparent),
+      ellipse 55% 50% at 45% 15%,
+      color-mix(in srgb, var(--vs-cyan) 18%, transparent),
       transparent
     ),
-    linear-gradient(180deg, color-mix(in srgb, var(--vs-bg) 40%, transparent), var(--vs-bg) 70%);
-}
-
-// Soft, blurred "cloud" blobs for the reference's hazy golden-hour
-// backdrop — a cheap CSS approximation of tilt-shift softness, since real
-// depth-of-field blur across WebGL geometry isn't worth the render cost
-// here.
-.hero::before,
-.hero::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  border-radius: 50%;
-  filter: blur(40px);
-  pointer-events: none;
-}
-
-.hero::before {
-  top: 8%;
-  left: -8%;
-  width: min(26rem, 55vw);
-  height: min(12rem, 22vw);
-  background: color-mix(in srgb, white 70%, var(--vs-gold) 30%);
-  opacity: 0.35;
-}
-
-.hero::after {
-  bottom: 4%;
-  right: -10%;
-  width: min(30rem, 60vw);
-  height: min(14rem, 25vw);
-  background: color-mix(in srgb, white 75%, var(--vs-cyan) 25%);
-  opacity: 0.3;
-}
-
-.hero-scene-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.hero-scene-placeholder {
-  width: 100%;
-  height: 100%;
+    var(--hero-bg);
 }
 
 .hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 38rem;
+  max-width: 34rem;
+  margin-top: var(--vs-space-5);
 }
 
 .eyebrow {
@@ -121,7 +98,7 @@ h2 {
   font-size: clamp(2rem, 1.5vw + 1.6rem, 2.85rem);
   line-height: 1.14;
   margin: 0 0 var(--vs-space-4);
-  color: var(--vs-ink);
+  color: var(--hero-ink);
 }
 
 .title-line {
@@ -129,14 +106,14 @@ h2 {
 
   em {
     font-style: normal;
-    color: var(--vs-deep-blue);
+    color: var(--vs-gold);
   }
 }
 
 .dek {
   font-size: var(--vs-font-size-md);
-  color: var(--vs-ink-soft);
-  margin: 0 auto var(--vs-space-5);
+  color: var(--hero-ink-soft);
+  margin: 0 0 var(--vs-space-3);
 }
 
 .cta-pill {
@@ -149,6 +126,7 @@ h2 {
   color: var(--vs-on-accent);
   font-weight: 600;
   text-decoration: none;
+  box-shadow: 0 8px 28px -10px color-mix(in srgb, var(--vs-accent) 70%, transparent);
   transition: transform 0.15s ease;
 
   @include mixins.focus-ring;
@@ -158,79 +136,132 @@ h2 {
   }
 }
 
-.hero-fallback-description {
-  margin-top: var(--vs-space-4);
-  color: var(--vs-ink-soft);
-  font-size: var(--vs-font-size-sm);
-  max-width: 32rem;
-}
-
-// ---- mic pedestal ----
-$bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
-
-.mic-pedestal {
+// ---- hero stage: a defined box the Three.js scene (or its fallback)
+// and the real mic overlay position against, instead of the whole .hero
+// (whose width varies with .hero-copy's own content) ----
+.hero-stage {
   position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: auto auto auto;
-  align-items: center;
-  gap: var(--vs-space-4);
-  margin-top: var(--vs-space-6);
-  padding: var(--vs-space-4) var(--vs-space-6);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 820px;
+  align-self: stretch;
 }
 
-.mic-waveform {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 2rem;
-
-  &--right {
-    flex-direction: row-reverse;
-  }
-
-  .bar {
-    width: 3px;
-    border-radius: 2px;
-    background: var(--vs-cyan);
-    opacity: 0.4;
-    transition: opacity 0.2s ease;
-
-    @for $i from 1 through list.length($bar-heights) {
-      &:nth-child(#{$i}) {
-        height: list.nth($bar-heights, $i);
-      }
-    }
-  }
+.hero-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
-.mic-pedestal.is-active .mic-waveform .bar {
-  opacity: 1;
-  background: var(--vs-cyan);
-  box-shadow: 0 0 6px var(--vs-cyan);
-  animation: mic-bar 0.9s ease-in-out infinite alternate;
-  animation-delay: calc(var(--bar) * 60ms);
+// The no-WebGL / reduced-motion path — a plain, procedural radial glow,
+// never a static image (a cropped photo here never sat right at every
+// viewport size, the same "clumsy" problem .hero's own background ran
+// into before it became a gradient).
+.mic-art-fallback {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 18rem;
+  height: 18rem;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 35% 30%,
+      color-mix(in srgb, var(--vs-cyan) 55%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 65% 70%,
+      color-mix(in srgb, var(--vs-gold) 40%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--vs-cyan) 25%, transparent), transparent 72%);
+  filter: blur(6px);
+  animation: mic-art-breathe 4.5s ease-in-out infinite;
 
   @include mixins.reduced-motion-off;
 }
 
-@keyframes mic-bar {
-  from {
-    transform: scaleY(0.6);
+@keyframes mic-art-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: translate(-50%, -50%) scale(1);
   }
-  to {
-    transform: scaleY(1);
+
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+// The real, functional mic control — overlaid centered on top of the 3D
+// scene (or its fallback glow) either way. No waveform bars here
+// anymore: the 3D scene's own pulsing rings/particles carry that role
+// when it's mounted, and the fallback path is calm on purpose.
+.mic-overlay {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vs-space-2);
+  // The flex box is much larger than the visible dial/hint (it reserves
+  // room for the hint text below), and it sits above the 3D scene — left
+  // at the default `auto`, its invisible padding blocks the canvas's own
+  // pointermove listener underneath, silently killing hover-highlight
+  // and parallax for anything behind it (found live: a hovered node
+  // chip near the mic never registered because this box, not the
+  // canvas, was catching the pointer). Only the real button opts back in.
+  pointer-events: none;
+}
+
+// The dial: the SVG ring is a purely decorative label (aria-hidden — the
+// real accessible name is .btn-mic's own aria-label), sized and
+// positioned to sit exactly around .btn-mic without affecting its click
+// target or focus ring.
+.mic-dial {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 9.5rem;
+  height: 9.5rem;
+}
+
+.mic-dial-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+
+  text {
+    fill: var(--hero-ink-faint);
+    font-size: 6.2px;
+    font-weight: 600;
+    letter-spacing: 0.25px;
+    text-transform: uppercase;
   }
 }
 
 .btn-mic {
   position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 4.5rem;
-  height: 4.5rem;
-  border: 1px solid rgb(255 255 255 / 70%);
+  width: 6.5rem;
+  height: 6.5rem;
+  pointer-events: auto;
+  border: 1px solid rgb(255 255 255 / 25%);
   border-radius: 50%;
   background: radial-gradient(
     circle at 35% 30%,
@@ -240,8 +271,8 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   color: var(--vs-on-accent);
   cursor: pointer;
   box-shadow:
-    0 0 0 1px rgb(255 255 255 / 40%) inset,
-    0 0 22px -4px var(--vs-cyan);
+    0 0 0 1px rgb(255 255 255 / 20%) inset,
+    0 0 32px -4px var(--vs-cyan);
 
   @include mixins.focus-ring;
 
@@ -270,28 +301,107 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
 }
 
 .mic-hint {
-  grid-column: 1 / -1;
-  margin: var(--vs-space-2) 0 0;
-  font-size: var(--vs-font-size-sm);
-  color: var(--vs-ink-faint);
-}
-
-.hero-info-card {
   position: relative;
   z-index: 1;
-  margin-top: var(--vs-space-5);
-  padding: var(--vs-space-2) var(--vs-space-4);
-  border-radius: var(--vs-radius-pill);
-  background: rgb(255 255 255 / 70%);
-  color: var(--vs-ink-soft);
+  margin: var(--vs-space-2) 0 0;
   font-size: var(--vs-font-size-sm);
+  color: var(--hero-ink-faint);
 }
+
+// The honest "today vs. vision" signal — deliberately plain (no pill/
+// border chrome) so it reads as a footnote under the description, not a
+// competing headline claim.
+.hero-vision-note {
+  margin: 0 0 var(--vs-space-5);
+  font-size: 0.72rem;
+  color: var(--hero-ink-faint);
+}
+
+// ---- status panel (top-right, matching the reference) ----
+.phase-legend {
+  position: absolute;
+  top: var(--vs-space-4);
+  right: var(--vs-space-4);
+  z-index: 1;
+  margin: 0;
+  padding: var(--vs-space-3) var(--vs-space-3);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vs-space-2);
+  border: 1px solid var(--hero-line);
+  border-radius: var(--vs-radius-md);
+  background: var(--hero-panel);
+  backdrop-filter: blur(8px);
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--vs-space-2);
+  padding: 2px 4px;
+  border-radius: var(--vs-radius-pill);
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+
+  &:has(.legend-label.is-active) {
+    opacity: 1;
+  }
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: box-shadow 0.2s ease;
+
+  &--voice {
+    background: #3fb56a;
+  }
+
+  &--language {
+    background: #3f96b0;
+  }
+
+  &--translation {
+    background: #7a5fc4;
+  }
+
+  &--connection {
+    background: #b9812e;
+  }
+}
+
+.legend-row:has(.legend-label.is-active) .legend-dot {
+  &--voice {
+    box-shadow: 0 0 6px 1px #3fb56a;
+  }
+
+  &--language {
+    box-shadow: 0 0 6px 1px #3f96b0;
+  }
+
+  &--translation {
+    box-shadow: 0 0 6px 1px #7a5fc4;
+  }
+
+  &--connection {
+    box-shadow: 0 0 6px 1px #b9812e;
+  }
+}
+
+.legend-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--hero-ink-soft);
+}
+
 
 .scroll-cue {
   position: absolute;
   bottom: var(--vs-space-4);
-  left: 50%;
-  transform: translateX(-50%);
+  right: var(--vs-space-4);
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -299,7 +409,7 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   gap: 2px;
   border: none;
   background: none;
-  color: var(--vs-ink-faint);
+  color: var(--hero-ink-faint);
   font-size: 0.7rem;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -334,6 +444,13 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   &.is-selected {
     border-color: var(--vs-cyan);
     background: var(--vs-accent-soft);
+  }
+
+  // Decorative echo only — set when the hero's 3D scene reports its
+  // matching node is hovered (HeroCanvas's (regionHover) output). Never
+  // required: this list's own click/keyboard behavior is unaffected.
+  &.is-hover-linked:not(.is-selected) {
+    border-color: var(--vs-cyan);
   }
 }
 
@@ -448,10 +565,6 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   }
 }
 
-.global-network-placeholder {
-  min-height: 20rem;
-}
-
 @include mixins.breakpoint-tablet {
   .lang-groups {
     grid-template-columns: 1fr 1fr;
@@ -468,13 +581,30 @@ $bar-heights: 100%, 84%, 92%, 70%, 78%, 58%, 66%, 46%, 52%, 34%, 40%, 24%;
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
+  // Stack .hero-copy above .hero-stage instead of squeezing both into a
+  // shrinking flex row.
   .hero {
     flex-direction: column;
   }
 
-  .hero-info-card,
+  .hero-stage {
+    width: 100%;
+    min-height: 420px;
+  }
+
+  // The decorative status panel and scroll cue would otherwise float
+  // over whatever's left of a narrow stage — hidden rather than shown
+  // misaligned. The headline, mic button, and CTA — the
+  // actually-functional parts — stay exactly as they are. (The
+  // language-node chip count itself reduces via hero-canvas.scss's own
+  // media query, on the same breakpoint.)
+  .phase-legend,
   .scroll-cue {
     display: none;
+  }
+
+  .mic-art-fallback {
+    width: 11rem;
   }
 }

@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TextInputBar } from './text-input-bar';
 import { ConversationService } from '../../core/services/conversation.service';
+import { SettingsStore } from '../../core/services/settings.store';
 import { VoiceSessionMockService } from '../../core/services/voice-session.mock.service';
 import { VoiceSessionService } from '../../core/services/voice-session.service';
 
@@ -9,6 +10,7 @@ describe('TextInputBar', () => {
   let voiceSession: VoiceSessionMockService;
 
   beforeEach(() => {
+    localStorage.clear();
     sendUserTurn = vi.fn();
     TestBed.configureTestingModule({
       providers: [
@@ -51,6 +53,18 @@ describe('TextInputBar', () => {
 
     expect(sendUserTurn).toHaveBeenCalledWith('Hello', 'hi');
     expect(fixture.componentInstance.draft()).toBe('');
+  });
+
+  it('sends "auto" instead of the pinned language when auto-detect is on', () => {
+    TestBed.inject(SettingsStore).setAutoDetectLanguage(true);
+
+    const fixture = TestBed.createComponent(TextInputBar);
+    fixture.detectChanges();
+    type(fixture, 'Hello');
+
+    fixture.componentInstance.send();
+
+    expect(sendUserTurn).toHaveBeenCalledWith('Hello', 'auto');
   });
 
   it('disables send while a reply is in flight', () => {

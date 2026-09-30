@@ -9,8 +9,15 @@ import {
   viewChild,
   viewChildren,
 } from '@angular/core';
-import { LANGUAGE_OPTIONS, type LanguageOption } from '../../../core/models/language.model';
+import {
+  AUTO_DETECT_OPTION,
+  LANGUAGE_OPTIONS,
+  type AutoDetectOption,
+  type LanguageOption,
+} from '../../../core/models/language.model';
 import { SettingsStore } from '../../../core/services/settings.store';
+
+type SelectorOption = AutoDetectOption | LanguageOption;
 
 /**
  * Header-level language control. This is the ONE place preferred language is
@@ -31,8 +38,9 @@ export class LanguageSelector {
   private readonly settingsStore = inject(SettingsStore);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly options: readonly LanguageOption[] = LANGUAGE_OPTIONS;
+  readonly options: readonly SelectorOption[] = [AUTO_DETECT_OPTION, ...LANGUAGE_OPTIONS];
   readonly preferredLanguage = this.settingsStore.preferredLanguage;
+  readonly autoDetectLanguage = this.settingsStore.autoDetectLanguage;
 
   readonly isOpen = signal(false);
   readonly activeIndex = signal(0);
@@ -41,9 +49,20 @@ export class LanguageSelector {
   readonly listEl = viewChild<ElementRef<HTMLUListElement>>('listEl');
   readonly optionEls = viewChildren<ElementRef<HTMLLIElement>>('optionEl');
 
-  readonly currentOption = computed<LanguageOption>(
-    () =>
-      this.options.find((option) => option.code === this.preferredLanguage()) ?? this.options[0],
+  readonly currentOption = computed<SelectorOption>(() => {
+    if (this.autoDetectLanguage()) {
+      return AUTO_DETECT_OPTION;
+    }
+    return (
+      LANGUAGE_OPTIONS.find((option) => option.code === this.preferredLanguage()) ??
+      LANGUAGE_OPTIONS[0]
+    );
+  });
+
+  /** Short enough for the header pill — "Auto-detect" is fine in the open
+   * list but too wide as the trigger's own label. */
+  readonly triggerLabel = computed(() =>
+    this.autoDetectLanguage() ? 'Auto' : this.currentOption().label,
   );
 
   constructor() {
@@ -71,7 +90,7 @@ export class LanguageSelector {
   }
 
   open(): void {
-    const index = this.options.findIndex((option) => option.code === this.preferredLanguage());
+    const index = this.options.findIndex((option) => option.code === this.currentOption().code);
     this.activeIndex.set(index >= 0 ? index : 0);
     this.isOpen.set(true);
     queueMicrotask(() => this.focusActiveOption());
@@ -82,9 +101,14 @@ export class LanguageSelector {
     this.buttonEl()?.nativeElement.focus();
   }
 
-  select(option: LanguageOption): void {
+  select(option: SelectorOption): void {
     if (!option.enabled) return;
-    this.settingsStore.setPreferredLanguage(option.code);
+    if (option.code === 'auto') {
+      this.settingsStore.setAutoDetectLanguage(true);
+    } else {
+      this.settingsStore.setAutoDetectLanguage(false);
+      this.settingsStore.setPreferredLanguage(option.code);
+    }
     this.close();
   }
 

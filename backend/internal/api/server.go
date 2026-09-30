@@ -168,6 +168,24 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "unknown or missing language code")
 		return
 	}
+	// Same reasoning as handleVoiceTurn's identical check: ASR needs a
+	// real hint before transcription, so "auto" (POST /api/v1/chat's
+	// sentinel, ADR-030) has nothing to resolve against here yet.
+	if language == autoLanguage {
+		writeError(w, http.StatusBadRequest, "invalid_request",
+			"automatic language detection is not yet supported for transcription")
+		return
+	}
+	// Same reasoning as handleVoiceTurn's identical check: faster-whisper
+	// has no real support for these (see noASRLanguages) — a capability
+	// gap, not a quality one. Rejecting explicitly beats letting it
+	// through: an unrejected request would either silently transcribe the
+	// wrong language or raise an opaque 500, not fail cleanly.
+	if noASRLanguages[language] {
+		writeError(w, http.StatusBadRequest, "invalid_request",
+			"speech recognition does not support this language yet")
+		return
+	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxAudioBytes)
 	audio, err := io.ReadAll(r.Body)
@@ -222,6 +240,14 @@ func (s *Server) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isValidLanguage(req.Language) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "unknown language code")
+		return
+	}
+	// "auto" (POST /api/v1/chat's sentinel, ADR-030) has no meaning here:
+	// this text is already-decided reply text to speak aloud, not
+	// something to run language detection against.
+	if req.Language == autoLanguage {
+		writeError(w, http.StatusBadRequest, "invalid_request",
+			"language must be a specific language, not \"auto\", for speech synthesis")
 		return
 	}
 
@@ -280,6 +306,26 @@ func (s *Server) handleVoiceTurn(w http.ResponseWriter, r *http.Request) {
 	language := r.URL.Query().Get("language")
 	if !isValidLanguage(language) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "unknown or missing language code")
+		return
+	}
+	// "auto" is valid input for POST /api/v1/chat (ADR-030) but not here:
+	// ASR needs a real language hint before transcription even happens
+	// (ADR-018 — un-hinted auto-detect decoded romanized Hinglish speech
+	// into the wrong script), so there is nothing yet to resolve "auto"
+	// against at this point in a voice turn. A real solution is deferred,
+	// not silently unsupported.
+	if language == autoLanguage {
+		writeError(w, http.StatusBadRequest, "invalid_request",
+			"automatic language detection is not yet supported for voice turns")
+		return
+	}
+	// faster-whisper has no real support for these (see noASRLanguages) —
+	// a capability gap, not the accuracy gap Malayalam has (ADR-029).
+	// Letting either reach the ASR call would produce a wrong-language
+	// transcript or an opaque 500, not a clean failure — reject explicitly.
+	if noASRLanguages[language] {
+		writeError(w, http.StatusBadRequest, "invalid_request",
+			"speech recognition does not support this language yet")
 		return
 	}
 	voice := r.URL.Query().Get("voice")
