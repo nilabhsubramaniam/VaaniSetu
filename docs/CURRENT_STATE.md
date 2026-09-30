@@ -9,7 +9,18 @@ project moves between milestones or a phase's status changes.
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
   **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap
   — see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
-  latency gap — see below). Phase 6 - Indian Language Support,
+  latency gap — see below). Phase 7 - RAG, **IN PROGRESS** (Milestone
+  7a: the document-upload boundary — plain-text-only `POST`/`GET
+  /api/v1/documents`, a `documents` table with no `vector` column yet,
+  and a new `embedding` Go capability boundary following the same
+  Fake/HTTP pattern every other capability uses, wired into
+  `documents.Service` but not called by any request path yet — see
+  `docs/DECISIONS.md` ADR-036 — and Milestone 7b: the real Python
+  `embedding` capability, benchmarked and wired — `intfloat/
+  multilingual-e5-base` selected on real latency/memory/dimension
+  tie-breakers after all three candidates tied at 100% retrieval
+  accuracy on the fixture set; `POST /v1/embed` live-verified — see
+  ADR-037; both complete). Phase 6 - Indian Language Support,
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
   Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
   transliteration, Malayalam's real bottleneck diagnosed —, 6e —
@@ -27,7 +38,9 @@ project moves between milestones or a phase's status changes.
   LLM-generation and ASR-capability blockers) is **deferred at the
   user's explicit request** (2026-09-30), not abandoned — see below for
   the real evidence gathered before deferring.
-- **Current focus:** none. Phase 6 has no approved work in progress.
+- **Current focus:** none of Phase 7's remaining scope is currently
+  approved to start (Milestones 7c/7d/7e are sketched, not approved — see
+  `AGENTS.md` §5). Phase 6 has no approved work in progress either.
   Milestone 6g's real ASR-candidate search reached a confirmed dead end
   for now: a valid Hugging Face login was obtained, but both
   `ai4bharat/indic-conformer-600m-multilingual` and `ARTPARK-IISc/
@@ -38,7 +51,84 @@ project moves between milestones or a phase's status changes.
   revisiting later if access is ever granted; the user chose to defer
   rather than wait on it. Maithili's `LANGUAGE_OPTIONS.mai.enabled`
   stays `false`.
-- **Last updated:** 2026-09-29 (Phase 6 Milestone 6j: evaluated Odia, the
+- **Last updated:** 2026-09-30 (Phase 7 Milestone 7b: the real Python
+  `embedding` capability, benchmark, and real wiring. Before
+  implementation, narrowed 7b's scope against this project's own
+  precedent — every prior phase's "b" milestone (2b/3b/4b/6b) did only
+  "Python capability + benchmark + real wiring", but ADR-036's original
+  sketch had bundled chunking, the `document_chunks`/pgvector schema, and
+  an async job-dispatch mechanism into "7b" too — moved that bundle to a
+  new, not-yet-approved Milestone 7c instead. New
+  `ai-services/app/engines/embedding/` module (`EmbeddingEngine`
+  interface, `SentenceTransformersEngine`, mirroring `langid`'s
+  subpackage layout) and a new `models.yaml` `embedding` section with
+  three real, ungated, license-checked candidates
+  (`paraphrase-multilingual-mpnet-base-v2`, `multilingual-e5-base`,
+  `bge-m3`). Real benchmark (`scripts/benchmark_embedding.py`, per-
+  candidate subprocess isolation, same pattern as `benchmark_langid.py`)
+  measures retrieval quality with a cosine-similarity proxy — no pgvector
+  pipeline exists yet — against a composed fixture set
+  (`eval_data/embedding_fixtures.yaml`) that deliberately includes
+  cross-lingual query/passage pairs, per `docs/PROJECT_GOAL.md`'s
+  cross-lingual grounding goal. All three candidates tied at 100%
+  overall and cross-lingual accuracy (the fixture set is too easy to
+  discriminate quality), so `intfloat/multilingual-e5-base` was selected
+  on the real tie-breakers: ~6x faster mean passage-embed latency than
+  the slowest candidate (0.0228s vs 0.1438s), lowest peak memory
+  (719.9MB), and the smallest of the two tied-smallest embedding
+  dimensions (768). `POST /v1/embed` added to `ai-services/app/main.py`,
+  mirroring `/v1/detect`'s shape exactly; `/healthz` now reports the
+  embedding model too. Go side needed no code change: setting
+  `VAANISETU_EMBEDDING_SERVICE_URL` switches `cmd/api/main.go` from
+  `FakeEmbeddingClient` to the already-built `HTTPEmbeddingClient` from
+  Milestone 7a, the same "swap by config" mechanism (ADR-006) proven for
+  every other capability. A real, measured download-size fix found along
+  the way: `sentence_transformers`-engine snapshots were pulling
+  redundant ONNX/OpenVINO/TensorFlow/Flax/Rust weight variants this
+  project's engine never loads, roughly doubling one candidate's
+  download size — fixed with a scoped `ignore_patterns` filter in
+  `scripts/download_models.py` (the separate `.bin`/`.safetensors`
+  duplication within the PyTorch format itself was not fixed, an
+  accepted, non-blocking inefficiency). 9 new Python tests (93 total, all
+  pass); `ruff check`/`ruff format --check` clean. **Verified live, end
+  to end:** the AI service loads all five models (llm, asr, tts x12
+  languages, langid, embedding) and reports ready; a direct `POST
+  /v1/embed` call with real Hindi text returns a real 768-dimension
+  vector; the same text embedded twice produces identical vectors
+  (determinism confirmed) and different text produces a different
+  vector. See `docs/DECISIONS.md` ADR-037 for the full benchmark table,
+  scope-split reasoning, and evidence.
+  Earlier that day (Phase 7 Milestone 7a: the document-upload
+  boundary), no dependency on Phase 6 so it started even with Phase 6's
+  Maithili gap deferred. `backend/migrations/0004_add_documents.sql`
+  adds a plain `documents` table (`id`/`title`/`content`/`status`/
+  `created_at`) — deliberately no `vector` column and no `CREATE
+  EXTENSION vector` yet, even though `docker-compose.yml`'s `postgres`
+  service already runs the `pgvector/pgvector:pg16` image: the real
+  embedding dimension isn't known until Milestone 7b benchmarks a model,
+  and guessing now would mean a disruptive column-type migration later.
+  New `backend/internal/embedding` package (Fake/HTTP client pair,
+  following the exact pattern `llm`/`asr`/`tts`/`langid` established) and
+  `backend/internal/documents` package (persistence only — `CreateDocument`
+  always writes `status: "pending"` and nothing transitions it; the
+  embedding client is threaded through the constructor but not called by
+  either method yet, the same "wire it in before every method uses it"
+  shape `conversation.Service` uses). New `POST`/`GET /api/v1/documents`,
+  `proto/embedding.openapi.yaml`, `docs/openapi/documents.yaml`. `go
+  build/vet/test`, `gofmt` all clean; new unit tests for both new
+  packages (the `documents` package's are Docker-gated integration tests,
+  same pattern as `conversation`'s, skip cleanly without Docker in this
+  environment). **Verified live** against a real (native) PostgreSQL: the
+  new migration applied automatically at boot, a real `POST
+  /api/v1/documents` persisted a row, `GET` returned it, the empty-title/
+  empty-content validation paths returned clean 400s, and the existing
+  `/chat` endpoint was unaffected. A real open design question was
+  flagged, not assumed: `docs/ARCHITECTURE.md` §4's "RAG retrieval
+  mechanics | Python (called by Go)" could mean Python needs its own
+  Postgres connection — recorded for Milestone 7c to resolve when
+  retrieval is actually built, not decided now. See `docs/DECISIONS.md`
+  ADR-036 for the full reasoning.
+  The day before (2026-09-29): Phase 6 Milestone 6j: evaluated Odia, the
   last of the phase's originally-named eight languages — **not enabled**,
   a genuinely different outcome from Milestones 6h/6i's six enabled
   languages, not a rubber-stamped continuation of that pattern.

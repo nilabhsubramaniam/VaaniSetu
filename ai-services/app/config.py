@@ -29,6 +29,7 @@ class Config:
     asr_model_store_dir: str
     tts_model_store_dir: str
     langid_model_store_dir: str
+    embedding_model_store_dir: str
     # One of "debug", "info", "warn", "error" — same levels as the Go
     # backend's internal/logging, for consistency across services.
     log_level: str
@@ -41,6 +42,7 @@ def load() -> Config:
     default_asr_store_dir = os.path.join(here, "..", "..", "models", "asr")
     default_tts_store_dir = os.path.join(here, "..", "..", "models", "tts")
     default_langid_store_dir = os.path.join(here, "..", "..", "models", "langid")
+    default_embedding_store_dir = os.path.join(here, "..", "..", "models", "embedding")
 
     return Config(
         port=int(os.environ.get("VAANISETU_LLM_PORT", "8090")),
@@ -50,6 +52,9 @@ def load() -> Config:
         tts_model_store_dir=os.environ.get("VAANISETU_TTS_MODEL_STORE", default_tts_store_dir),
         langid_model_store_dir=os.environ.get(
             "VAANISETU_LANGID_MODEL_STORE", default_langid_store_dir
+        ),
+        embedding_model_store_dir=os.environ.get(
+            "VAANISETU_EMBEDDING_MODEL_STORE", default_embedding_store_dir
         ),
         log_level=os.environ.get("VAANISETU_LLM_LOG_LEVEL", "info"),
     )

@@ -2490,6 +2490,182 @@ the real Three.js map scene.
   gap-closing (Milestone 6g, paused) remains open in Phase 6's
   currently-scoped work.
 
+## ADR-036 - Phase 7 Milestone 7a: document-upload boundary, embedding capability deferred
+
+- **Decision:** Two related choices establishing Phase 7's first slice:
+  1. **A `documents` table with no `vector` column yet**, and no
+     `CREATE EXTENSION vector` — even though `docker-compose.yml`'s
+     `postgres` service already runs the `pgvector/pgvector:pg16` image.
+     `documents.id/title/content/status/created_at` is the entire schema
+     this milestone adds (`backend/migrations/0004_add_documents.sql`).
+  2. **Plain-text upload only** — `POST /api/v1/documents` accepts
+     `{title, content}` JSON; no file-format parsing (PDF/DOCX/etc.) this
+     milestone.
+  3. **A new `embedding` capability boundary** (`backend/internal/
+     embedding`), following the exact Fake/HTTP pattern `llm`/`asr`/
+     `tts`/`langid` already established — but not called by any request
+     path yet. `documents.Service` takes an `embedding.EmbeddingClient`
+     at construction (the same "wire the client in even before every
+     method uses it" shape `conversation.Service` uses) so Milestone 7b
+     can add chunking/embedding without another constructor-signature
+     change, but `CreateDocument`/`ListDocuments` never call it.
+- **Reason:**
+  1. The real embedding dimension is unknown until Milestone 7b
+     benchmarks and selects a candidate model (this project's own
+     "measure before selecting" principle, ADR-008). `pgvector`'s
+     `vector` column type is fixed-dimension at creation time — guessing
+     a dimension now would mean either picking arbitrarily (violating
+     "measure before selecting") or a disruptive column-type migration
+     once the real model is chosen. Deferring the column avoids both.
+  2. File-format parsing (extracting text from PDF/DOCX/etc.) is a real,
+     separate technical concern needing its own library choice and
+     testing — cutting it from 7a keeps this milestone to exactly
+     "upload and store," provably correct on its own, the same
+     incremental discipline every prior phase's first milestone used
+     (Milestone 2a shipped chat against `FakeLLMClient` with no real
+     model; 3a shipped audio capture before any real ASR; 6a shipped the
+     langid boundary before any real classifier).
+  3. `docs/ARCHITECTURE.md` §3.2 requires chunking/embedding to be
+     dispatched to Python as an async job, not embedded inline in the
+     upload request — a genuinely new pattern (every existing capability
+     is a synchronous request/response call). Designing that dispatch
+     mechanism is real, separate work belonging to Milestone 7b, once
+     there's a real engine to dispatch to; building it against a fake
+     with no real consumer risks guessing wrong and redoing it.
+- **A real open question, flagged rather than assumed**:
+  `docs/ARCHITECTURE.md` §4's boundary table lists "RAG retrieval
+  mechanics | Python (called by Go)". Read literally this could mean
+  Python needs its own Postgres connection to run the vector-similarity
+  query itself — a pattern no existing capability has (all are
+  stateless; "Persistence, migrations" is listed as Go's alone
+  elsewhere in the same table). This milestone does not resolve it —
+  retrieval doesn't exist yet — but records the question now so
+  Milestone 7c doesn't silently assume an answer: the recommended
+  reading is that "retrieval mechanics" means the ML algorithm
+  (embedding a query, reranking candidates), both stateless Python
+  calls Go makes, while the actual `SELECT ... ORDER BY embedding <->
+  $1` query stays in Go, consistent with Go owning persistence
+  everywhere else in this project.
+- **Alternatives considered:**
+  - **Pick a common embedding dimension now** (e.g. 768, matching many
+    popular sentence-transformer models) and add the `vector` column in
+    this migration — rejected: this project selects models by
+    benchmark, not by popularity, and a wrong guess means an extra
+    migration later for no benefit gained now.
+  - **Support real file upload (PDF/DOCX) in 7a** — rejected as the
+    same kind of premature scope-widening every prior phase's first
+    milestone has avoided; a real parsing-library choice deserves its
+    own evidence-based decision, not a default bundled into the upload
+    boundary.
+- **Impact:** New `backend/internal/embedding` and `backend/internal/
+  documents` packages; `backend/migrations/0004_add_documents.sql`; new
+  `POST`/`GET /api/v1/documents`; `config.Config` gained
+  `EmbeddingServiceURL`/`UsesFakeEmbedding`; new `proto/
+  embedding.openapi.yaml` and `docs/openapi/documents.yaml`. No Python,
+  no frontend, no docker-compose change. Verified live against a real
+  (native) PostgreSQL: the new migration applies automatically at boot,
+  a real `POST /api/v1/documents` persists a row, `GET` returns it, and
+  the existing `/chat` endpoint is unaffected.
+- **Status:** Accepted. Phase 7 moves from `NOT STARTED` to `IN PROGRESS
+  (Milestone 7a)`. Milestones 7b (real embedding model + chunking +
+  pgvector schema completion), 7c (retrieval + rerank + grounded prompt
+  assembly), and 7d (frontend upload UI) are sketched but not planned in
+  detail or approved — each needs its own approval per `AGENTS.md` §5.
+
+## ADR-037 - Phase 7 Milestone 7b: `embedding` capability, benchmark, and real wiring; 7b/7c scope split
+
+- **Decision:** Three related choices:
+  1. **A real scope correction, made before implementation, not after**:
+     ADR-036's own sketch bundled "real embedding model + chunking +
+     pgvector schema completion + async job dispatch" into "Milestone
+     7b". Checked against how this project's own prior phases actually
+     split their "b" milestones — 2b, 3b, 4b, 6b each did *only* the
+     Python capability + benchmark + selection + config-only Go wiring,
+     with zero new Go orchestration logic — that bundle was too big for
+     one milestone. **Narrowed 7b to exactly that precedent's shape**;
+     chunking, the `document_chunks`/pgvector schema, and the async
+     job-dispatch mechanism move to a new Milestone 7c, not planned in
+     detail here. Confirmed by direct inspection before deciding this:
+     no goroutine-worker, queue, or background-job pattern exists
+     anywhere in `backend/` today — every existing capability is a
+     synchronous request/response call, so designing that dispatch
+     mechanism is real, separate work deserving its own milestone.
+  2. **`ai-services/app/engines/embedding/`** (`base.py` +
+     `sentence_transformers_engine.py`) added, following the exact
+     `langid` subpackage pattern; `app/registry.py`/`app/main.py`/
+     `models.yaml` extended the same generic way every prior capability
+     was. `sentence-transformers` added as a new runtime dependency —
+     the standard, well-tested wrapper for pooling/normalizing a
+     transformer's hidden states, avoiding hand-rolling that logic on
+     top of the already-present bare `torch`/`transformers`.
+  3. **`intfloat/multilingual-e5-base` selected** after a real benchmark
+     of three real, license-checked, ungated candidates.
+- **Reason — the benchmark, measured not assumed:**
+  Retrieval doesn't exist yet (7c/7d), so quality was measured directly
+  with cosine similarity in `scripts/benchmark_embedding.py` — a small,
+  composed set of 5 passages and 8 queries (`eval_data/
+  embedding_fixtures.yaml`), 3 of the 8 queries deliberately
+  cross-lingual (a different language than their matching passage),
+  since `docs/PROJECT_GOAL.md` explicitly wants "cross-lingual
+  grounding." All three candidates scored identically:
+
+  | Candidate | License | Dimensions | Overall accuracy | Cross-lingual accuracy | Mean passage-embed latency | Peak RSS |
+  |---|---|---|---|---|---|---|
+  | `paraphrase-multilingual-mpnet-base-v2` | Apache-2.0 | 768 | 1.00 | 1.00 | 0.144s | 804.8MB |
+  | `multilingual-e5-base` | MIT | 768 | 1.00 | 1.00 | **0.023s** | **719.9MB** |
+  | `bge-m3` | MIT | 1024 | 1.00 | 1.00 | 0.075s | 728.1MB |
+
+  A real, honest finding, not hidden: this fixture set's passages are
+  topically distinct enough that all three candidates solved it
+  perfectly — it does not discriminate retrieval *quality* at this
+  small scale. The decision came down to the real, measured
+  tie-breakers instead, exactly as planned before seeing the numbers:
+  `multilingual-e5-base` won on every one — ~6x faster passage-embedding
+  latency than `paraphrase-multilingual-mpnet-base-v2`, the lowest peak
+  memory, and the smallest dimension (cheaper to store/index once
+  pgvector is wired in, versus `bge-m3`'s 1024). E5's own training uses
+  asymmetric `"query: "`/`"passage: "` prefixes for best retrieval
+  quality — applied in the benchmark's own calls (`models.yaml`'s
+  `query_prefix`/`passage_prefix` fields, read only by the benchmark
+  script, not the engine or the real `/v1/embed` request path) to give
+  it a fair, correctly-configured evaluation.
+- **A real, independent inefficiency found and fixed along the way**:
+  `scripts/download_models.py`'s `snapshot_download` call pulled every
+  file in each repo by default, including redundant alternate weight
+  formats (ONNX, OpenVINO) a plain PyTorch load never uses — measured
+  directly: the first candidate's download roughly doubled in size for
+  files this project's `SentenceTransformersEngine` never touches. Fixed
+  with an `ignore_patterns` filter scoped to the `sentence_transformers`
+  engine kind only, leaving every other engine kind's download
+  untouched.
+- **Alternatives considered:**
+  - **Keep 7b's original, larger scope** — rejected: see reason 1 above;
+    doesn't match this project's own proven milestone sizing.
+  - **Pick a winner by accuracy alone, ignore the tie** — rejected as
+    incomplete: the plan committed to latency/memory as real
+    tie-breakers before seeing results specifically so a tie wouldn't
+    become an arbitrary pick; `multilingual-e5-base` won that
+    comparison decisively, not by default.
+- **Impact:** New `ai-services/app/engines/embedding/*.py`; `app/
+  registry.py`/`app/main.py`/`app/config.py` extended (new
+  `sentence_transformers` engine branch, `POST /v1/embed`,
+  `embedding_model_store_dir`); `models.yaml` gained an `embedding:`
+  section; new `eval_data/embedding_fixtures.yaml` and `scripts/
+  benchmark_embedding.py`; `pyproject.toml` gained `sentence-
+  transformers`; `scripts/download_models.py`'s snapshot-download path
+  gained the format-filtering fix. No `backend/` file changes — setting
+  `VAANISETU_EMBEDDING_SERVICE_URL` switches `cmd/api/main.go` from
+  `FakeEmbeddingClient` to `HTTPEmbeddingClient` with no code change,
+  already built in Milestone 7a. 9 new Python tests (93 total), `ruff
+  check`/`ruff format --check` clean. **Verified live**: the real
+  running service reports `embedding_model: "multilingual-e5-base"` and
+  `ready: true`; a real `POST /v1/embed` call returns a real 768-
+  dimension vector; the same text embeds identically twice; different
+  text produces a different vector.
+- **Status:** Accepted. Milestone 7c (chunking, `document_chunks`/
+  pgvector schema, async job-dispatch design) is sketched but not
+  planned in detail or approved.
+
 ## Template for future ADRs
 
 ```

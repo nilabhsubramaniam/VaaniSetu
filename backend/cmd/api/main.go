@@ -20,6 +20,8 @@ import (
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/config"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/documents"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/embedding"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
@@ -89,8 +91,17 @@ func run() error {
 		langIDClient = langid.NewHTTPLangIDClient(cfg.LangIDServiceURL)
 	}
 
+	var embeddingClient embedding.EmbeddingClient
+	if cfg.UsesFakeEmbedding() {
+		logger.Warn("no VAANISETU_EMBEDDING_SERVICE_URL set — using FakeEmbeddingClient (Milestone 7a behavior)")
+		embeddingClient = embedding.NewFakeEmbeddingClient()
+	} else {
+		embeddingClient = embedding.NewHTTPEmbeddingClient(cfg.EmbeddingServiceURL)
+	}
+
 	convService := conversation.NewService(pool, llmClient, langIDClient, logger)
-	server := api.NewServer(convService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
+	documentsService := documents.NewService(pool, embeddingClient)
+	server := api.NewServer(convService, documentsService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -113,6 +124,7 @@ func run() error {
 		"usesFakeASR", cfg.UsesFakeASR(),
 		"usesFakeTTS", cfg.UsesFakeTTS(),
 		"usesFakeLangID", cfg.UsesFakeLangID(),
+		"usesFakeEmbedding", cfg.UsesFakeEmbedding(),
 		"allowedOrigin", cfg.AllowedOrigin,
 	)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

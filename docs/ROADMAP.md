@@ -359,7 +359,26 @@ ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
 ## Phase 7 - RAG
 
-**Status:** NOT STARTED
+**Status:** IN PROGRESS — Milestone 7a (the document-upload boundary: a
+plain-text-only `POST`/`GET /api/v1/documents`, a `documents` table with
+no `vector` column yet, and a new `embedding` Go capability boundary
+following the exact Fake/HTTP pattern every other capability uses, wired
+into `documents.Service` but not called by any request path yet — see
+`docs/DECISIONS.md` ADR-036) and Milestone 7b (the real Python
+`embedding` capability — three real candidates benchmarked with a
+cosine-similarity retrieval-quality proxy including cross-lingual
+queries; all three tied at 100% accuracy on the small fixture set, so
+`intfloat/multilingual-e5-base` was selected on the real, measured
+tie-breakers — ~6x faster than the slowest candidate, lowest memory,
+smallest embedding dimension; `POST /v1/embed` live-verified against the
+real running service — see ADR-037; the 7b/7c scope was narrowed before
+implementation to match every prior phase's own "b" milestone shape,
+with chunking/schema/async-job design moved to 7c) are both complete.
+Milestone 7c (chunking, `document_chunks`/pgvector schema, the async
+job-dispatch mechanism — a genuinely new pattern, confirmed nothing like
+it exists in `backend/` today) and 7d (retrieval + rerank + grounded
+prompt assembly) and 7e (frontend upload UI) are sketched only, not
+approved — each needs its own go-ahead per `AGENTS.md` §5.
 
 - **Objective:** Let the assistant answer from user-provided documents,
   grounded and cross-lingual.

@@ -1,0 +1,323 @@
+{
+  "passages": [
+    {
+      "id": "p1",
+      "language": "hi",
+      "text": "भारत की राजधानी दिल्ली है। यह एक बहुत पुराना और ऐतिहासिक शहर है।"
+    },
+    {
+      "id": "p2",
+      "language": "en",
+      "text": "The Eiffel Tower is located in Paris, France. It was completed in 1889 and is 330 meters tall."
+    },
+    {
+      "id": "p3",
+      "language": "hinglish",
+      "text": "Mera favorite food pizza hai, especially jab usme extra cheese ho aur thoda spicy ho."
+    },
+    {
+      "id": "p4",
+      "language": "hi",
+      "text": "मानसून का मौसम जून से सितंबर तक रहता है और इस दौरान भारी बारिश होती है।"
+    },
+    {
+      "id": "p5",
+      "language": "en",
+      "text": "Python is a popular programming language known for its readability and large ecosystem of libraries."
+    }
+  ],
+  "queries": [
+    {
+      "id": "q1",
+      "language": "hi",
+      "text": "भारत की राजधानी कौन सी है?",
+      "passage_id": "p1",
+      "cross_lingual": false
+    },
+    {
+      "id": "q2",
+      "language": "en",
+      "text": "What is the capital city of India?",
+      "passage_id": "p1",
+      "cross_lingual": true
+    },
+    {
+      "id": "q3",
+      "language": "en",
+      "text": "Where is the Eiffel Tower situated?",
+      "passage_id": "p2",
+      "cross_lingual": false
+    },
+    {
+      "id": "q4",
+      "language": "hi",
+      "text": "एफिल टावर कहाँ स्थित है?",
+      "passage_id": "p2",
+      "cross_lingual": true
+    },
+    {
+      "id": "q5",
+      "language": "hinglish",
+      "text": "Tumhara pasandida khana kya hai?",
+      "passage_id": "p3",
+      "cross_lingual": false
+    },
+    {
+      "id": "q6",
+      "language": "hi",
+      "text": "मानसून का मौसम कब शुरू होता है?",
+      "passage_id": "p4",
+      "cross_lingual": false
+    },
+    {
+      "id": "q7",
+      "language": "en",
+      "text": "When does the monsoon season begin in India?",
+      "passage_id": "p4",
+      "cross_lingual": true
+    },
+    {
+      "id": "q8",
+      "language": "en",
+      "text": "What programming language is known for readability?",
+      "passage_id": "p5",
+      "cross_lingual": false
+    }
+  ],
+  "results": [
+    {
+      "key": "paraphrase-multilingual-mpnet-base-v2",
+      "repo_id": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+      "license": "Apache-2.0",
+      "load_seconds": 5.577,
+      "dimensions": 768,
+      "overall_accuracy": 1.0,
+      "cross_lingual_accuracy": 1.0,
+      "mean_passage_embed_seconds": 0.1438,
+      "mean_query_embed_seconds": 0.0146,
+      "peak_rss_mb": 804.8,
+      "runs": [
+        {
+          "query_id": "q1",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q2",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q3",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q4",
+          "language": "hi",
+          "cross_lingual": true,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q5",
+          "language": "hinglish",
+          "cross_lingual": false,
+          "top1_passage_id": "p3",
+          "expected_passage_id": "p3",
+          "correct": true
+        },
+        {
+          "query_id": "q6",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q7",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q8",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p5",
+          "expected_passage_id": "p5",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "key": "multilingual-e5-base",
+      "repo_id": "intfloat/multilingual-e5-base",
+      "license": "MIT",
+      "load_seconds": 1.853,
+      "dimensions": 768,
+      "overall_accuracy": 1.0,
+      "cross_lingual_accuracy": 1.0,
+      "mean_passage_embed_seconds": 0.0228,
+      "mean_query_embed_seconds": 0.0069,
+      "peak_rss_mb": 719.9,
+      "runs": [
+        {
+          "query_id": "q1",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q2",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q3",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q4",
+          "language": "hi",
+          "cross_lingual": true,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q5",
+          "language": "hinglish",
+          "cross_lingual": false,
+          "top1_passage_id": "p3",
+          "expected_passage_id": "p3",
+          "correct": true
+        },
+        {
+          "query_id": "q6",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q7",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q8",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p5",
+          "expected_passage_id": "p5",
+          "correct": true
+        }
+      ]
+    },
+    {
+      "key": "bge-m3",
+      "repo_id": "BAAI/bge-m3",
+      "license": "MIT",
+      "load_seconds": 2.587,
+      "dimensions": 1024,
+      "overall_accuracy": 1.0,
+      "cross_lingual_accuracy": 1.0,
+      "mean_passage_embed_seconds": 0.0753,
+      "mean_query_embed_seconds": 0.0169,
+      "peak_rss_mb": 728.1,
+      "runs": [
+        {
+          "query_id": "q1",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q2",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p1",
+          "expected_passage_id": "p1",
+          "correct": true
+        },
+        {
+          "query_id": "q3",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q4",
+          "language": "hi",
+          "cross_lingual": true,
+          "top1_passage_id": "p2",
+          "expected_passage_id": "p2",
+          "correct": true
+        },
+        {
+          "query_id": "q5",
+          "language": "hinglish",
+          "cross_lingual": false,
+          "top1_passage_id": "p3",
+          "expected_passage_id": "p3",
+          "correct": true
+        },
+        {
+          "query_id": "q6",
+          "language": "hi",
+          "cross_lingual": false,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q7",
+          "language": "en",
+          "cross_lingual": true,
+          "top1_passage_id": "p4",
+          "expected_passage_id": "p4",
+          "correct": true
+        },
+        {
+          "query_id": "q8",
+          "language": "en",
+          "cross_lingual": false,
+          "top1_passage_id": "p5",
+          "expected_passage_id": "p5",
+          "correct": true
+        }
+      ]
+    }
+  ]
+}

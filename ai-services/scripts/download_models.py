@@ -7,9 +7,10 @@ service or running a benchmark:
     uv run scripts/download_models.py [--only KEY]
 
 `llama_cpp` candidates (the "llm" capability) are a single GGUF file;
-`faster_whisper` (the "asr" capability) and `mms_vits`/`parler_tts`/`xtts`
-(the "tts" capability) candidates are each a full repo snapshot downloaded
-as a directory; `fasttext_lid` (the "langid" capability) is a single file
+`faster_whisper` (the "asr" capability), `mms_vits`/`parler_tts`/`xtts`
+(the "tts" capability), and `sentence_transformers` (the "embedding"
+capability) candidates are each a full repo snapshot downloaded as a
+directory; `fasttext_lid` (the "langid" capability) is a single file
 fetched from a direct URL (not a HF repo); `indiclid` (also "langid") is
 three separate direct-URL zip files, extracted in place, plus one HF
 snapshot for its BERT fallback stage's tokenizer — see app/registry.py for
@@ -65,13 +66,32 @@ def _download_one(capability: str, key: str, entry: dict, store_dir: str) -> Non
         print(f"[done] {capability}/{key}: {path}")
         return
 
-    if entry["engine"] in ("faster_whisper", "mms_vits", "parler_tts", "xtts"):
+    if entry["engine"] in (
+        "faster_whisper",
+        "mms_vits",
+        "parler_tts",
+        "xtts",
+        "sentence_transformers",
+    ):
         dest_dir = os.path.join(store_dir, key)
         if os.path.isdir(dest_dir) and os.listdir(dest_dir):
             print(f"[skip] {capability}/{key}: already present at {dest_dir}")
             return
         print(f"[download] {capability}/{key}: {entry['repo_id']} (full snapshot)")
-        path = snapshot_download(repo_id=entry["repo_id"], local_dir=dest_dir)
+        # sentence-transformers repos commonly ship redundant alternate
+        # weight formats (ONNX, OpenVINO, TensorFlow, Flax, Rust) alongside
+        # the plain PyTorch weights this project's SentenceTransformersEngine
+        # actually loads — real, measured (not assumed): the first candidate
+        # benchmarked in Milestone 7b pulled an unrelated ONNX variant that
+        # roughly doubled its download size for nothing this project uses.
+        ignore_patterns = (
+            ["onnx/*", "openvino/*", "*.onnx", "tf_model.h5", "flax_model.msgpack", "rust_model.ot"]
+            if entry["engine"] == "sentence_transformers"
+            else None
+        )
+        path = snapshot_download(
+            repo_id=entry["repo_id"], local_dir=dest_dir, ignore_patterns=ignore_patterns
+        )
         print(f"[done] {capability}/{key}: {path}")
         return
 

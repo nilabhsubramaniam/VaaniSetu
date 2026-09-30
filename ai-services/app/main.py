@@ -1,12 +1,13 @@
 """VaaniSetu's Python AI service HTTP surface: the `llm` capability
 (proto/llm.openapi.yaml, `POST /v1/generate`), the `asr` capability
 (proto/asr.openapi.yaml, `POST /v1/transcribe`), the `tts` capability
-(proto/tts.openapi.yaml, `POST /v1/synthesize`), and the `langid`
-capability (proto/langid.openapi.yaml, `POST /v1/detect`), hosted in one
-FastAPI app per docs/DECISIONS.md ADR-017 — "one module per capability" is
-a code-organization convention (docs/DEVELOPMENT.md §5), not a
-one-process-per-capability deployment rule. Plus an operational
-`/healthz` that neither contract requires but
+(proto/tts.openapi.yaml, `POST /v1/synthesize`), the `langid` capability
+(proto/langid.openapi.yaml, `POST /v1/detect`), and the `embedding`
+capability (proto/embedding.openapi.yaml, `POST /v1/embed`, Phase 7
+Milestone 7b), hosted in one FastAPI app per docs/DECISIONS.md ADR-017 —
+"one module per capability" is a code-organization convention
+(docs/DEVELOPMENT.md §5), not a one-process-per-capability deployment
+rule. Plus an operational `/healthz` that neither contract requires but
 docs/ARCHITECTURE.md §3.3 asks every AI service to expose ("model warm /
 ready state").
 
@@ -26,6 +27,7 @@ from pydantic import BaseModel
 from . import config, registry
 from .engines.asr.base import ASREngine, TranscribeRequest
 from .engines.base import GenerateRequest, LLMEngine
+from .engines.embedding.base import EmbeddingEngine, EmbedRequest
 from .engines.langid.base import DetectRequest, LangIDEngine
 from .engines.tts.base import SynthesizeRequest, TTSEngine
 
@@ -55,6 +57,8 @@ class _AppState:
     tts_model_keys: dict[str, dict[str, str]] | None = None
     langid_engine: LangIDEngine | None = None
     langid_model_key: str | None = None
+    embedding_engine: EmbeddingEngine | None = None
+    embedding_model_key: str | None = None
 
 
 @asynccontextmanager
@@ -106,6 +110,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         app.state.state.langid_model_key = langid_entry.key
         logger.info("langid model loaded: %s (%s)", langid_entry.key, langid_entry.repo_id)
+
+        embedding_entry = registry.load_selected_entry(_cfg.model_registry_path, "embedding")
+        app.state.state.embedding_engine = registry.build_engine(
+            embedding_entry, _cfg.embedding_model_store_dir
+        )
+        app.state.state.embedding_model_key = embedding_entry.key
+        logger.info("embedding model loaded: %s (%s)", embedding_entry.key, embedding_entry.repo_id)
     except registry.RegistryError as e:
         # Fail loudly at startup rather than on the first request — an
         # operator finds out immediately that a configured model isn't
@@ -165,6 +176,13 @@ def get_langid_engine() -> LangIDEngine:
     engine = app.state.state.langid_engine
     if engine is None:
         raise HTTPException(status_code=503, detail="langid model not loaded")
+    return engine
+
+
+def get_embedding_engine() -> EmbeddingEngine:
+    engine = app.state.state.embedding_engine
+    if engine is None:
+        raise HTTPException(status_code=503, detail="embedding model not loaded")
     return engine
 
 
@@ -262,6 +280,28 @@ def detect(
     return DetectResponseBody(language=result.language, confidence=result.confidence)
 
 
+class EmbedRequestBody(BaseModel):
+    text: str
+
+
+class EmbedResponseBody(BaseModel):
+    vector: list[float]
+    dimensions: int
+
+
+@app.post("/v1/embed", response_model=EmbedResponseBody)
+def embed(
+    body: EmbedRequestBody, engine: EmbeddingEngine = Depends(get_embedding_engine)
+) -> EmbedResponseBody:
+    try:
+        result = engine.embed(EmbedRequest(text=body.text))
+    except Exception as e:  # noqa: BLE001 - see the /v1/generate handler's identical reasoning
+        logger.error("embed failed: %s", e)
+        raise HTTPException(status_code=500, detail="embedding failed") from e
+
+    return EmbedResponseBody(vector=result.vector, dimensions=result.dimensions)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, object]:
     state = app.state.state
@@ -274,9 +314,11 @@ def healthz() -> dict[str, object]:
             and state.asr_engine is not None
             and tts_ready
             and state.langid_engine is not None
+            and state.embedding_engine is not None
         ),
         "llm_model": state.llm_model_key,
         "asr_model": state.asr_model_key,
         "tts_models": state.tts_model_keys or {},
         "langid_model": state.langid_model_key,
+        "embedding_model": state.embedding_model_key,
     }

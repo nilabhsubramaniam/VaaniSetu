@@ -44,6 +44,14 @@ type Config struct {
 	// Milestone 6a's default — no Python `langid` capability exists yet).
 	LangIDServiceURL string
 
+	// EmbeddingServiceURL, when set, points HTTPEmbeddingClient at the
+	// Python `embedding` capability (see internal/embedding) — typically
+	// the same host:port as the other service URLs (docs/DEVELOPMENT.md
+	// §5). When empty, the backend uses FakeEmbeddingClient instead
+	// (Phase 7 Milestone 7a's default — no Python `embedding` capability
+	// exists yet, and nothing in 7a's own request path calls it).
+	EmbeddingServiceURL string
+
 	// LogLevel is one of "debug", "info", "warn", "error" (see
 	// internal/logging). Defaults to "info".
 	LogLevel string
@@ -59,20 +67,22 @@ type Config struct {
 //
 // Required: VAANISETU_DATABASE_URL.
 // Optional: VAANISETU_PORT (default "8080"), VAANISETU_LLM_SERVICE_URL,
-// VAANISETU_ASR_SERVICE_URL, VAANISETU_TTS_SERVICE_URL, and
-// VAANISETU_LANGID_SERVICE_URL (each default "", meaning use the
-// corresponding fake client), VAANISETU_LOG_LEVEL (default "info"),
-// VAANISETU_ALLOWED_ORIGIN (default "http://localhost:4200").
+// VAANISETU_ASR_SERVICE_URL, VAANISETU_TTS_SERVICE_URL,
+// VAANISETU_LANGID_SERVICE_URL, and VAANISETU_EMBEDDING_SERVICE_URL (each
+// default "", meaning use the corresponding fake client),
+// VAANISETU_LOG_LEVEL (default "info"), VAANISETU_ALLOWED_ORIGIN (default
+// "http://localhost:4200").
 func Load() (Config, error) {
 	cfg := Config{
-		Port:             getEnvDefault("VAANISETU_PORT", "8080"),
-		DatabaseURL:      os.Getenv("VAANISETU_DATABASE_URL"),
-		LLMServiceURL:    os.Getenv("VAANISETU_LLM_SERVICE_URL"),
-		ASRServiceURL:    os.Getenv("VAANISETU_ASR_SERVICE_URL"),
-		TTSServiceURL:    os.Getenv("VAANISETU_TTS_SERVICE_URL"),
-		LangIDServiceURL: os.Getenv("VAANISETU_LANGID_SERVICE_URL"),
-		LogLevel:         getEnvDefault("VAANISETU_LOG_LEVEL", "info"),
-		AllowedOrigin:    getEnvDefault("VAANISETU_ALLOWED_ORIGIN", "http://localhost:4200"),
+		Port:                getEnvDefault("VAANISETU_PORT", "8080"),
+		DatabaseURL:         os.Getenv("VAANISETU_DATABASE_URL"),
+		LLMServiceURL:       os.Getenv("VAANISETU_LLM_SERVICE_URL"),
+		ASRServiceURL:       os.Getenv("VAANISETU_ASR_SERVICE_URL"),
+		TTSServiceURL:       os.Getenv("VAANISETU_TTS_SERVICE_URL"),
+		LangIDServiceURL:    os.Getenv("VAANISETU_LANGID_SERVICE_URL"),
+		EmbeddingServiceURL: os.Getenv("VAANISETU_EMBEDDING_SERVICE_URL"),
+		LogLevel:            getEnvDefault("VAANISETU_LOG_LEVEL", "info"),
+		AllowedOrigin:       getEnvDefault("VAANISETU_ALLOWED_ORIGIN", "http://localhost:4200"),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -108,6 +118,13 @@ func (c Config) UsesFakeTTS() bool {
 // langid.FakeLangIDClient instead of langid.HTTPLangIDClient.
 func (c Config) UsesFakeLangID() bool {
 	return c.LangIDServiceURL == ""
+}
+
+// UsesFakeEmbedding reports whether no real embedding service has been
+// configured, in which case the caller should wire up
+// embedding.FakeEmbeddingClient instead of embedding.HTTPEmbeddingClient.
+func (c Config) UsesFakeEmbedding() bool {
+	return c.EmbeddingServiceURL == ""
 }
 
 func getEnvDefault(key, fallback string) string {

@@ -73,6 +73,13 @@ _REGISTRY_YAML = textwrap.dedent(
             ftr: https://example.invalid/ftr.zip
             bert: https://example.invalid/bert.zip
           bert_tokenizer: someorg/indic-bert-tokenizer
+    embedding:
+      selected: st-a
+      candidates:
+        st-a:
+          engine: sentence_transformers
+          repo_id: someorg/embedding-a
+          license: MIT
     """
 )
 
@@ -211,6 +218,20 @@ def test_load_selected_entry_reads_indiclids_download_urls_and_bert_tokenizer(tm
     assert entry.bert_tokenizer == "someorg/indic-bert-tokenizer"
 
 
+def test_load_selected_entry_reads_the_selected_embedding_candidate(tmp_path) -> None:
+    registry_path = tmp_path / "models.yaml"
+    registry_path.write_text(_REGISTRY_YAML)
+
+    entry = load_selected_entry(str(registry_path), "embedding")
+
+    assert entry == ModelEntry(
+        key="st-a",
+        engine="sentence_transformers",
+        repo_id="someorg/embedding-a",
+        license="MIT",
+    )
+
+
 def test_load_selected_entry_rejects_an_unknown_tts_voice(tmp_path) -> None:
     registry_path = tmp_path / "models.yaml"
     registry_path.write_text(_REGISTRY_YAML)
@@ -339,6 +360,18 @@ def test_build_engine_raises_when_indiclid_model_files_are_missing(tmp_path) -> 
     )
 
     with pytest.raises(RegistryError, match="indiclid model files not found"):
+        build_engine(entry, str(tmp_path))
+
+
+def test_build_engine_raises_when_sentence_transformers_model_dir_is_missing(tmp_path) -> None:
+    entry = ModelEntry(
+        key="embedding-a",
+        engine="sentence_transformers",
+        repo_id="someorg/embedding-a",
+        license="MIT",
+    )
+
+    with pytest.raises(RegistryError, match="model directory not found"):
         build_engine(entry, str(tmp_path))
 
 

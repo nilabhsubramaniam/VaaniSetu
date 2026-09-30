@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  title: VaaniSetu Backend — Documents API
+  version: "1.0.0"
+  description: >
+    Phase 7 Milestone 7a: the document-upload boundary only. Plain text
+    upload, no file-format parsing yet. Nothing chunks or embeds a
+    document after it's created — `status` is always "pending" in this
+    milestone; Milestone 7b owns the transition to "ready"/"failed" once
+    a real embedding model and job-dispatch mechanism exist
+    (docs/ARCHITECTURE.md §3.2). Hand-maintained, kept in sync by hand
+    with backend/internal/api/{dto,server}.go — same convention as
+    docs/openapi/chat.yaml. CORS: the server allows exactly one
+    configured origin (config.Config.AllowedOrigin) — never "*".
+servers:
+  - url: http://localhost:8080/api/v1
+
+paths:
+  /documents:
+    post:
+      summary: >
+        Upload a document as plain text. Stores it and returns
+        immediately with status "pending" — no chunking or embedding
+        happens as part of this request (docs/ARCHITECTURE.md §3.2: Go
+        dispatches chunking/embedding jobs to Python, never inline in a
+        request — that dispatch mechanism is Milestone 7b's job, not yet
+        built).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+            example:
+              title: "Project Notes"
+              content: "These are some notes I want the assistant to know about."
+      responses:
+        "200":
+          description: The stored document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDocumentResponse"
+              example:
+                document:
+                  id: "d30f6898-d5c3-4526-b769-6b558d406e6e"
+                  title: "Project Notes"
+                  content: "These are some notes I want the assistant to know about."
+                  status: pending
+                  createdAt: "2026-09-30T13:40:14Z"
+        "400":
+          description: Empty title or content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: invalid_request
+                  message: "title must not be empty"
+        "500":
+          description: An unexpected internal error (e.g. a persistence failure).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: internal
+                  message: "something went wrong"
+
+    get:
+      summary: List every uploaded document, most recently created first.
+      responses:
+        "200":
+          description: The uploaded documents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDocumentsResponse"
+              example:
+                documents:
+                  - id: "d30f6898-d5c3-4526-b769-6b558d406e6e"
+                    title: "Project Notes"
+                    content: "These are some notes I want the assistant to know about."
+                    status: pending
+                    createdAt: "2026-09-30T13:40:14Z"
+        "500":
+          description: An unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    Document:
+      type: object
+      required: [id, title, content, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [pending, ready, failed]
+          description: >
+            Always "pending" in Milestone 7a — nothing yet transitions
+            it.
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateDocumentRequest:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+          description: >
+            Raw plain text. File upload/parsing (PDF, DOCX, etc.) is
+            explicitly deferred to a later milestone.
+
+    CreateDocumentResponse:
+      type: object
+      required: [document]
+      properties:
+        document:
+          $ref: "#/components/schemas/Document"
+
+    ListDocumentsResponse:
+      type: object
+      required: [documents]
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid_request, internal]
+            message:
+              type: string
+              description: Safe to show a user; never the raw underlying error.

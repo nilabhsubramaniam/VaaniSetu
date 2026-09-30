@@ -17,6 +17,7 @@ import yaml
 
 from .engines.asr.base import ASREngine
 from .engines.base import LLMEngine
+from .engines.embedding.base import EmbeddingEngine
 from .engines.langid.base import LangIDEngine
 from .engines.tts.base import TTSEngine
 
@@ -142,7 +143,7 @@ def _find_model_file(directory: str, extension: str) -> str | None:
 
 def build_engine(
     entry: ModelEntry, model_store_dir: str
-) -> LLMEngine | ASREngine | TTSEngine | LangIDEngine:
+) -> LLMEngine | ASREngine | TTSEngine | LangIDEngine | EmbeddingEngine:
     """Builds the engine for `entry`. `entry.engine` selects the wrapper
     class; add a branch here (never a new caller-visible type) when a
     genuinely new engine kind is needed.
@@ -245,5 +246,18 @@ def build_engine(
             bert_model_path=bert_path,
             bert_tokenizer=tokenizer_dir,
         )
+
+    if entry.engine == "sentence_transformers":
+        model_path = os.path.join(model_store_dir, entry.key)
+        if not os.path.isdir(model_path):
+            raise RegistryError(
+                f"registry: model directory not found: {model_path} "
+                f"(expected the full {entry.repo_id} snapshot downloaded there — "
+                "see ai-services/scripts/download_models.py)"
+            )
+
+        from .engines.embedding.sentence_transformers_engine import SentenceTransformersEngine
+
+        return SentenceTransformersEngine(model_path=model_path)
 
     raise RegistryError(f"registry: unknown engine kind {entry.engine!r}")

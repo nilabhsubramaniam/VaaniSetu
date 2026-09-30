@@ -1,9 +1,10 @@
-"""Contract tests for the `llm`, `asr`, `tts`, and `langid` capabilities'
-HTTP surfaces (proto/llm.openapi.yaml, proto/asr.openapi.yaml,
-proto/tts.openapi.yaml, proto/langid.openapi.yaml). Uses fake engines via
-FastAPI's dependency-override mechanism — no real model file or lifespan
-startup required, the same "depend on the interface, fake it in tests"
-pattern used on the Go side (internal/api's handler tests against a fake
+"""Contract tests for the `llm`, `asr`, `tts`, `langid`, and `embedding`
+capabilities' HTTP surfaces (proto/llm.openapi.yaml, proto/asr.openapi.yaml,
+proto/tts.openapi.yaml, proto/langid.openapi.yaml,
+proto/embedding.openapi.yaml). Uses fake engines via FastAPI's
+dependency-override mechanism — no real model file or lifespan startup
+required, the same "depend on the interface, fake it in tests" pattern
+used on the Go side (internal/api's handler tests against a fake
 ConversationService).
 """
 
@@ -15,9 +16,10 @@ from app.engines.asr.base import ASREngine
 from app.engines.asr.base import TranscribeRequest as ASRTranscribeRequest
 from app.engines.asr.base import TranscribeResponse as ASRTranscribeResponse
 from app.engines.base import GenerateRequest, GenerateResponse, LLMEngine
+from app.engines.embedding.base import EmbeddingEngine, EmbedRequest, EmbedResponse
 from app.engines.langid.base import DetectRequest, DetectResponse, LangIDEngine
 from app.engines.tts.base import SynthesizeRequest, SynthesizeResponse, TTSEngine
-from app.main import app, get_asr_engine, get_langid_engine, get_llm_engine
+from app.main import app, get_asr_engine, get_embedding_engine, get_langid_engine, get_llm_engine
 
 
 class FakeLLM(LLMEngine):
@@ -73,6 +75,19 @@ class FakeLangID(LangIDEngine):
         return DetectResponse(language=self.language, confidence=self.confidence)
 
 
+class FakeEmbedding(EmbeddingEngine):
+    def __init__(self, vector: list[float] | None = None, fail: bool = False) -> None:
+        self.vector = vector if vector is not None else [0.1, 0.2, 0.3]
+        self.fail = fail
+        self.last_request: EmbedRequest | None = None
+
+    def embed(self, request: EmbedRequest) -> EmbedResponse:
+        self.last_request = request
+        if self.fail:
+            raise RuntimeError("boom")
+        return EmbedResponse(vector=self.vector, dimensions=len(self.vector))
+
+
 def _client_with_llm(engine: LLMEngine) -> TestClient:
     app.dependency_overrides[get_llm_engine] = lambda: engine
     return TestClient(app)
@@ -85,6 +100,11 @@ def _client_with_asr(engine: ASREngine) -> TestClient:
 
 def _client_with_langid(engine: LangIDEngine) -> TestClient:
     app.dependency_overrides[get_langid_engine] = lambda: engine
+    return TestClient(app)
+
+
+def _client_with_embedding(engine: EmbeddingEngine) -> TestClient:
+    app.dependency_overrides[get_embedding_engine] = lambda: engine
     return TestClient(app)
 
 
@@ -340,6 +360,43 @@ def test_detect_returns_503_when_no_langid_model_loaded() -> None:
     assert resp.status_code == 503
 
 
+def test_embed_returns_the_engines_vector() -> None:
+    fake = FakeEmbedding(vector=[0.5, -0.5, 1.0])
+    client = _client_with_embedding(fake)
+
+    resp = client.post("/v1/embed", json={"text": "some passage"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"vector": [0.5, -0.5, 1.0], "dimensions": 3}
+    assert fake.last_request == EmbedRequest(text="some passage")
+
+
+def test_embed_maps_engine_failure_to_5xx() -> None:
+    fake = FakeEmbedding(fail=True)
+    client = _client_with_embedding(fake)
+
+    resp = client.post("/v1/embed", json={"text": "hello"})
+
+    assert resp.status_code >= 500
+
+
+def test_embed_rejects_a_malformed_body() -> None:
+    fake = FakeEmbedding()
+    client = _client_with_embedding(fake)
+
+    resp = client.post("/v1/embed", json={})  # missing "text"
+
+    assert resp.status_code == 422
+
+
+def test_embed_returns_503_when_no_embedding_model_loaded() -> None:
+    client = TestClient(app)
+
+    resp = client.post("/v1/embed", json={"text": "hello"})
+
+    assert resp.status_code == 503
+
+
 def test_healthz_reports_not_ready_when_no_engines_loaded() -> None:
     # No dependency override and no lifespan run (TestClient here is used
     # without entering it as a context manager, so startup never fires) —
@@ -356,6 +413,7 @@ def test_healthz_reports_not_ready_when_no_engines_loaded() -> None:
         "asr_model": None,
         "tts_models": {},
         "langid_model": None,
+        "embedding_model": None,
     }
 
 

@@ -245,3 +245,39 @@ langid:
       license: CC-BY-SA-3.0
       download_url: https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin
       filename: lid.176.bin
+
+# `selected` reflects the outcome of the Milestone 7b benchmark recorded
+# in docs/DECISIONS.md (ADR pending) —
+# scripts/benchmark_embedding.py's real result: all three candidates tied
+# at 100% retrieval accuracy (overall and cross-lingual) on the small
+# fixture set, so the decision came down to the measured tie-breakers —
+# `multilingual-e5-base` was the clear winner on every one: ~6x faster
+# passage-embedding latency than `paraphrase-multilingual-mpnet-base-v2`
+# (0.023s vs 0.144s mean), lowest peak memory (719.9MB), and the smallest
+# dimension (768 vs `bge-m3`'s 1024 — cheaper to store/index once
+# pgvector is wired in). All three remain listed (not deleted) so the
+# benchmark stays reproducible. `query_prefix`/`passage_prefix` are not
+# read by app/registry.py or the engine itself (see
+# app/engines/embedding/sentence_transformers_engine.py) — they exist
+# only for scripts/benchmark_embedding.py's own use, since the E5 family
+# is trained with asymmetric query/passage prefixes for best retrieval
+# quality; whether the real request path needs the same distinction is a
+# question for whichever future milestone builds query-time retrieval,
+# not decided here.
+embedding:
+  selected: multilingual-e5-base
+  candidates:
+    paraphrase-multilingual-mpnet-base-v2:
+      engine: sentence_transformers
+      repo_id: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+      license: Apache-2.0
+    multilingual-e5-base:
+      engine: sentence_transformers
+      repo_id: intfloat/multilingual-e5-base
+      license: MIT
+      query_prefix: "query: "
+      passage_prefix: "passage: "
+    bge-m3:
+      engine: sentence_transformers
+      repo_id: BAAI/bge-m3
+      license: MIT

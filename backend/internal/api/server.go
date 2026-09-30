@@ -12,6 +12,7 @@ import (
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/asr"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/documents"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/logging"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/orchestrator"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/tts"
@@ -34,10 +35,19 @@ type ConversationService interface {
 	History(ctx context.Context) ([]conversation.Turn, error)
 }
 
+// DocumentsService is the subset of *documents.Service the API layer
+// needs (Phase 7 Milestone 7a) — the same "depend on an interface"
+// pattern as [ConversationService].
+type DocumentsService interface {
+	CreateDocument(ctx context.Context, title, content string) (documents.Document, error)
+	ListDocuments(ctx context.Context) ([]documents.Document, error)
+}
+
 // Server holds the dependencies every handler needs. Construct one with
 // [NewServer] and mount its handlers with [Server.Routes].
 type Server struct {
 	conversation  ConversationService
+	documents     DocumentsService
 	asrClient     asr.ASRClient
 	ttsClient     tts.TTSClient
 	orchestrator  *orchestrator.Orchestrator
@@ -45,14 +55,15 @@ type Server struct {
 	allowedOrigin string
 }
 
-// NewServer builds a Server. conv, asrClient, and ttsClient do the actual
-// work; logger is used only for operational logging (see internal/logging
-// for the no-transcript-at-info-level enforcement every handler here
-// follows). allowedOrigin is the single origin permitted by CORS (see
-// [Server.Routes]) — typically config.Config.AllowedOrigin.
-func NewServer(conv ConversationService, asrClient asr.ASRClient, ttsClient tts.TTSClient, logger *slog.Logger, allowedOrigin string) *Server {
+// NewServer builds a Server. conv, docs, asrClient, and ttsClient do the
+// actual work; logger is used only for operational logging (see
+// internal/logging for the no-transcript-at-info-level enforcement every
+// handler here follows). allowedOrigin is the single origin permitted by
+// CORS (see [Server.Routes]) — typically config.Config.AllowedOrigin.
+func NewServer(conv ConversationService, docs DocumentsService, asrClient asr.ASRClient, ttsClient tts.TTSClient, logger *slog.Logger, allowedOrigin string) *Server {
 	return &Server{
 		conversation:  conv,
+		documents:     docs,
 		asrClient:     asrClient,
 		ttsClient:     ttsClient,
 		orchestrator:  orchestrator.New(asrClient, conv, ttsClient),
@@ -76,6 +87,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/speech/transcribe", s.handleTranscribe)
 	mux.HandleFunc("POST /api/v1/speech/synthesize", s.handleSynthesize)
 	mux.HandleFunc("POST /api/v1/voice/turn", s.handleVoiceTurn)
+	mux.HandleFunc("POST /api/v1/documents", s.handleCreateDocument)
+	mux.HandleFunc("GET /api/v1/documents", s.handleListDocuments)
 	return s.withCORS(mux)
 }
 
@@ -155,6 +168,56 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		dtos = append(dtos, turnToDTO(t))
 	}
 	writeJSON(w, http.StatusOK, historyResponse{Turns: dtos})
+}
+
+// handleCreateDocument implements POST /api/v1/documents per
+// docs/openapi/documents.yaml (Phase 7 Milestone 7a). Plain text only —
+// no file upload/parsing yet. Stores the document and returns it
+// immediately with status "pending"; nothing chunks or embeds it yet
+// (see internal/documents' package doc comment).
+func (s *Server) handleCreateDocument(w http.ResponseWriter, r *http.Request) {
+	var req createDocumentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "title must not be empty")
+		return
+	}
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		writeError(w, http.StatusBadRequest, "invalid_request", "content must not be empty")
+		return
+	}
+
+	doc, err := s.documents.CreateDocument(r.Context(), title, content)
+	if err != nil {
+		s.logger.Error("create document failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal", "something went wrong")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, createDocumentResponse{Document: documentToDTO(doc)})
+}
+
+// handleListDocuments implements GET /api/v1/documents per
+// docs/openapi/documents.yaml.
+func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
+	docs, err := s.documents.ListDocuments(r.Context())
+	if err != nil {
+		s.logger.Error("list documents failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal", "something went wrong")
+		return
+	}
+
+	dtos := make([]documentDTO, 0, len(docs))
+	for _, d := range docs {
+		dtos = append(dtos, documentToDTO(d))
+	}
+	writeJSON(w, http.StatusOK, listDocumentsResponse{Documents: dtos})
 }
 
 // handleTranscribe implements POST /api/v1/speech/transcribe per
