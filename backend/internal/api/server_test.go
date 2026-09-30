@@ -418,6 +418,19 @@ func TestHandleTranscribe_RejectsMaithili(t *testing.T) {
 	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
 }
 
+func TestHandleTranscribe_RejectsOdia(t *testing.T) {
+	// faster-whisper has no "or" language code either (found while
+	// evaluating Milestone 6h) — the same capability gap as "mai", not
+	// Malayalam's accuracy gap (ADR-029).
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/speech/transcribe?language=or", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
 func TestHandleTranscribe_EmptyAudioBody(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
@@ -756,6 +769,18 @@ func TestHandleVoiceTurn_RejectsMaithili(t *testing.T) {
 	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=mai", bytes.NewReader([]byte("audio")))
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	assertErrorResponse(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
+func TestHandleVoiceTurn_RejectsOdia(t *testing.T) {
+	// faster-whisper has no "or" language code either (found while
+	// evaluating Milestone 6h) — the same capability gap as "mai".
+	server := NewServer(&fakeConversationService{}, defaultFakeASR(), defaultFakeTTS(), testLogger(), testOrigin)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/voice/turn?language=or", bytes.NewReader([]byte("audio")))
 	rec := httptest.NewRecorder()
 	server.Routes().ServeHTTP(rec, req)
 

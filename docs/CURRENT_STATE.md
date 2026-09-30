@@ -13,16 +13,148 @@ project moves between milestones or a phase's status changes.
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
   Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
   transliteration, Malayalam's real bottleneck diagnosed —, 6e —
-  auto-detection now drives typed-chat behavior, opt-in —, and 6f —
+  auto-detection now drives typed-chat behavior, opt-in —, 6f —
   Maithili real evidence gathered across all four capabilities, **not
-  enabled** (LLM never replies in Maithili, ADR-031) — all complete, with
-  known remaining gaps, see below; the phase's broader scope —
-  Bengali/Gujarati/Marathi/Tamil/Telugu/Kannada/Punjabi/Odia — has no
-  milestone named or approved yet).
-- **Current focus:** none active — no milestone is currently approved to
-  start next. See `AGENTS.md` §5, "never advance to the next milestone
-  automatically".
-- **Last updated:** 2026-09-27 (Phase 6 Milestone 6f: Maithili added to
+  enabled** (LLM never replies in Maithili, ADR-031) —, 6h — Bengali,
+  Tamil, Telugu, and Kannada evaluated across all four capabilities and
+  **enabled** (ADR-033), plus a real, independent Odia ASR bug found and
+  fixed —, 6i — Gujarati, Marathi, and Punjabi evaluated and **enabled**
+  (ADR-034) —, and 6j — Odia evaluated and **not enabled** (broken LLM
+  generation plus a hard ASR capability gap, the same class of blocker
+  Maithili has — ADR-035) — all complete, with known remaining gaps, see
+  below; this closes evidence-gathering for all eight of the phase's
+  originally-named languages. Milestone 6g (closing Maithili's
+  LLM-generation and ASR-capability blockers) is **in progress, paused
+  mid-milestone** — see below; it is the only work remaining in Phase 6's
+  currently-scoped work, with no milestone approved yet to resume it.
+- **Current focus:** none of Phase 6's remaining scope is currently
+  approved to start (Milestone 6g's resume is the only thing left named)
+  — see `AGENTS.md` §5. Milestone 6g is paused, not abandoned — its
+  LLM-generation experiments concluded negative (see below); its
+  ASR-capability search found two real, MIT-licensed candidates
+  (`ai4bharat/indic-conformer-600m-multilingual`, `ARTPARK-IISc/
+  SraVaani-1.0`), both gated on Hugging Face, paused pending a decision
+  on whether a real account/token is available to attempt access (the
+  same wall `indic-parler-tts` hit in ADR-021).
+- **Last updated:** 2026-09-29 (Phase 6 Milestone 6j: evaluated Odia, the
+  last of the phase's originally-named eight languages — **not enabled**,
+  a genuinely different outcome from Milestones 6h/6i's six enabled
+  languages, not a rubber-stamped continuation of that pattern.
+  **langid**: 100% accurate (4/4) — real Odia training data, cleanly
+  distinguished, same strong result every script-distinct language has
+  had. **LLM**: broken, not just wrong-language — unlike Maithili
+  (fluent, just replies in Hindi), `llama-3.2-3b-instruct`'s Odia output
+  degenerates into repetitive token loops and, on two of four fixtures,
+  mixes in stray characters from unrelated scripts entirely; none of the
+  four fixtures produced a coherent, on-topic reply. **ASR**: no real
+  Whisper support at all (confirmed directly, the same hard capability
+  gap Maithili has) — demonstrated dramatically: with Milestone 6h's
+  hint-dict bug fix in place, Whisper's auto-detection fallback
+  hallucinated a **different, unrelated script for every single clip**
+  (romanized Latin, Devanagari, Gujarati, Arabic) when asked to
+  transcribe the TTS-proxy audio, not mere mispronunciation but
+  essentially a random guess. Unlike Bengali/Telugu/Gujarati/Marathi/
+  Punjabi/Kannada/Tamil (all working LLM + a real, if imperfect, ASR
+  path — a voice-*quality* gap, the accepted shippable category since
+  Malayalam), Odia has neither a reliable LLM nor any ASR path at all —
+  the same "non-functional, not degraded" reasoning ADR-031 used for
+  Maithili, so it stays disabled rather than extending the last two
+  milestones' enable-by-default pattern. `LANGUAGE_OPTIONS`'s `or.enabled`
+  stays `false`. See `docs/DECISIONS.md` ADR-035 for the full evidence.
+  This closes evidence-gathering for all eight of Phase 6's
+  originally-named languages (Bengali, Gujarati, Marathi, Tamil, Telugu,
+  Kannada, Punjabi, Odia) — seven enabled (all but Odia), on top of
+  Malayalam's earlier, separate Milestone 6c enablement. Only Maithili's
+  own gap-closing (Milestone 6g, paused) remains open in Phase 6.
+- **Last updated:** 2026-09-29 (Phase 6 Milestone 6i: evaluated Gujarati,
+  Marathi, and Punjabi the same way Milestone 6h evaluated its four
+  languages, and enabled all three. **LLM**: fluent, on-topic, correct
+  script for all three, 4/4 each. **langid**: 100% accurate for all three
+  (12/12) — including Marathi, correctly distinguished from Hindi despite
+  sharing Devanagari, a stronger result than the Hindi/Hinglish/Maithili
+  confusion ADR-031 already documented. **ASR/TTS**: real, uneven quality
+  gaps again, not a capability gap. A real sourcing improvement this
+  time: Gujarati and Marathi both have real, human-recorded OpenSLR
+  corpora (resources 78/64, the same family Milestone 6d used for
+  Malayalam), so their ASR could be measured against genuine speech, not
+  just a TTS-round-trip proxy — Gujarati measured 0.333 real-audio WER /
+  0.585 TTS-proxy WER; Marathi measured 0.5375 / 1.00, with one real clip
+  transcribed entirely into **romanized Latin script** instead of
+  Devanagari, a genuine script-fidelity failure distinct from anything
+  seen before. Punjabi has no equivalent real corpus (checked directly
+  against OpenSLR's resource list), so it rests on the TTS-proxy metric
+  alone (0.983) — including one transcript that **hallucinated
+  characters from unrelated scripts** (Armenian- and CJK-looking glyphs),
+  a more severe failure than Kannada's repetitive-syllable breakdown
+  (ADR-033). Generalized the Malayalam-only real-fixture download/
+  benchmark scripts into `scripts/download_real_fixtures.py`/
+  `scripts/benchmark_real_asr.py` (a real second use, not speculative);
+  the original Malayalam scripts are untouched. Given the pattern is now
+  well-established, enabled all three directly rather than pausing for a
+  separate confirmation round — same reasoning as Milestone 6h's
+  recommendation, this time stated once rather than re-litigated. This
+  again surfaced the same class of gap 6h found: none of the three had a
+  self-hosted, script-specific font — fixed the same way (two new fonts,
+  `Noto Sans Gujarati`/`Noto Sans Gurmukhi`; Marathi reuses the existing
+  Devanagari font), verified live via a real font-file network fetch and
+  computed `font-family`. See `docs/DECISIONS.md` ADR-034 for the full
+  evidence.
+- **Last updated:** 2026-09-28 (Phase 6 Milestone 6h: evaluated Bengali,
+  Tamil, Telugu, and Kannada across langid/LLM/ASR/TTS, the same process
+  Milestones 6b/6c/6d/6f established. **LLM**: fluent, on-topic, correct
+  script for all four, 4/4 each — no code change needed, the same
+  generic-prompt result Malayalam had (ADR-028). **langid**: 100%
+  accurate for all four (16/16) — tied with Malayalam for the strongest
+  result measured, since each has its own unambiguous Unicode script
+  block. **ASR/TTS**: real, uneven, language-specific quality gaps, not
+  a capability gap — Tamil measured best (WER 0.36 real-audio / 0.34
+  TTS-proxy), Kannada's real-audio ASR was reasonable (0.42) but its
+  `mms-tts-kan` TTS candidate showed an actual synthesis breakdown (proxy
+  WER 1.00, repetitive-syllable gibberish, not just mispronunciation),
+  and Bengali/Telugu both measured poorly two independent ways (~0.83-
+  0.94 across real-audio ASR and TTS-proxy alike, converging evidence of
+  a genuine weakness). None meet `docs/EVALUATION.md`'s targets, but all
+  four are in the same "ship with a known, non-fatal quality gap" class
+  Malayalam/Hinglish already shipped in — recommendation put to the user
+  rather than decided silently, per `AGENTS.md` §14, and **accepted: all
+  four enabled** in `language.model.ts`. This surfaced a real gap none of
+  the four had a self-hosted, script-specific font the way Devanagari/
+  Malayalam already do, so their chat replies would have silently
+  rendered in the generic Latin stack — fixed the same way Malayalam was
+  (four new self-hosted Noto Sans fonts, SIL OFL 1.1, four new `[lang=]`
+  rules), verified live via a real network request and computed
+  `font-family` per language, not assumed from unit tests alone. See
+  `docs/DECISIONS.md` ADR-033 for the full evidence.
+  **Also that day**: found and fixed a real, independent, previously-
+  live bug while evaluating Odia for this same batch — `ai-services`'s
+  `_WHISPER_LANGUAGE_HINTS` incorrectly asserted Odia (`"or"`) is a valid
+  Whisper language; it isn't (confirmed directly against `faster_whisper.
+  tokenizer._LANGUAGE_CODES`), and the incorrect entry would have raised
+  an opaque `500` (not Maithili's clean `400`) the first time anyone
+  actually requested Odia voice input. Fixed at the source and generalized
+  the Go-layer guard (`dto.go`'s `maithiliLanguage` constant is now a
+  `noASRLanguages` set covering both `mai` and `or`) so the same bug
+  class can't recur for a future language silently.
+  Earlier that day (Milestone 6g, paused): tested whether a strengthened
+  system prompt could fix Maithili's LLM-generation gap (ADR-031) —
+  negative, `llama-3.2-3b-instruct` still replied in Hindi 0/4 times,
+  identical to the unmodified prompt. Tested the two other
+  already-benchmarked LLM candidates (Qwen2.5-3B, Gemma-2-2B) against an
+  expanded 8-fixture Maithili set — an initial small-sample read looked
+  promising for Gemma (real Maithili copula grammar in 2 of 4 replies),
+  but the larger sample showed neither alternate model is usable: both
+  frequently produced incoherent text or drifted into a third language
+  entirely (Qwen into Nepali, Gemma into Marathi) — worse than Llama's
+  clean, fluent, wrong-language fallback, not better. Swapping the
+  selected LLM is not a fix. Searched for a Maithili-capable ASR engine:
+  found two real, MIT-licensed, transformers-compatible candidates from
+  credible sources (AI4Bharat, ARTPARK-IISc), one of which
+  (`indic-conformer`) explicitly supports a per-language hint the way
+  this project's architecture needs and could also close Odia's gap —
+  both are gated on Hugging Face, the same real obstacle ADR-021 already
+  hit with `indic-parler-tts`. Paused here, not concluded, when the user
+  directed a pivot to evaluating the other languages instead.
+  The day before (2026-09-27): Phase 6 Milestone 6f: Maithili added to
   `AGENTS.md`/`docs/PROJECT_GOAL.md`'s long-term language list at the
   user's request, then wired into the same per-language scaffolding
   every prior language uses and measured for real across all four

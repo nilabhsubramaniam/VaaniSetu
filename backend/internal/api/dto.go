@@ -24,20 +24,33 @@ var validLanguages = map[string]bool{
 // keeps that check separate from "is this valid input at all".
 const autoLanguage = "auto"
 
-// maithiliLanguage is a concrete, valid LanguageCode (unlike
-// autoLanguage) that POST /api/v1/chat and POST /api/v1/speech/synthesize
-// accept normally, but that handleVoiceTurn and handleTranscribe reject
-// outright: faster-whisper's language table has no "mai" entry at all
-// (confirmed against its tokenizer, and upstream OpenAI Whisper's own).
-// Measured, not assumed (docs/DECISIONS.md ADR-031): this project's own
-// FasterWhisperEngine wrapper doesn't propagate an unmapped code into a
-// call that would raise — its hint dict silently returns nil for "mai",
-// which makes the underlying model fall back to its own auto-detection
-// instead of failing cleanly, the exact same wrong-script failure mode
-// ADR-018 already found for un-hinted Hinglish. A capability gap, not
-// the accuracy gap Malayalam had (ADR-029) — voice input for Maithili
-// needs a different ASR engine, out of scope here.
-const maithiliLanguage = "mai"
+// noASRLanguages are concrete, valid LanguageCodes (unlike autoLanguage)
+// that POST /api/v1/chat and POST /api/v1/speech/synthesize accept
+// normally, but that handleVoiceTurn and handleTranscribe reject
+// outright: faster-whisper has no real support for either.
+//
+// "mai" (Maithili): confirmed against its tokenizer, and upstream OpenAI
+// Whisper's own — no entry at all. This project's own FasterWhisperEngine
+// wrapper doesn't propagate an unmapped code into a call that would
+// raise — its hint dict silently returned nil, which made the underlying
+// model fall back to its own auto-detection instead of failing cleanly,
+// the exact same wrong-script failure mode ADR-018 already found for
+// un-hinted Hinglish (docs/DECISIONS.md ADR-031).
+//
+// "or" (Odia): a related but distinct bug, found while evaluating the
+// next batch of languages (Milestone 6h) — FasterWhisperEngine's hint
+// dict incorrectly had an "or": "or" entry, asserting Odia support that
+// doesn't exist. Unlike "mai", this doesn't silently fall back: Whisper's
+// tokenizer raises ValueError for an unrecognized language code, which
+// ai-services' blanket exception handler turns into an opaque 500
+// instead of a clean 400. Fixed at the source (the hint dict entry was
+// removed) and guarded here too, for the same reason "mai" is: better to
+// reject before the request ever reaches the Python service.
+//
+// Both are capability gaps, not accuracy ones (unlike Malayalam's ASR
+// weakness, ADR-029) — voice input for either needs a different ASR
+// engine, out of scope here.
+var noASRLanguages = map[string]bool{"mai": true, "or": true}
 
 // isValidLanguage reports whether code is one of the frontend's known
 // LanguageCode values, or the "auto" sentinel (valid input for

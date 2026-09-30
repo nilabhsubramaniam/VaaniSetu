@@ -50,6 +50,9 @@ describe('LanguageSelector', () => {
   });
 
   it('clicking a disabled option does not change the preferred language', () => {
+    // Odia (ଓଡ଼ିଆ) — Bengali (Milestone 6h, ADR-033) and Gujarati
+    // (Milestone 6i, ADR-034) both joined the enabled set, so neither
+    // fits this test anymore. Odia is the last still-disabled language.
     const fixture = TestBed.createComponent(LanguageSelector);
     fixture.detectChanges();
 
@@ -59,8 +62,8 @@ describe('LanguageSelector', () => {
     const options = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLLIElement>(
       '.option',
     );
-    const bengaliOption = Array.from(options).find((el) => el.textContent?.includes('বাংলা'))!;
-    bengaliOption.click();
+    const odiaOption = Array.from(options).find((el) => el.textContent?.includes('ଓଡ଼ିଆ'))!;
+    odiaOption.click();
     fixture.detectChanges();
 
     const settingsStore = TestBed.inject(SettingsStore);

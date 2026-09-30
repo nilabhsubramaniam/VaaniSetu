@@ -65,14 +65,18 @@ describe('LandingPage', () => {
     expect(buttons.length).toBe(fixture.componentInstance.demoLanguages.length);
   });
 
-  it('lists Hindi and Hinglish as available, and a future language as coming next', () => {
+  it('lists Hindi, Hinglish, and Bengali as available, and a future language as coming next', () => {
+    // Bengali joined Milestone 6h (ADR-033); Gujarati joined Milestone 6i
+    // (ADR-034) — this test's own former "coming next" example is now
+    // "available now" too. Odia is the last still-disabled language.
     const fixture = TestBed.createComponent(LandingPage);
     fixture.detectChanges();
     const groups = (fixture.nativeElement as HTMLElement).querySelectorAll('.lang-group');
 
     expect(groups[0].textContent).toContain('Hindi');
     expect(groups[0].textContent).toContain('Hinglish');
-    expect(groups[1].textContent).toContain('Bengali');
+    expect(groups[0].textContent).toContain('Bengali');
+    expect(groups[1].textContent).toContain('Odia');
   });
 
   it('marks not-yet-built capabilities with a planned note', () => {

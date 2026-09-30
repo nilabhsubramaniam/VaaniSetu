@@ -280,14 +280,49 @@ wrong-language auto-detect fallback rather than a clean error — unlike
 Hinglish/Malayalam's "ship with a known gap" precedent, this failure is
 in the *primary* typed-chat channel, not a secondary one, so the
 enable/don't-enable call was put to the user rather than decided
-silently, see ADR-031) are all complete. A manual language pin still
-wins whenever the user sets one, per `docs/PROJECT_GOAL.md`. The phase's
-broader scope below (Bengali, Gujarati, Marathi, Tamil, Telugu, Kannada,
-Punjabi, Odia — each needing this same per-language treatment, plus
-Maithili's own enablement decision still pending) has no milestone named
-or approved yet.
+silently, see ADR-031) are complete, and Milestone 6h (Bengali, Tamil,
+Telugu, and Kannada evaluated across all four capabilities — LLM fluent
+and langid 100% accurate for all four, matching or beating Malayalam's
+own result, but real, uneven ASR/TTS quality gaps in the same shippable
+class Malayalam/Hinglish already have; a real, independent, previously-
+live Odia ASR bug found and fixed along the way, unrelated to Odia's own
+still-pending evaluation; enablement put to the user rather than decided
+silently, and accepted — all four enabled, with matching self-hosted
+fonts added the same way Malayalam's was, see ADR-033) and Milestone 6i
+(Gujarati, Marathi, and Punjabi evaluated the same way — LLM fluent and
+langid 100% accurate for all three, Marathi correctly distinguished from
+Hindi despite sharing Devanagari; Gujarati and Marathi had real,
+human-recorded OpenSLR corpora to measure real-audio ASR against (0.333/
+0.5375 WER), Punjabi didn't so its evidence rests on the TTS-proxy metric
+alone (0.983); two new failure modes found — one Marathi clip
+transcribed into romanized Latin script instead of Devanagari, one
+Punjabi TTS-proxy transcript hallucinated unrelated-script characters —
+enabled all three directly on the now-established precedent, see
+ADR-034) are complete too, and Milestone 6j (Odia evaluated — **not
+enabled**, breaking the pattern 6h/6i just set on real evidence, not by
+default: langid 100% accurate, but the LLM's Odia output degenerates
+into repetitive token loops with occasional cross-script contamination
+rather than producing coherent replies, and Whisper has no real Odia
+support at all — demonstrated starkly when its auto-detection fallback
+hallucinated a different, unrelated script for every TTS-proxy clip
+transcribed (Latin, Devanagari, Gujarati, Arabic). Unlike the six
+languages just enabled, which had a working LLM and a real, if
+imperfect, ASR path, Odia has neither — the same "non-functional, not
+degraded" category Maithili is in, so it stays disabled, see ADR-035)
+is complete too. This closes evidence-gathering for all eight of Phase
+6's originally-named languages (seven enabled, Odia not). Milestone 6g
+(closing Maithili's real LLM-generation and ASR-capability blockers) is
+**in progress, paused mid-milestone**: a strengthened system prompt and
+two alternate already-benchmarked LLM candidates were tested and found
+not to fix Maithili's generation gap (worse than the original, in fact —
+see ADR-033's Milestone 6g notes in `docs/CURRENT_STATE.md`); an ASR
+capability search found two real, MIT-licensed candidates, both gated on
+Hugging Face access this environment doesn't yet have confirmed. A
+manual language pin still wins whenever the user sets one, per
+`docs/PROJECT_GOAL.md`. Milestone 6g's resume is the only work remaining
+in Phase 6's currently-scoped work, with no milestone approved yet.
 See `docs/CURRENT_STATE.md` and `docs/DECISIONS.md`
-ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031.
+ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
 - **Objective:** Extend the working loop to the long-term language set, one
   language at a time, each gated on meeting its quality targets.

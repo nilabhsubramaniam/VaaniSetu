@@ -50,6 +50,41 @@
 # can produce/detect genuine Maithili at all; a native-speaker review of
 # these exact four sentences before treating any result as final would be
 # a reasonable next step, not assumed done here.
+#
+# Milestone 6h added the sixteen `bn-*`/`ta-*`/`te-*`/`kn-*` fixtures
+# below, mirroring the same four Hindi/Malayalam/Maithili themes
+# (weather, capital, story, greeting). Unlike Malayalam/Maithili, macOS
+# has a real `say` voice for all four of these (checked directly: `Piya`
+# bn_IN, `Vani` ta_IN, `Geeta` te_IN, `Soumya` kn_IN) — so, like Hindi,
+# real (not proxy-only) audio can be generated and independently verified
+# through the ASR pipeline, not just the TTS round-trip. Same provenance
+# caveat as every non-Hindi language here: composed directly using common,
+# high-confidence phrasing, not sourced from a certified corpus or
+# reviewed by a native speaker.
+#
+# Milestone 6i added the `gu-*`/`mr-*`/`pa-*` fixtures below. Unlike every
+# earlier non-Hindi language here, the Gujarati and Marathi text is NOT
+# self-composed — it's real, human-written and human-spoken text lifted
+# directly from the same real corpus eval_data/real_fixtures.yaml uses
+# (OpenSLR resources 78/64, CC-BY-SA-4.0), reused here so
+# benchmark_langid.py and benchmark_tts.py can measure against genuine
+# text too, not just the real audio. No macOS `say` voice exists for
+# either (checked directly), so these carry no independent `voice` field,
+# same as `ml`/`mai`. Punjabi has no equivalent real corpus on OpenSLR
+# (checked directly) and no macOS voice either — its four fixtures are
+# composed, same caveat as every other composed-fixture language here.
+#
+# Milestone 6j added the `or-*` (Odia) fixtures below — same situation as
+# Punjabi: no OpenSLR corpus (checked directly) and no macOS voice, so
+# these four are composed, same caveat as every other composed-fixture
+# language here. Unlike every other language in this file, Odia has no
+# real Whisper ASR support at all (checked directly against
+# faster_whisper.tokenizer._LANGUAGE_CODES, the same check that found
+# Milestone 6h's Odia hint-dict bug) — a capability gap, not a quality
+# one, the same class Maithili has (ADR-031). These fixtures still
+# measure langid and the TTS-proxy metric; real ASR-input measurement
+# isn't possible for Odia with today's engine regardless of fixture
+# quality.
 fixtures:
   - id: hi-weather
     language: hi
@@ -107,3 +142,115 @@ fixtures:
   - id: mai-greeting
     language: mai
     text: "प्रणाम, अहाँ कोना छी?"
+  - id: bn-weather
+    language: bn
+    text: "আজকে আবহাওয়া কেমন?"
+    voice: Piya
+  - id: bn-capital
+    language: bn
+    text: "ভারতের রাজধানী কী?"
+    voice: Piya
+  - id: bn-story
+    language: bn
+    text: "আমাকে একটা ছোট গল্প বলো"
+    voice: Piya
+  - id: bn-greeting
+    language: bn
+    text: "নমস্কার, আপনি কেমন আছেন?"
+    voice: Piya
+  - id: ta-weather
+    language: ta
+    text: "இன்று வானிலை எப்படி இருக்கிறது?"
+    voice: Vani
+  - id: ta-capital
+    language: ta
+    text: "இந்தியாவின் தலைநகரம் எது?"
+    voice: Vani
+  - id: ta-story
+    language: ta
+    text: "எனக்கு ஒரு சிறு கதை சொல்லுங்கள்"
+    voice: Vani
+  - id: ta-greeting
+    language: ta
+    text: "வணக்கம், நீங்கள் எப்படி இருக்கிறீர்கள்?"
+    voice: Vani
+  - id: te-weather
+    language: te
+    text: "ఈరోజు వాతావరణం ఎలా ఉంది?"
+    voice: Geeta
+  - id: te-capital
+    language: te
+    text: "భారతదేశ రాజధాని ఏమిటి?"
+    voice: Geeta
+  - id: te-story
+    language: te
+    text: "నాకు ఒక చిన్న కథ చెప్పండి"
+    voice: Geeta
+  - id: te-greeting
+    language: te
+    text: "నమస్కారం, మీరు ఎలా ఉన్నారు?"
+    voice: Geeta
+  - id: kn-weather
+    language: kn
+    text: "ಇಂದು ಹವಾಮಾನ ಹೇಗಿದೆ?"
+    voice: Soumya
+  - id: kn-capital
+    language: kn
+    text: "ಭಾರತದ ರಾಜಧಾನಿ ಯಾವುದು?"
+    voice: Soumya
+  - id: kn-story
+    language: kn
+    text: "ನನಗೆ ಒಂದು ಚಿಕ್ಕ ಕಥೆ ಹೇಳಿ"
+    voice: Soumya
+  - id: kn-greeting
+    language: kn
+    text: "ನಮಸ್ಕಾರ, ನೀವು ಹೇಗಿದ್ದೀರಿ?"
+    voice: Soumya
+  - id: gu-nav1
+    language: gu
+    text: "ઉત્તર દિશામાં જાઓ"
+  - id: gu-nav2
+    language: gu
+    text: "જમણે વળો"
+  - id: gu-nav3
+    language: gu
+    text: "જંક્શનને અનુસરો"
+  - id: gu-nav4
+    language: gu
+    text: "તમે આવી પહોંચ્યાં."
+  - id: mr-chat1
+    language: mr
+    text: "ओह . मी काय मदत करू ?"
+  - id: mr-chat2
+    language: mr
+    text: "आता मी ऐकतेय"
+  - id: mr-chat3
+    language: mr
+    text: "आपण चॅट करू शकतो"
+  - id: mr-chat4
+    language: mr
+    text: "खरंच ? धन्यवाद"
+  - id: pa-weather
+    language: pa
+    text: "ਅੱਜ ਮੌਸਮ ਕਿਹੋ ਜਿਹਾ ਹੈ?"
+  - id: pa-capital
+    language: pa
+    text: "ਭਾਰਤ ਦੀ ਰਾਜਧਾਨੀ ਕੀ ਹੈ?"
+  - id: pa-story
+    language: pa
+    text: "ਮੈਨੂੰ ਇੱਕ ਛੋਟੀ ਕਹਾਣੀ ਸੁਣਾਓ"
+  - id: pa-greeting
+    language: pa
+    text: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ, ਤੁਸੀਂ ਕਿਵੇਂ ਹੋ?"
+  - id: or-weather
+    language: or
+    text: "ଆଜି ପାଗ କେମିତି ଅଛି?"
+  - id: or-capital
+    language: or
+    text: "ଭାରତର ରାଜଧାନୀ କଣ?"
+  - id: or-story
+    language: or
+    text: "ମୋତେ ଗୋଟିଏ ଛୋଟ କାହାଣୀ କୁହ"
+  - id: or-greeting
+    language: or
+    text: "ନମସ୍କାର, ଆପଣ କେମିତି ଅଛନ୍ତି?"

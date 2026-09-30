@@ -177,14 +177,13 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Same reasoning as handleVoiceTurn's identical check: faster-whisper
-	// has no "mai" language code at all (ADR-031) — a capability gap, not
-	// a quality one. Rejecting explicitly beats letting it through: this
-	// project's ASR wrapper silently falls back to auto-detection for an
-	// unmapped language rather than erroring, so an unrejected request
-	// would produce a wrong-language transcript, not a clean failure.
-	if language == maithiliLanguage {
+	// has no real support for these (see noASRLanguages) — a capability
+	// gap, not a quality one. Rejecting explicitly beats letting it
+	// through: an unrejected request would either silently transcribe the
+	// wrong language or raise an opaque 500, not fail cleanly.
+	if noASRLanguages[language] {
 		writeError(w, http.StatusBadRequest, "invalid_request",
-			"speech recognition does not support Maithili yet")
+			"speech recognition does not support this language yet")
 		return
 	}
 
@@ -320,16 +319,13 @@ func (s *Server) handleVoiceTurn(w http.ResponseWriter, r *http.Request) {
 			"automatic language detection is not yet supported for voice turns")
 		return
 	}
-	// faster-whisper's language table has no "mai" entry at all (checked
-	// directly against its tokenizer, and upstream OpenAI Whisper's own —
-	// ADR-031) — a capability gap, not the accuracy gap Malayalam has
-	// (ADR-029). This project's ASR wrapper silently falls back to
-	// auto-detection for an unmapped code rather than erroring (measured,
-	// not assumed), so letting this reach the ASR call would produce a
-	// wrong-language transcript, not a clean failure — reject explicitly.
-	if language == maithiliLanguage {
+	// faster-whisper has no real support for these (see noASRLanguages) —
+	// a capability gap, not the accuracy gap Malayalam has (ADR-029).
+	// Letting either reach the ASR call would produce a wrong-language
+	// transcript or an opaque 500, not a clean failure — reject explicitly.
+	if noASRLanguages[language] {
 		writeError(w, http.StatusBadRequest, "invalid_request",
-			"speech recognition does not support Maithili yet")
+			"speech recognition does not support this language yet")
 		return
 	}
 	voice := r.URL.Query().Get("voice")

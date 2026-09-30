@@ -8,12 +8,23 @@
  * (proxy WER 100-150% against the <10% target); it ships anyway on the
  * same precedent Hinglish already set (ADR-020's non-fatal TTS failure —
  * text conversation still works, voice output for that turn silently
- * doesn't). `mai` (Maithili, Milestone 6f, ADR-031) is listed disabled
- * pending its own benchmark results — unlike the others below, even if
- * it ships, voice *input* never will with today's ASR engine, which has
- * no Maithili language code at all. The rest are listed so the language
- * selector can show them as "coming soon" without any functionality
- * behind them.
+ * doesn't). `bn`/`ta`/`te`/`kn` joined in Milestone 6h (ADR-033) on the
+ * same precedent — LLM fluent and langid 100% accurate for all four
+ * (stronger than Malayalam's own result), but real, uneven ASR/TTS
+ * quality gaps (Tamil measured best; Kannada's TTS candidate has an
+ * actual synthesis defect, not just weak accuracy). `gu`/`mr`/`pa`
+ * joined in Milestone 6i (ADR-034) on the same precedent again — LLM
+ * fluent and langid 100% accurate for all three (Marathi correctly
+ * distinguished from Hindi despite sharing Devanagari); Gujarati/Marathi
+ * had real, human-recorded corpora to test against (Punjabi didn't, so
+ * its evidence rests on the TTS-proxy metric alone, the same
+ * lower-confidence situation Malayalam/Maithili have). `mai` (Maithili,
+ * Milestone 6f, ADR-031) is listed disabled pending its own blockers
+ * closing — unlike the four above, its LLM never replies in Maithili at
+ * all (not a quality gap), and voice input never will with today's ASR
+ * engine, which has no Maithili language code at all. The rest are
+ * listed so the language selector can show them as "coming soon" without
+ * any functionality behind them.
  */
 export type LanguageCode =
   'hi' | 'hinglish' | 'en' | 'bn' | 'gu' | 'mr' | 'ta' | 'te' | 'kn' | 'ml' | 'pa' | 'or' | 'mai';
@@ -46,14 +57,14 @@ export interface LanguageOption {
 export const LANGUAGE_OPTIONS: readonly LanguageOption[] = [
   { code: 'hi', label: 'हिन्दी', englishName: 'Hindi', enabled: true },
   { code: 'hinglish', label: 'Hinglish', englishName: 'Hinglish', enabled: true },
-  { code: 'bn', label: 'বাংলা', englishName: 'Bengali', enabled: false },
-  { code: 'gu', label: 'ગુજરાતી', englishName: 'Gujarati', enabled: false },
-  { code: 'mr', label: 'मराठी', englishName: 'Marathi', enabled: false },
-  { code: 'ta', label: 'தமிழ்', englishName: 'Tamil', enabled: false },
-  { code: 'te', label: 'తెలుగు', englishName: 'Telugu', enabled: false },
-  { code: 'kn', label: 'ಕನ್ನಡ', englishName: 'Kannada', enabled: false },
+  { code: 'bn', label: 'বাংলা', englishName: 'Bengali', enabled: true },
+  { code: 'gu', label: 'ગુજરાતી', englishName: 'Gujarati', enabled: true },
+  { code: 'mr', label: 'मराठी', englishName: 'Marathi', enabled: true },
+  { code: 'ta', label: 'தமிழ்', englishName: 'Tamil', enabled: true },
+  { code: 'te', label: 'తెలుగు', englishName: 'Telugu', enabled: true },
+  { code: 'kn', label: 'ಕನ್ನಡ', englishName: 'Kannada', enabled: true },
   { code: 'ml', label: 'മലയാളം', englishName: 'Malayalam', enabled: true },
-  { code: 'pa', label: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', enabled: false },
+  { code: 'pa', label: 'ਪੰਜਾਬੀ', englishName: 'Punjabi', enabled: true },
   { code: 'or', label: 'ଓଡ଼ିଆ', englishName: 'Odia', enabled: false },
   { code: 'mai', label: 'मैथिली', englishName: 'Maithili', enabled: false },
 ];

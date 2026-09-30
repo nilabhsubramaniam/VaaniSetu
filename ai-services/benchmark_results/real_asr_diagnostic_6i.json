@@ -1,0 +1,65 @@
+{
+  "asr_key": "faster-whisper-large-v3-turbo",
+  "asr_repo_id": "deepdml/faster-whisper-large-v3-turbo-ct2",
+  "audio_source": "Google Speech Corpora (LREC 2020), OpenSLR resources 64 (mr) / 78 (gu), CC-BY-SA-4.0",
+  "by_language": {
+    "mr": {
+      "mean_wer": 0.5375,
+      "runs": [
+        {
+          "fixture_id": "mrt_02436_01445823883",
+          "reference": "ओह . मी काय मदत करू ?",
+          "hypothesis": "आहे मी काय मदद करू",
+          "wer": 0.4
+        },
+        {
+          "fixture_id": "mrt_09697_00476676389",
+          "reference": "आता मी ऐकतेय",
+          "hypothesis": "Atami-eit-tie",
+          "wer": 1.0
+        },
+        {
+          "fixture_id": "mrt_09697_01157410292",
+          "reference": "आपण चॅट करू शकतो",
+          "hypothesis": "आपण चैट करू शकतो",
+          "wer": 0.25
+        },
+        {
+          "fixture_id": "mrt_02624_01936911566",
+          "reference": "खरंच ? धन्यवाद",
+          "hypothesis": "करच धन्यवाद",
+          "wer": 0.5
+        }
+      ]
+    },
+    "gu": {
+      "mean_wer": 0.3333,
+      "runs": [
+        {
+          "fixture_id": "guf_01906_00985663318",
+          "reference": "ઉત્તર દિશામાં જાઓ",
+          "hypothesis": "ઉત્તર દિશામાં જાઓ",
+          "wer": 0.0
+        },
+        {
+          "fixture_id": "guf_01906_02048738580",
+          "reference": "જમણે વળો",
+          "hypothesis": "જમણી વળો",
+          "wer": 0.5
+        },
+        {
+          "fixture_id": "guf_01906_01371727905",
+          "reference": "જંક્શનને અનુસરો",
+          "hypothesis": "જંક્શને અનુસરો",
+          "wer": 0.5
+        },
+        {
+          "fixture_id": "guf_01906_01600766818",
+          "reference": "તમે આવી પહોંચ્યાં.",
+          "hypothesis": "તમે આવી પહંચયા.",
+          "wer": 0.3333
+        }
+      ]
+    }
+  }
+}
