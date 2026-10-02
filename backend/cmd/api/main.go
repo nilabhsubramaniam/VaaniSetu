@@ -103,6 +103,14 @@ func run() error {
 	documentsService := documents.NewService(pool, embeddingClient)
 	server := api.NewServer(convService, documentsService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
 
+	// The async chunk/embed job dispatch docs/ARCHITECTURE.md §3.2
+	// requires (Phase 7 Milestone 7c) — polls for documents left
+	// "pending" by documentsService.CreateDocument and turns them into
+	// "ready"/"failed". Tied to the same shutdown context as the HTTP
+	// server below, so it stops cleanly rather than leaking a goroutine.
+	documentsWorker := documents.NewWorker(pool, embeddingClient, logger)
+	go documentsWorker.Run(ctx, 2*time.Second)
+
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           server.Routes(),

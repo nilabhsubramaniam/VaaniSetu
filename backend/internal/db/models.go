@@ -6,6 +6,7 @@ package db
 
 import (
 	"github.com/jackc/pgx/v5/pgtype"
+	pgvector "github.com/pgvector/pgvector-go"
 )
 
 type Document struct {
@@ -14,6 +15,15 @@ type Document struct {
 	Content   string             `json:"content"`
 	Status    string             `json:"status"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type DocumentChunk struct {
+	ID         pgtype.UUID        `json:"id"`
+	DocumentID pgtype.UUID        `json:"document_id"`
+	ChunkIndex int32              `json:"chunk_index"`
+	Content    string             `json:"content"`
+	Embedding  pgvector.Vector    `json:"embedding"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type Session struct {

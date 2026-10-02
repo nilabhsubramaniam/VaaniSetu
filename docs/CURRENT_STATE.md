@@ -15,12 +15,17 @@ project moves between milestones or a phase's status changes.
   and a new `embedding` Go capability boundary following the same
   Fake/HTTP pattern every other capability uses, wired into
   `documents.Service` but not called by any request path yet — see
-  `docs/DECISIONS.md` ADR-036 — and Milestone 7b: the real Python
+  `docs/DECISIONS.md` ADR-036 —, Milestone 7b: the real Python
   `embedding` capability, benchmarked and wired — `intfloat/
   multilingual-e5-base` selected on real latency/memory/dimension
   tie-breakers after all three candidates tied at 100% retrieval
   accuracy on the fixture set; `POST /v1/embed` live-verified — see
-  ADR-037; both complete). Phase 6 - Indian Language Support,
+  ADR-037 —, and Milestone 7c: chunking (in Go), the `document_chunks`
+  table with a real `vector(768)` column and HNSW cosine index, and a
+  Postgres-`SKIP LOCKED` async worker that finally calls the embedding
+  client — live-verified end to end including a real self-deadlock bug
+  found and fixed along the way — see ADR-038; all three complete).
+  Phase 6 - Indian Language Support,
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
   Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
   transliteration, Malayalam's real bottleneck diagnosed —, 6e —
@@ -39,7 +44,7 @@ project moves between milestones or a phase's status changes.
   user's explicit request** (2026-09-30), not abandoned — see below for
   the real evidence gathered before deferring.
 - **Current focus:** none of Phase 7's remaining scope is currently
-  approved to start (Milestones 7c/7d/7e are sketched, not approved — see
+  approved to start (Milestones 7d/7e are sketched, not approved — see
   `AGENTS.md` §5). Phase 6 has no approved work in progress either.
   Milestone 6g's real ASR-candidate search reached a confirmed dead end
   for now: a valid Hugging Face login was obtained, but both
@@ -51,8 +56,73 @@ project moves between milestones or a phase's status changes.
   revisiting later if access is ever granted; the user chose to defer
   rather than wait on it. Maithili's `LANGUAGE_OPTIONS.mai.enabled`
   stays `false`.
-- **Last updated:** 2026-09-30 (Phase 7 Milestone 7b: the real Python
-  `embedding` capability, benchmark, and real wiring. Before
+- **Last updated:** 2026-09-30 (Phase 7 Milestone 7c: chunking,
+  `document_chunks`/pgvector schema, and async job dispatch — the piece
+  that finally makes `documents.Service`'s stored-but-unused
+  `embedding.EmbeddingClient` get called. A real architectural question
+  was flagged before implementing, not assumed: `docs/ARCHITECTURE.md`
+  §3.2 says Go should "dispatch chunking / embedding jobs to Python,"
+  read literally suggesting chunking itself could live in Python —
+  resolved the same way ADR-036 resolved an identical ambiguity for "RAG
+  retrieval mechanics": chunking is plain text-splitting, not inference,
+  so it stays in Go, and only the stateless embedding call goes to
+  Python. New `backend/internal/documents/chunk.go`
+  (`SplitIntoChunks`, a paragraph/word-boundary splitter with overlap,
+  no new interface since exactly one implementation exists) and
+  `worker.go` (`Worker`, a Postgres-`SELECT ... FOR UPDATE SKIP
+  LOCKED`-based async job dispatcher on a 2-second ticker — chosen over
+  an in-process channel or a new external queue like Redis because
+  Postgres already holds the state that matters, `documents.status`, so
+  a job survives a process restart with zero extra code and no new
+  external dependency). New migration `0005_add_document_chunks.sql`:
+  `CREATE EXTENSION IF NOT EXISTS vector`, a `document_chunks` table with
+  a real `vector(768)` column (`multilingual-e5-base`'s real, benchmarked
+  dimension from ADR-037 — not a guess, exactly what ADR-036 deferred
+  this column to avoid) and an HNSW `vector_cosine_ops` index, per
+  `docs/ARCHITECTURE.md` §3.5's own named choice. New Go dependency
+  `github.com/pgvector/pgvector-go` (pgx has no native `vector` type);
+  `internal/db/pool.go` now registers pgvector's codec on every
+  connection; `sqlc.yaml` gained a type override for it (the plain
+  `"module/path.Type"` override string produced an invalid import alias
+  since the module's last path segment isn't its real package name —
+  fixed by spelling out `import`/`package`/`type` explicitly).
+  **A real, self-inflicted deadlock found and fixed during this
+  milestone's own live verification, not a hypothetical**: the first
+  working version of `Worker.Tick` tried to mark a document `"failed"`
+  from a second database connection while its own claiming transaction
+  still held that row's lock — verified live by creating a document,
+  killing `ai-services` mid-flight, and watching it wedge in `"pending"`
+  forever (`pg_stat_activity` showed the tick's own goroutine blocked on
+  a lock only its own not-yet-run deferred rollback could release). Fixed
+  by rolling back the claiming transaction explicitly before issuing the
+  failure update; re-verified live afterward — a genuine embedding-service
+  outage now correctly marks the document `"failed"` within one tick, with
+  the real cause logged and zero orphaned rows. A related, necessary fix:
+  both `internal/documents`'s and `internal/conversation`'s Docker-gated
+  integration tests built their test Postgres from plain
+  `postgres:16-alpine`, which has no `vector` extension — both switched to
+  `pgvector/pgvector:pg16` (matching `docker-compose.yml`). Also
+  documented a real native-Postgres setup gap in `backend/SETUP.md`:
+  `pgvector` isn't a trusted extension, so a superuser must `CREATE
+  EXTENSION vector` once before the application's ordinary login role can
+  use it. `docker-compose.yml` also gained the
+  `VAANISETU_EMBEDDING_MODEL_STORE`/`VAANISETU_EMBEDDING_SERVICE_URL`
+  wiring Milestone 7b's own compose changes had missed. 6 new unit tests
+  for `SplitIntoChunks` plus 3 new Docker-gated integration tests for
+  `Worker.Tick` (happy path, no-pending-document, embedding failure with
+  no orphaned chunks) — skip cleanly without Docker in this environment,
+  same as every other integration test here; `go build/vet/test`,
+  `gofmt`, `golangci-lint` all clean. **Verified live** against a real
+  native PostgreSQL (pgvector installed via `brew install pgvector`) and
+  the real `multilingual-e5-base` service from Milestone 7b: a real
+  document's status went `"pending"` -> `"ready"` within one 2-second
+  tick, a real, non-trivial 768-dimension vector landed in
+  `document_chunks.embedding` (confirmed via `psql`, including a real
+  `embedding <=> embedding = 0` cosine self-distance query against the
+  HNSW index). See `docs/DECISIONS.md` ADR-038 for the full reasoning and
+  evidence.
+  Earlier that day (Phase 7 Milestone 7b: the real Python
+  `embedding` capability, benchmark, and real wiring). Before
   implementation, narrowed 7b's scope against this project's own
   precedent — every prior phase's "b" milestone (2b/3b/4b/6b) did only
   "Python capability + benchmark + real wiring", but ADR-036's original

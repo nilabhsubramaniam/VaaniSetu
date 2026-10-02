@@ -2666,6 +2666,141 @@ the real Three.js map scene.
   pgvector schema, async job-dispatch design) is sketched but not
   planned in detail or approved.
 
+## ADR-038 - Phase 7 Milestone 7c: chunking, pgvector schema, and async job dispatch
+
+- **Decision:** Four related choices:
+  1. **Chunking stays in Go**, not Python. `docs/ARCHITECTURE.md` §3.2
+     says Go should "dispatch chunking / embedding jobs to Python,"
+     which read literally could put chunking itself in Python. Read
+     instead as "the embedding *call* goes to Python, asynchronously,
+     out of the request path" — chunking is plain text-splitting, not
+     inference, and `internal/embedding`'s own package doc already said
+     so since Milestone 7a. This mirrors ADR-036's identical resolution
+     for "RAG retrieval mechanics" (keep DB-touching/orchestration logic
+     in Go, keep Python to stateless ML calls).
+  2. **`document_chunks`** (`backend/migrations/0005_add_document_chunks.sql`):
+     `id`/`document_id` (FK to `documents`, `ON DELETE CASCADE`)/
+     `chunk_index`/`content`/`embedding vector(768)`/`created_at`, unique
+     on `(document_id, chunk_index)`, plus `CREATE EXTENSION IF NOT
+     EXISTS vector` and an HNSW `vector_cosine_ops` index — exactly what
+     `docs/ARCHITECTURE.md` §3.5 already named ("Approximate index (HNSW)
+     on the embedding column, tuned when RAG is built (Phase 7)"). 768 is
+     `multilingual-e5-base`'s real, benchmarked dimension (ADR-037), not
+     a guess — the guess ADR-036 explicitly deferred this column to avoid.
+  3. **PostgreSQL itself as the durable job queue**
+     (`backend/internal/documents/worker.go`'s `Worker`): `SELECT ...
+     WHERE status = 'pending' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP
+     LOCKED` on a 2-second ticker inside the existing Go process, chunk
+     the claimed document, call `embedding.EmbeddingClient.Embed` once
+     per chunk, insert the `document_chunks` rows, mark `documents.status`
+     `"ready"`; any failure marks it `"failed"` instead (no automatic
+     retry). Chosen over an in-process channel/goroutine-pool or a new
+     external queue (Redis, a queue library): the state that matters —
+     which documents still need processing — already lives in
+     `documents.status`, so a job survives a process restart with zero
+     extra code and no new external dependency, consistent with this
+     project's local-first, no-unnecessary-dependencies rule
+     (`AGENTS.md` §4). Wired into `cmd/api/main.go` on a goroutine tied to
+     the existing shutdown context — the same lifecycle pattern already
+     used for graceful HTTP shutdown, no new mechanism.
+  4. **`github.com/pgvector/pgvector-go`** added as a new Go dependency —
+     pgx has no native `vector` type. sqlc's pgx/v5 codegen needed an
+     explicit `overrides` entry (`backend/sqlc.yaml`) mapping the
+     Postgres `vector` type to it; the plain `"module/path.Type"` string
+     form of that override produced an invalid Go identifier (the
+     module's last path segment, `pgvector-go`, isn't its actual package
+     name, `pgvector`) — fixed by spelling out `import`/`package`/`type`
+     explicitly in the override instead.
+- **A real bug found and fixed during this milestone's own live
+  verification, not a hypothetical**: the first working version of
+  `Worker.Tick` rolled back its transaction only via `defer`, and on an
+  embedding failure called `fail()`, which tried to `UPDATE documents SET
+  status = 'failed'` on a **second**, separate connection (`db.New(w.pool)`)
+  for the *same row* the outer transaction still held locked via `FOR
+  UPDATE`. Verified live: creating a document, then killing `ai-services`
+  mid-flight, wedged that document in `"pending"` forever — `pg_stat_activity`
+  showed the tick's own transaction sitting "idle in transaction" while a
+  second connection from the very same goroutine sat "active", blocked
+  waiting on the row lock only the first transaction's own (not-yet-run)
+  deferred rollback could release. A single goroutine deadlocking itself
+  on its own two connections. Fixed by rolling back the claiming
+  transaction **explicitly, before** issuing the failure `UPDATE`
+  (`rollbackAndFail`), so the row lock is released before anything else
+  tries to touch that row. Re-verified live after the fix: killing
+  `ai-services` mid-flight now marks the document `"failed"` within one
+  2-second tick, logs the real cause
+  (`dial tcp [::1]:8090: connect: connection refused`), leaves zero
+  orphaned `document_chunks` rows, and leaves no stuck
+  `pg_stat_activity` entries.
+- **A real, separate fix this milestone's schema forced**: both
+  `internal/documents` and `internal/conversation`'s Docker-gated
+  integration tests built their test Postgres container from plain
+  `postgres:16-alpine`, which has no `vector` extension — `db.Migrate`
+  now runs `CREATE EXTENSION vector` for every test that applies the
+  full migration set, so both test files' container image changed to
+  `pgvector/pgvector:pg16` (matching `docker-compose.yml`'s own image).
+  Also: `pgvector` is not a
+  [trusted extension](https://www.postgresql.org/docs/current/sql-createextension.html),
+  so a native (non-Docker) Postgres needs a superuser to `CREATE
+  EXTENSION vector` once before the `vaanisetu` application role (an
+  ordinary login role) can use it — undocumented until this milestone;
+  `backend/SETUP.md` now covers it.
+- **Reason — the benchmark/measurement discipline applied to a design
+  choice, not just a model**: the Postgres-as-queue design was chosen
+  over alternatives by the same reasoning this project applies to model
+  selection — match the tool to what's actually needed. An in-process
+  channel needs no new dependency either, but loses a pending job on a
+  crash before it's processed (the durability this project's "documents
+  shouldn't silently vanish" expectation needs); Redis or a queue library
+  adds a new external service this local-first project doesn't otherwise
+  need, for a job volume (one Go process, one Postgres, no multi-worker
+  fan-out yet) Postgres's own row-locking already handles correctly.
+- **Alternatives considered:**
+  - **Chunk in Python, per a literal reading of ARCHITECTURE.md §3.2** —
+    rejected: no inference is involved, and it would mean giving Python
+    a reason to know about `documents`/`document_chunks` at all, which
+    no existing capability does (every existing Python capability is
+    stateless).
+  - **An in-process channel/goroutine-pool for job dispatch** — rejected:
+    loses pending jobs across a restart with no compensating benefit for
+    this project's current scale.
+  - **A new external queue (Redis, a Go queue library)** — rejected: a
+    new external dependency and a new service to run, for a job pattern
+    Postgres's own `SKIP LOCKED` already solves without one, violating
+    `AGENTS.md` §4's "no unnecessary dependencies."
+- **Impact:** New `backend/migrations/0005_add_document_chunks.sql`;
+  `backend/internal/documents/{chunk.go, worker.go}`; new sqlc queries
+  (`ClaimPendingDocument`, `CreateDocumentChunk`, `ListChunksByDocument`,
+  `MarkDocumentReady`, `MarkDocumentFailed`) and regenerated
+  `internal/db/documents.sql.go`/`models.go`; `backend/internal/db/pool.go`
+  now registers pgvector's Go<->wire codec on every connection
+  (`pgxvec.RegisterTypes` via `pgxpool.Config.AfterConnect`);
+  `backend/sqlc.yaml` gained a `vector` type override; `backend/go.mod`
+  gained `pgvector-go`/`pgvector-go/pgx`; `cmd/api/main.go` starts
+  `documents.Worker.Run` on a goroutine; `docker-compose.yml` gained the
+  `VAANISETU_EMBEDDING_MODEL_STORE`/`VAANISETU_EMBEDDING_SERVICE_URL`
+  wiring Milestone 7b's own compose changes had missed; `backend/SETUP.md`
+  documents the native-Postgres `CREATE EXTENSION vector` superuser step.
+  6 new unit tests for `SplitIntoChunks`; 3 new Docker-gated integration
+  tests for `Worker.Tick` (happy path, no-pending-document, embedding
+  failure with no orphaned chunks) — skip cleanly without Docker in this
+  environment, same as every other integration test here. `go
+  build/vet/test`, `gofmt`, `golangci-lint` all clean. **Verified live**
+  against a real native PostgreSQL (pgvector installed via
+  `brew install pgvector`) and the real `multilingual-e5-base` service
+  from Milestone 7b: a real document's `status` field went
+  `"pending"` -> `"ready"` within one 2-second tick, a real,
+  non-trivial 768-dimension vector landed in `document_chunks.embedding`
+  (confirmed via `psql`, including a real `embedding <=> embedding = 0`
+  cosine self-distance query against the HNSW index), and — after the
+  deadlock fix above — a genuine embedding-service outage correctly
+  produced a `"failed"` status with no orphaned rows and no stuck
+  connections.
+- **Status:** Accepted. Milestone 7d (the retrieval query, reranking,
+  grounded prompt assembly) and 7e (frontend upload UI) remain sketched
+  but not planned in detail or approved — each needs its own approval
+  per `AGENTS.md` §5.
+
 ## Template for future ADRs
 
 ```

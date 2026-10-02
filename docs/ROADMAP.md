@@ -373,12 +373,16 @@ tie-breakers — ~6x faster than the slowest candidate, lowest memory,
 smallest embedding dimension; `POST /v1/embed` live-verified against the
 real running service — see ADR-037; the 7b/7c scope was narrowed before
 implementation to match every prior phase's own "b" milestone shape,
-with chunking/schema/async-job design moved to 7c) are both complete.
-Milestone 7c (chunking, `document_chunks`/pgvector schema, the async
-job-dispatch mechanism — a genuinely new pattern, confirmed nothing like
-it exists in `backend/` today) and 7d (retrieval + rerank + grounded
-prompt assembly) and 7e (frontend upload UI) are sketched only, not
-approved — each needs its own go-ahead per `AGENTS.md` §5.
+with chunking/schema/async-job design moved to 7c), and Milestone 7c
+(chunking in Go, the `document_chunks` table with a real `vector(768)`
+column and an HNSW cosine index, and a Postgres-`SKIP LOCKED`-based async
+worker — the genuinely new job-dispatch pattern confirmed absent from
+`backend/` before this milestone — that actually calls the embedding
+client for the first time; live-verified end to end including a real
+self-deadlock bug found and fixed along the way — see ADR-038) are all
+complete. Milestone 7d (retrieval + rerank + grounded prompt assembly)
+and 7e (frontend upload UI) are sketched only, not approved — each needs
+its own go-ahead per `AGENTS.md` §5.
 
 - **Objective:** Let the assistant answer from user-provided documents,
   grounded and cross-lingual.

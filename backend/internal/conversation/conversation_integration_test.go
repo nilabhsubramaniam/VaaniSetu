@@ -47,7 +47,11 @@ func newTestServiceWithLangID(t *testing.T, llmClient llm.LLMClient, langIDClien
 	skipIfNoDocker(t)
 
 	ctx := context.Background()
-	container, err := postgres.Run(ctx, "postgres:16-alpine",
+	// pgvector/pgvector:pg16 (not plain postgres:16-alpine), matching
+	// docker-compose.yml's postgres service — required since Phase 7
+	// Milestone 7c's migration runs `CREATE EXTENSION vector`, which a
+	// plain Postgres image doesn't have.
+	container, err := postgres.Run(ctx, "pgvector/pgvector:pg16",
 		postgres.WithDatabase("vaanisetu_test"),
 		postgres.WithUsername("test"),
 		postgres.WithPassword("test"),

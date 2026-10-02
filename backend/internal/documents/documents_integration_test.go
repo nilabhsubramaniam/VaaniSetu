@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
@@ -26,17 +27,20 @@ func skipIfNoDocker(t *testing.T) {
 	}
 }
 
-// newTestService starts a real Postgres container, applies the schema via
-// the exact same db.Migrate path cmd/api/main.go uses in production, and
-// returns a documents.Service backed by it, using FakeEmbeddingClient —
-// never called by this milestone's methods (see documents.Service's
-// package doc comment), but wired the same way production does.
-func newTestService(t *testing.T) *documents.Service {
+// newTestPool starts a real Postgres container and applies the schema via
+// the exact same db.Migrate path cmd/api/main.go uses in production —
+// shared by every test in this package that needs a real database,
+// documents.Service and documents.Worker alike.
+func newTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	skipIfNoDocker(t)
 
 	ctx := context.Background()
-	container, err := postgres.Run(ctx, "postgres:16-alpine",
+	// pgvector/pgvector:pg16 (not plain postgres:16-alpine), matching
+	// docker-compose.yml's postgres service — required since Phase 7
+	// Milestone 7c's migration runs `CREATE EXTENSION vector`, which a
+	// plain Postgres image doesn't have.
+	container, err := postgres.Run(ctx, "pgvector/pgvector:pg16",
 		postgres.WithDatabase("vaanisetu_test"),
 		postgres.WithUsername("test"),
 		postgres.WithPassword("test"),
@@ -63,7 +67,16 @@ func newTestService(t *testing.T) *documents.Service {
 	}
 	t.Cleanup(pool.Close)
 
-	return documents.NewService(pool, embedding.NewFakeEmbeddingClient())
+	return pool
+}
+
+// newTestService returns a documents.Service backed by a fresh test
+// database, using FakeEmbeddingClient — never called by Service's own
+// methods (see documents.Service's package doc comment), but wired the
+// same way production does.
+func newTestService(t *testing.T) *documents.Service {
+	t.Helper()
+	return documents.NewService(newTestPool(t), embedding.NewFakeEmbeddingClient())
 }
 
 func TestService_CreateDocument_PersistsWithPendingStatus(t *testing.T) {

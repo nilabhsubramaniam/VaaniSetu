@@ -7,7 +7,31 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
+	pgvector "github.com/pgvector/pgvector-go"
 )
+
+const claimPendingDocument = `-- name: ClaimPendingDocument :one
+SELECT id, title, content, status, created_at FROM documents
+WHERE status = 'pending'
+ORDER BY created_at
+LIMIT 1
+FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) ClaimPendingDocument(ctx context.Context) (Document, error) {
+	row := q.db.QueryRow(ctx, claimPendingDocument)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Content,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
 
 const createDocument = `-- name: CreateDocument :one
 INSERT INTO documents (title, content)
@@ -31,6 +55,71 @@ func (q *Queries) CreateDocument(ctx context.Context, arg CreateDocumentParams) 
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const createDocumentChunk = `-- name: CreateDocumentChunk :one
+INSERT INTO document_chunks (document_id, chunk_index, content, embedding)
+VALUES ($1, $2, $3, $4)
+RETURNING id, document_id, chunk_index, content, embedding, created_at
+`
+
+type CreateDocumentChunkParams struct {
+	DocumentID pgtype.UUID     `json:"document_id"`
+	ChunkIndex int32           `json:"chunk_index"`
+	Content    string          `json:"content"`
+	Embedding  pgvector.Vector `json:"embedding"`
+}
+
+func (q *Queries) CreateDocumentChunk(ctx context.Context, arg CreateDocumentChunkParams) (DocumentChunk, error) {
+	row := q.db.QueryRow(ctx, createDocumentChunk,
+		arg.DocumentID,
+		arg.ChunkIndex,
+		arg.Content,
+		arg.Embedding,
+	)
+	var i DocumentChunk
+	err := row.Scan(
+		&i.ID,
+		&i.DocumentID,
+		&i.ChunkIndex,
+		&i.Content,
+		&i.Embedding,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listChunksByDocument = `-- name: ListChunksByDocument :many
+SELECT id, document_id, chunk_index, content, embedding, created_at FROM document_chunks
+WHERE document_id = $1
+ORDER BY chunk_index
+`
+
+func (q *Queries) ListChunksByDocument(ctx context.Context, documentID pgtype.UUID) ([]DocumentChunk, error) {
+	rows, err := q.db.Query(ctx, listChunksByDocument, documentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DocumentChunk
+	for rows.Next() {
+		var i DocumentChunk
+		if err := rows.Scan(
+			&i.ID,
+			&i.DocumentID,
+			&i.ChunkIndex,
+			&i.Content,
+			&i.Embedding,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDocuments = `-- name: ListDocuments :many
@@ -62,4 +151,22 @@ func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const markDocumentFailed = `-- name: MarkDocumentFailed :exec
+UPDATE documents SET status = 'failed' WHERE id = $1
+`
+
+func (q *Queries) MarkDocumentFailed(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markDocumentFailed, id)
+	return err
+}
+
+const markDocumentReady = `-- name: MarkDocumentReady :exec
+UPDATE documents SET status = 'ready' WHERE id = $1
+`
+
+func (q *Queries) MarkDocumentReady(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markDocumentReady, id)
+	return err
 }
