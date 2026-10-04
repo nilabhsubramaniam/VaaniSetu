@@ -3014,6 +3014,130 @@ the real Three.js map scene.
   concretely-scoped piece of Phase 7's original sketch is complete;
   Phase 7 itself is not marked DONE while 7e's open question stands.
 
+## ADR-041 - Phase 7 closeout: RAG evaluation and the 7e decision
+
+- **Decision:** Ran the lightweight, phase-scoped RAG evaluation
+  `docs/ROADMAP.md`'s own Definition of Done for Phase 7 requires
+  (`docs/EVALUATION.md` §4), using a new Go tool rather than a Python
+  script — unlike every other benchmark so far, what needed measuring is
+  Go-owned (`documents.Service.Retrieve`'s real pgvector query and
+  `conversation.Service.SendMessage`'s real grounded-chat path from
+  Milestone 7d), not a Python capability. Based on the real numbers
+  below, **Milestone 7e (reranking / a measured relevance-score cutoff)
+  is not needed now** — Phase 7 moves from IN PROGRESS to **DONE**.
+- **What was built:** `backend/cmd/evalrag` (a second Go binary,
+  `backend/cmd/`'s established multi-binary shape) — seeds
+  `backend/eval_data/rag_fixtures.yaml`'s 6 composed documents (4
+  English, 2 Hindi, on deliberately distinct topics so recall@4 actually
+  discriminates) via the real `documents.Service.CreateDocument`, drives
+  `documents.Worker.Tick` directly until all are `"ready"` (the same
+  pattern `worker_integration_test.go` already uses, against the real
+  embedding service instead of a fake one), then for each of 10 fixture
+  queries: calls `documents.Service.Retrieve` directly to measure
+  recall@4, and calls the real `conversation.Service.SendMessage` to
+  check whether the reply contains an expected keyword — a simplified,
+  honestly-labeled proxy for "grounding/faithfulness" and "answer
+  correctness" (no LLM-judge infrastructure exists in this project; the
+  same kind of proxy precedent `benchmark_tts.py`'s proxy WER and
+  `benchmark_embedding.py`'s cosine-similarity proxy already
+  established). Deletes the documents it created afterward (direct
+  `DELETE` via the pool, since no delete endpoint exists) so the run is
+  repeatable — confirmed by running it twice, `documents`/
+  `document_chunks` both returning to 0 rows both times, identical
+  results both runs.
+- **The real numbers** (`backend/eval_results/rag_milestone_7_eval.json`):
+
+  | Metric | Result | `docs/EVALUATION.md` §4 target |
+  |---|---|---|
+  | Overall recall@4 | **1.00** (10/10) | recall@4 > 0.8 *(provisional)* |
+  | Cross-lingual recall@4 | **1.00** (4/4) | within 10pts of same-language *(provisional)* |
+  | Same-language recall@4 | **1.00** (6/6) | — |
+  | Answer-correct (keyword proxy) | **1.00** (10/10) | no hard target set yet |
+
+  Every query retrieved its gold document at **rank 1**, not just
+  somewhere in the top-4. Inspected the actual replies, not just the
+  pass/fail flags, to confirm this is real and not an artifact of a
+  lenient keyword check: two genuine cross-lingual translations were
+  caught in the wild — an English query against the Hindi "सांस्कृतिक
+  उत्सव" document correctly answered "15 November" (translating "15
+  नवंबर"); a Hindi query against the English chai-recipe document
+  correctly answered with "अदरक" (translating "ginger") and added real
+  detail beyond the keyword match ("आपकी दादी की रेसिपी में हर कप में
+  एक-एक अदरक की छोटी सी टुकड़ी होती है").
+- **A real, honestly-stated limitation of this result, not hidden**: the
+  fixture set is small (6 documents) and topically easy to discriminate
+  — the same caveat ADR-037's embedding benchmark already gave for an
+  identical reason ("this fixture set's passages are topically distinct
+  enough that all three candidates solved it perfectly — it does not
+  discriminate retrieval quality at this small scale"). A perfect score
+  here is real evidence that nothing is currently broken, not proof that
+  retrieval would stay perfect at a realistic scale (dozens-to-hundreds
+  of documents, including near-duplicate or overlapping topics) where
+  reranking's actual value usually shows up. If a future, larger-scale
+  evaluation (Phase 9's harness, or a future real usage pattern) finds a
+  real gap, Milestone 7e's own plan is already sketched and ready to pick
+  up with that evidence.
+- **Also verified: real spoken Q&A, not just typed chat** — Phase 7's own
+  Definition of Done says "Voice Q&A over an uploaded document," and
+  every grounding check up to this point (7d/7f/this evaluation) had
+  only gone through typed `/api/v1/chat`. Checked directly: the voice
+  orchestrator's `RunTurn` (Phase 5) calls the exact same
+  `conversation.Service.SendMessage` 7d wired retrieval into, so nothing
+  extra needed building — confirmed live with real recorded audio
+  (macOS `say`, the same synthesis tool `ai-services/scripts/
+  generate_audio_fixtures.py` already uses for test fixtures), not just
+  inferred from the shared code path. An English spoken question
+  ("Who leads Project Nilgiri and when does it launch?") was
+  transcribed (with a minor, honest ASR mishearing of the invented name,
+  "Neil Giri" for "Nilgiri" — the embedding-based retrieval matched the
+  right document anyway) and correctly, grounded answered; `audio` came
+  back `null` for this one, the already-known, separate `facebook/
+  mms-tts-hin` English-text limitation ADR-021 documented in Phase 4,
+  not a new RAG gap. A Hindi spoken question ("प्रोजेक्ट निलगिरी का
+  नेतृत्व कौन कर रहा है?") got a correct, grounded Hindi reply ("...
+  अनन्या राव कर रही हैं") **with real synthesized audio returned** — a
+  complete, literal voice-in/voice-out grounded round trip.
+- **Reason:** `docs/EVALUATION.md` §9 is explicit that the automated,
+  repeatable harness is Phase 9's job, not this phase's — every prior
+  phase (2-6) closed out with its own lightweight, phase-scoped
+  measurement instead, and this evaluation is sized the same way.
+  Building Milestone 7e without the evidence this evaluation now
+  provides would have meant guessing at both a model (a reranker) and a
+  threshold with nothing to measure them against — the same
+  "measure before selecting" discipline (ADR-008) applied to milestone
+  sequencing, not just model choice.
+- **Alternatives considered:**
+  - **Build Phase 9's full automated harness now instead** — rejected:
+    explicitly out of this phase's scope per `docs/EVALUATION.md` §9;
+    every prior phase used its own lightweight check instead, and this
+    evaluation follows that precedent, not a premature escalation.
+  - **Write the evaluation as a Python script** — rejected: the
+    capability under test (`documents.Service.Retrieve`,
+    `conversation.Service.SendMessage`) is Go-owned; a Python script
+    would need its own HTTP-shaped access to internals that don't exist
+    as an API (there is no `/retrieve` endpoint, deliberately — retrieval
+    stays internal to chat per ADR-039), so it would end up re-implementing
+    the Go logic rather than exercising the real thing.
+  - **Build Milestone 7e anyway, "to be safe"** — rejected: contradicts
+    this project's own evidence-based discipline; the real numbers above
+    say it isn't needed right now, and building a second model's
+    benchmark/selection machinery without a real gap to close would be
+    exactly the kind of premature scope-widening `AGENTS.md` §4 warns
+    against.
+- **Impact:** New `backend/cmd/evalrag/main.go`,
+  `backend/eval_data/rag_fixtures.yaml`,
+  `backend/eval_results/rag_milestone_7_eval.json` (real, committed
+  results); `go.mod` gained `go.yaml.in/yaml/v3` as a direct dependency
+  (previously transitive only). `go build/vet`, `gofmt`, `golangci-lint`
+  all clean on the new command (an evaluation tool isn't itself unit
+  tested, the same precedent `ai-services/scripts/benchmark_*.py` already
+  set — its output is the artifact). `docs/ROADMAP.md`/
+  `docs/CURRENT_STATE.md` updated: **Phase 7 is DONE.**
+- **Status:** Accepted. Phase 7 (RAG) is DONE. Milestone 7e remains
+  sketched, explicitly not needed by current evidence, and not approved
+  to build — revisit only if a future, larger-scale evaluation finds a
+  real gap this one's small fixture set couldn't surface.
+
 ## Template for future ADRs
 
 ```

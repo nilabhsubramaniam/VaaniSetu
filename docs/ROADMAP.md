@@ -359,7 +359,7 @@ ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
 ## Phase 7 - RAG
 
-**Status:** IN PROGRESS — Milestone 7a (the document-upload boundary: a
+**Status:** DONE — Milestone 7a (the document-upload boundary: a
 plain-text-only `POST`/`GET /api/v1/documents`, a `documents` table with
 no `vector` column yet, and a new `embedding` Go capability boundary
 following the exact Fake/HTTP pattern every other capability uses, wired
@@ -396,11 +396,28 @@ polling convention existed in this frontend yet, wired into a new
 against the actual running stack — upload, watch status flip without a
 manual refresh, then a grounded chat reply from `/assistant` quoting the
 just-uploaded document, the full loop exercised from the UI for the
-first time — see ADR-040) are all complete. Milestone 7e (reranking
-and/or a measured relevance threshold, only if real evaluation evidence
-ever shows either is needed) remains sketched only, not approved — it
-needs its own go-ahead per `AGENTS.md` §5. Phase 7 itself stays IN
-PROGRESS while 7e's open question is unresolved.
+first time — see ADR-040) are all complete. The Phase 7 closeout
+evaluation (`backend/cmd/evalrag`, a new Go tool measuring
+`docs/EVALUATION.md` §4's RAG metrics directly against the real
+pipeline) then ran the real, lightweight, phase-scoped measurement this
+phase's own Definition of Done requires: **overall recall@4 1.00
+(10/10), cross-lingual recall@4 1.00 (4/4), a keyword-presence
+answer-correctness proxy 1.00 (10/10)** — every query retrieved its gold
+document at rank 1, including two genuine cross-lingual translations
+caught in the actual replies, not just the pass/fail numbers. Based on
+that real evidence, **Milestone 7e (reranking and/or a measured
+relevance threshold) is not needed now** — see ADR-041 for the full
+numbers, the fixture set's own honestly-stated small-scale limitation,
+and the reasoning. Milestone 7e stays sketched, not approved, revisit
+only if a future larger-scale evaluation finds a real gap. Also
+confirmed **real voice Q&A**, not just typed chat — the Phase 5 voice
+orchestrator shares the exact `conversation.Service.SendMessage` call 7d
+wired retrieval into, verified live with real recorded speech: an
+English spoken question got a correctly grounded reply (audio synthesis
+skipped only due to the already-known, separate Hindi-only TTS
+limitation from Phase 4, not a RAG gap); a Hindi spoken question got a
+correctly grounded reply with real synthesized audio returned — a
+complete voice-in/voice-out round trip.
 
 - **Objective:** Let the assistant answer from user-provided documents,
   grounded and cross-lingual.

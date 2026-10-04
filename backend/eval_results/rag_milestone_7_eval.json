@@ -1,0 +1,168 @@
+{
+  "overallRecallAt4": 1,
+  "crossLingualRecallAt4": 1,
+  "sameLanguageRecallAt4": 1,
+  "answerCorrectProxyRate": 1,
+  "results": [
+    {
+      "queryId": "q1",
+      "language": "en",
+      "crossLingual": false,
+      "goldDocumentId": "2dc2da36-8079-480b-a05d-3e180ad37677",
+      "retrievedDocumentIds": [
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c"
+      ],
+      "retrievalHit": true,
+      "chatReply": "Project Nilgiri is led by Ananya Rao.",
+      "expectedKeyword": "Ananya Rao",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q2",
+      "language": "en",
+      "crossLingual": false,
+      "goldDocumentId": "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+      "retrievedDocumentIds": [
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+        "86a25ebb-484e-44f5-8285-de68deac51ab",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "5af12695-84ae-45a2-a12e-773525a0dd17"
+      ],
+      "retrievalHit": true,
+      "chatReply": "Four green cardamom pods, exactly.",
+      "expectedKeyword": "four",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q3",
+      "language": "en",
+      "crossLingual": false,
+      "goldDocumentId": "53f7be7f-d112-4981-a5fc-6e3471247a70",
+      "retrievedDocumentIds": [
+        "53f7be7f-d112-4981-a5fc-6e3471247a70",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+        "86a25ebb-484e-44f5-8285-de68deac51ab"
+      ],
+      "retrievalHit": true,
+      "chatReply": "The Whispering Pines hiking trail is 7.5 kilometers long.",
+      "expectedKeyword": "7.5",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q4",
+      "language": "en",
+      "crossLingual": false,
+      "goldDocumentId": "86a25ebb-484e-44f5-8285-de68deac51ab",
+      "retrievedDocumentIds": [
+        "86a25ebb-484e-44f5-8285-de68deac51ab",
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017"
+      ],
+      "retrievalHit": true,
+      "chatReply": "A Great Bake-Off team has exactly three people.",
+      "expectedKeyword": "three",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q5",
+      "language": "en",
+      "crossLingual": true,
+      "goldDocumentId": "5af12695-84ae-45a2-a12e-773525a0dd17",
+      "retrievedDocumentIds": [
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c"
+      ],
+      "retrievalHit": true,
+      "chatReply": "The budget for the Ganga river cleanup project is fifty crore rupees.",
+      "expectedKeyword": "fifty",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q6",
+      "language": "en",
+      "crossLingual": true,
+      "goldDocumentId": "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+      "retrievedDocumentIds": [
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "86a25ebb-484e-44f5-8285-de68deac51ab",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017"
+      ],
+      "retrievalHit": true,
+      "chatReply": "The cultural festival is happening on 15 November this year, and it's going to be held in Jaipur.",
+      "expectedKeyword": "November",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q7",
+      "language": "hi",
+      "crossLingual": true,
+      "goldDocumentId": "2dc2da36-8079-480b-a05d-3e180ad37677",
+      "retrievedDocumentIds": [
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+        "53f7be7f-d112-4981-a5fc-6e3471247a70"
+      ],
+      "retrievalHit": true,
+      "chatReply": "प्रोजेक्ट निलगिरी का लक्ष्य तिथि मार्च 2027 है, लेकिन अभी तक कोई आधिकारिक घोषणा नहीं हुई है। मैं आपको अपडेट देने के लिए तैयार हूँ।",
+      "expectedKeyword": "2027",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q8",
+      "language": "hi",
+      "crossLingual": true,
+      "goldDocumentId": "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+      "retrievedDocumentIds": [
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017",
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "86a25ebb-484e-44f5-8285-de68deac51ab",
+        "2dc2da36-8079-480b-a05d-3e180ad37677"
+      ],
+      "retrievalHit": true,
+      "chatReply": "अदरक की मात्रा चाय की रेसिपी में बहुत महत्वपूर्ण है। आपकी दादी की रेसिपी में अदरक की मात्रा एक-इंच की है, जो हर कप के लिए उपयुक्त है।",
+      "expectedKeyword": "अदरक",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q9",
+      "language": "hi",
+      "crossLingual": false,
+      "goldDocumentId": "5af12695-84ae-45a2-a12e-773525a0dd17",
+      "retrievedDocumentIds": [
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+        "2d34828b-63d4-45b0-93ec-5ffba2b3f017"
+      ],
+      "retrievalHit": true,
+      "chatReply": "गंगा सफाई परियोजना का नेतृत्व डॉ. मीरा कपूर कर रही हैं।",
+      "expectedKeyword": "मीरा कपूर",
+      "answerCorrectProxy": true
+    },
+    {
+      "queryId": "q10",
+      "language": "hi",
+      "crossLingual": false,
+      "goldDocumentId": "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+      "retrievedDocumentIds": [
+        "9d0a03fb-1865-47bf-88d8-8a385292e38c",
+        "5af12695-84ae-45a2-a12e-773525a0dd17",
+        "2dc2da36-8079-480b-a05d-3e180ad37677",
+        "86a25ebb-484e-44f5-8285-de68deac51ab"
+      ],
+      "retrievalHit": true,
+      "chatReply": "मुख्य कलाकार सुनिधि वर्मा होंगी।",
+      "expectedKeyword": "सुनिधि वर्मा",
+      "answerCorrectProxy": true
+    }
+  ]
+}

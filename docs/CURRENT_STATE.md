@@ -9,7 +9,7 @@ project moves between milestones or a phase's status changes.
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
   **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap
   — see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
-  latency gap — see below). Phase 7 - RAG, **IN PROGRESS** (Milestone
+  latency gap — see below). Phase 7 - RAG, **DONE** (Milestone
   7a: the document-upload boundary — plain-text-only `POST`/`GET
   /api/v1/documents`, a `documents` table with no `vector` column yet,
   and a new `embedding` Go capability boundary following the same
@@ -33,9 +33,18 @@ project moves between milestones or a phase's status changes.
   frontend upload UI (a `DocumentService` real/mock pair, a `/documents`
   page, a self-stopping poll for the status transition) — live-verified
   in a real browser end to end, upload through grounded chat reply — see
-  ADR-040; all five complete). Milestone 7e (reranking / a measured
-  relevance threshold) remains open, gated on evaluation evidence that
-  doesn't exist yet.
+  ADR-040; all five complete). The Phase 7 closeout evaluation
+  (`backend/cmd/evalrag`, a new Go tool) then measured
+  `docs/EVALUATION.md` §4's RAG metrics for real: overall recall@4
+  **1.00** (10/10), cross-lingual recall@4 **1.00** (4/4), answer-correct
+  keyword proxy **1.00** (10/10) — every query hit its gold document at
+  rank 1. Also verified real voice Q&A (not just typed chat): the Phase 5
+  voice orchestrator shares the same grounded `SendMessage` call, and a
+  real recorded Hindi question got a correctly grounded reply with real
+  synthesized audio back, a complete voice-in/voice-out round trip.
+  Based on this real evidence, **Milestone 7e (reranking / a measured
+  relevance threshold) is not needed now** — see ADR-041. Phase 7 is
+  closed.
   Phase 6 - Indian Language Support,
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
   Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
@@ -54,10 +63,10 @@ project moves between milestones or a phase's status changes.
   LLM-generation and ASR-capability blockers) is **deferred at the
   user's explicit request** (2026-09-30), not abandoned — see below for
   the real evidence gathered before deferring.
-- **Current focus:** none of Phase 7's remaining scope is currently
-  approved to start (Milestone 7e is sketched, not approved, and gated on
-  evaluation evidence that doesn't exist yet — see `AGENTS.md` §5). Phase
-  6 has no approved work in progress either.
+- **Current focus:** Phase 7 is DONE; Milestone 7e stays sketched but not
+  approved — real evaluation evidence (ADR-041) says it isn't needed
+  right now, so it is not started (`AGENTS.md` §5). No phase has approved
+  work in progress. Phase 6 has no approved work in progress either.
   Milestone 6g's real ASR-candidate search reached a confirmed dead end
   for now: a valid Hugging Face login was obtained, but both
   `ai4bharat/indic-conformer-600m-multilingual` and `ARTPARK-IISc/
@@ -68,8 +77,60 @@ project moves between milestones or a phase's status changes.
   revisiting later if access is ever granted; the user chose to defer
   rather than wait on it. Maithili's `LANGUAGE_OPTIONS.mai.enabled`
   stays `false`.
-- **Last updated:** 2026-10-02 (Phase 7 Milestone 7f: the frontend
-  document-upload UI — the piece that finally lets an actual user reach
+- **Last updated:** 2026-10-04 (Phase 7 closeout: the real, lightweight,
+  phase-scoped RAG evaluation `docs/ROADMAP.md`'s own Definition of Done
+  for this phase required, finally run. New `backend/cmd/evalrag` (a
+  second Go binary, `cmd/`'s established multi-binary shape) seeds
+  `backend/eval_data/rag_fixtures.yaml`'s 6 composed documents (4
+  English, 2 Hindi) via the real `documents.Service.CreateDocument`,
+  drives the async worker directly until all are `"ready"`, then for 10
+  fixture queries measures retrieval recall@4 via
+  `documents.Service.Retrieve` and a keyword-presence
+  grounding/answer-correctness proxy via the real
+  `conversation.Service.SendMessage` — no LLM-judge infrastructure exists
+  in this project, so this is a simplified, honestly-labeled proxy, the
+  same precedent `benchmark_tts.py`'s proxy WER already established.
+  Deletes its own seeded documents afterward; confirmed repeatable by
+  running it twice with identical results and the database returning to
+  empty both times. **Real results**
+  (`backend/eval_results/rag_milestone_7_eval.json`): overall recall@4
+  **1.00** (10/10), cross-lingual recall@4 **1.00** (4/4), same-language
+  recall@4 **1.00** (6/6), answer-correct proxy **1.00** (10/10) — every
+  query retrieved its gold document at rank 1, not just somewhere in the
+  top-4; inspected the actual replies (not just pass/fail flags) and
+  found two genuine cross-lingual translations in the wild (a Hindi
+  document's "15 नवंबर" correctly answered as "15 November" in English;
+  an English document's "ginger" correctly answered as "अदरक" in Hindi,
+  with real added detail beyond the keyword match). Honestly caveated:
+  the 6-document fixture set is small and topically easy to discriminate
+  — the same limitation ADR-037's embedding benchmark already noted for
+  an identical reason — so this is real evidence nothing is currently
+  broken, not proof retrieval stays perfect at a realistic, larger scale.
+  **Also verified real voice Q&A**, not just typed chat (Phase 7's own
+  Definition of Done says "Voice Q&A"): confirmed the Phase 5 voice
+  orchestrator shares the exact `conversation.Service.SendMessage` call
+  retrieval was wired into, then proved it live with real recorded speech
+  (macOS `say`, the same tool `ai-services/scripts/
+  generate_audio_fixtures.py` already uses) rather than just trusting the
+  shared code path — an English spoken question about the uploaded
+  "Project Nilgiri" document got a correctly grounded reply (audio
+  synthesis skipped only due to the already-known, separate Hindi-only
+  TTS limitation from Phase 4/ADR-021, not a new RAG gap); a Hindi spoken
+  question got a correctly grounded reply **with real synthesized audio
+  returned** — a complete voice-in/voice-out grounded round trip. Based
+  on this real evidence, **Milestone 7e (reranking / a measured relevance
+  threshold) is not needed now** — revisit only if a future, larger-scale
+  evaluation finds a real gap. **Phase 7 (RAG) moves from IN PROGRESS to
+  DONE.** `docs/DEVELOPMENT.md`'s repo-structure tree and Backend
+  Conventions section were also corrected along the way: they had never
+  been updated for `internal/documents`/`internal/embedding`/
+  `internal/orchestrator` since those were added across Phases 5 and 7
+  (a real documentation-drift gap predating this task, fixed here since
+  it was touched anyway for the new `cmd/evalrag`/`eval_data`/
+  `eval_results` paths). See `docs/DECISIONS.md` ADR-041 for the full
+  reasoning and evidence.
+  The day before (2026-10-02, Phase 7 Milestone 7f: the frontend
+  document-upload UI) — the piece that finally lets an actual user reach
   the real upload/retrieval pipeline Milestones 7a-7d built, instead of
   only `curl`. Milestone 7e (reranking / a measured relevance threshold)
   stays correctly deferred: nothing yet shows 7d's plain top-k similarity

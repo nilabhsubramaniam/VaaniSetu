@@ -1,0 +1,127 @@
+# Phase 7 closeout evaluation fixtures (docs/DECISIONS.md, ADR pending).
+# Read and run by cmd/evalrag — the first real, phase-scoped measurement
+# of docs/EVALUATION.md §4's RAG metrics (retrieval recall@k,
+# cross-lingual retrieval, a grounding/answer-correctness proxy). Not
+# Phase 9's automated, repeatable harness — see docs/EVALUATION.md §9.
+#
+# Composed directly, not corpus-sourced — same "written directly, not
+# reviewed by a native speaker" caveat every other non-corpus fixture
+# file in this project already states plainly.
+#
+# 6 documents on deliberately distinct, unrelated topics (so recall@4
+# actually has to discriminate, not trivially succeed with only 2-3
+# documents in play) — 4 English, 2 Hindi. 10 queries, each naming the
+# document index it should retrieve and an `expectedKeyword` substring
+# (case-insensitive) a correct, grounded chat reply should contain — a
+# simplified proxy for "grounding/faithfulness" and "answer correctness"
+# (no LLM-judge infrastructure exists in this project; this is the same
+# kind of honestly-scoped proxy ai-services/scripts/benchmark_tts.py's
+# proxy WER and benchmark_embedding.py's cosine-similarity proxy already
+# established). `crossLingual: true` marks a query written in a
+# different language than its target document's own language — measured
+# as a separate recall figure, not averaged into the overall number, the
+# same design ai-services/eval_data/embedding_fixtures.yaml (Milestone
+# 7b) already used.
+documents:
+  - id: d1
+    language: en
+    title: "Project Nilgiri"
+    content: >
+      Project Nilgiri is VaaniSetu's internal codename for the offline
+      speech pipeline. The project lead is Ananya Rao. Project Nilgiri's
+      target launch date is March 2027.
+  - id: d2
+    language: en
+    title: "Masala Chai Recipe"
+    content: >
+      Grandmother's secret masala chai recipe uses four green cardamom
+      pods, a half-inch piece of fresh ginger, and exactly two black
+      peppercorns per cup.
+  - id: d3
+    language: en
+    title: "Whispering Pines Trail Guide"
+    content: >
+      The Whispering Pines hiking trail is 7.5 kilometers long, rated
+      moderate difficulty, and starts at the Cedar Hollow trailhead
+      parking lot.
+  - id: d4
+    language: en
+    title: "Great Bake-Off Competition Rules"
+    content: >
+      The Great Bake-Off cooking competition requires teams of exactly
+      three people, allows ninety minutes per round, and is judged on
+      taste, presentation, and creativity.
+  - id: d5
+    language: hi
+    title: "गंगा सफाई परियोजना"
+    content: >
+      गंगा सफाई परियोजना का नेतृत्व डॉ. मीरा कपूर कर रही हैं। इस
+      परियोजना का कुल बजट पचास करोड़ रुपये है।
+  - id: d6
+    language: hi
+    title: "सांस्कृतिक उत्सव"
+    content: >
+      वार्षिक सांस्कृतिक उत्सव इस वर्ष 15 नवंबर को जयपुर में आयोजित
+      किया जाएगा। मुख्य कलाकार प्रसिद्ध गायिका सुनिधि वर्मा होंगी।
+
+queries:
+  - id: q1
+    language: en
+    text: "Who leads Project Nilgiri?"
+    documentId: d1
+    crossLingual: false
+    expectedKeyword: "Ananya Rao"
+  - id: q2
+    language: en
+    text: "How many cardamom pods go in the chai recipe?"
+    documentId: d2
+    crossLingual: false
+    expectedKeyword: "four"
+  - id: q3
+    language: en
+    text: "How long is the Whispering Pines trail?"
+    documentId: d3
+    crossLingual: false
+    expectedKeyword: "7.5"
+  - id: q4
+    language: en
+    text: "How many people are on a Great Bake-Off team?"
+    documentId: d4
+    crossLingual: false
+    expectedKeyword: "three"
+  - id: q5
+    language: en
+    text: "What is the budget for the Ganga river cleanup project?"
+    documentId: d5
+    crossLingual: true
+    expectedKeyword: "fifty"
+  - id: q6
+    language: en
+    text: "When is the cultural festival happening and where?"
+    documentId: d6
+    crossLingual: true
+    expectedKeyword: "November"
+  - id: q7
+    language: hi
+    text: "प्रोजेक्ट निलगिरी कब लॉन्च होगा?"
+    documentId: d1
+    crossLingual: true
+    expectedKeyword: "2027"
+  - id: q8
+    language: hi
+    text: "चाय की रेसिपी में कितनी अदरक चाहिए?"
+    documentId: d2
+    crossLingual: true
+    expectedKeyword: "अदरक"
+  - id: q9
+    language: hi
+    text: "गंगा सफाई परियोजना का नेतृत्व कौन कर रहा है?"
+    documentId: d5
+    crossLingual: false
+    expectedKeyword: "मीरा कपूर"
+  - id: q10
+    language: hi
+    text: "सांस्कृतिक उत्सव में मुख्य कलाकार कौन हैं?"
+    documentId: d6
+    crossLingual: false
+    expectedKeyword: "सुनिधि वर्मा"
