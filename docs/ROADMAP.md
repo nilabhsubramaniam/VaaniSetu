@@ -379,10 +379,28 @@ column and an HNSW cosine index, and a Postgres-`SKIP LOCKED`-based async
 worker — the genuinely new job-dispatch pattern confirmed absent from
 `backend/` before this milestone — that actually calls the embedding
 client for the first time; live-verified end to end including a real
-self-deadlock bug found and fixed along the way — see ADR-038) are all
-complete. Milestone 7d (retrieval + rerank + grounded prompt assembly)
-and 7e (frontend upload UI) are sketched only, not approved — each needs
-its own go-ahead per `AGENTS.md` §5.
+self-deadlock bug found and fixed along the way — see ADR-038), and
+Milestone 7d (retrieval in Go via `document_chunks.embedding <=> $1`,
+wired into `conversation.Service.SendMessage` through a narrow
+`Retriever` interface, and grounded prompt assembly in Python — the 7d
+scope was narrowed before implementation the same way 7b/7c were, moving
+reranking and any measured relevance-score cutoff to a new Milestone 7e;
+live-verified end to end with two documents on deliberately
+LLM-unknowable topics, including a real, independent process-hygiene bug
+found along the way, not a code defect — see ADR-039), and Milestone 7f
+(the frontend upload UI — a `DocumentService` pair mirroring
+`ConversationService`'s real/mock shape, a self-stopping `setTimeout`
+poll for the `"pending"` → `"ready"`/`"failed"` transition since no
+polling convention existed in this frontend yet, wired into a new
+`/documents` page; live-verified in a real browser via Playwright
+against the actual running stack — upload, watch status flip without a
+manual refresh, then a grounded chat reply from `/assistant` quoting the
+just-uploaded document, the full loop exercised from the UI for the
+first time — see ADR-040) are all complete. Milestone 7e (reranking
+and/or a measured relevance threshold, only if real evaluation evidence
+ever shows either is needed) remains sketched only, not approved — it
+needs its own go-ahead per `AGENTS.md` §5. Phase 7 itself stays IN
+PROGRESS while 7e's open question is unresolved.
 
 - **Objective:** Let the assistant answer from user-provided documents,
   grounded and cross-lingual.

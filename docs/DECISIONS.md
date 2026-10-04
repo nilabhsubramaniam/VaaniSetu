@@ -2801,6 +2801,219 @@ the real Three.js map scene.
   but not planned in detail or approved — each needs its own approval
   per `AGENTS.md` §5.
 
+## ADR-039 - Phase 7 Milestone 7d: retrieval and grounded prompt assembly
+
+- **Decision:** Five related choices:
+  1. **A real scope correction, flagged before starting, the same move
+     7b/7c made**: `docs/ROADMAP.md`'s sketch bundled "retrieval + rerank
+     + grounded prompt assembly" into one "7d". A reranking stage needs
+     its own model, its own benchmark (ADR-008's "measure before
+     selecting" applies just as much to a second model as it did to
+     `embedding` in 7b), and `docs/EVALUATION.md` §4's `recall@k`/
+     `grounding` targets are explicitly *provisional* — there is no
+     evidence yet that plain top-k similarity is insufficient.
+     **Narrowed 7d to retrieval + grounded prompt assembly only**;
+     reranking and any measured relevance-score cutoff move to a new
+     Milestone 7e (not planned in detail here); frontend upload UI moves
+     to 7f.
+  2. **Retrieval stays in Go**, not Python — the same resolution ADR-036
+     already gave for `docs/ARCHITECTURE.md` §4's "RAG retrieval
+     mechanics | Python (called by Go)" ambiguity: the SQL vector search
+     (`document_chunks.embedding <=> $1`) stays in Go (Go owns
+     persistence everywhere else in this project); Python's only job is
+     the stateless `POST /v1/embed` call it already exposed in 7b. A new
+     `documents.Service.Retrieve(ctx, queryText string, topK int)
+     ([]RetrievedChunk, error)` method was added to the *same* `Service`
+     that already holds `embeddingClient` (used by `Worker` since 7c),
+     rather than a new package — the smaller, more minimal change.
+  3. **`conversation.Service` depends on a narrow `Retriever` interface**
+     (`Retrieve(ctx, queryText string, topK int)
+     ([]documents.RetrievedChunk, error)`), the same "accept a narrow
+     capability interface" shape `llm.LLMClient`/`langid.LangIDClient`
+     already use — `*documents.Service` implements it directly.
+     **A real mistake caught before it compiled, not after**: the first
+     draft declared a second, locally-defined `RetrievedChunk` struct
+     inside `conversation` "to avoid depending on `documents`" — this
+     does not work in Go, which requires interface method signatures to
+     match on identical named types, not just structurally equivalent
+     ones (unlike the struct-conversion rule Go uses elsewhere); fixed by
+     having `Retriever` reference `documents.RetrievedChunk` directly,
+     the same way `conversation.go` already imports `llm`/`langid`'s
+     request/response types.
+  4. **Retrieval is non-fatal and always attempted** inside
+     `SendMessage`, mirroring the existing `detectLanguage` "additive"
+     pattern (ADR-020/026) — called once per message using the user's raw
+     text as the query (cross-lingual matching is the embedding model's
+     job, not a Go-side special case). No documents yet, nothing
+     relevant, or an outright retrieval failure all degrade silently to
+     pre-7d behavior; a fresh install sees zero behavior change until a
+     document exists and is `"ready"`.
+  5. **The Go↔Python `llm` contract gains one optional field**,
+     `GenerateRequest.Passages []string` / `passages: list[str]`, plain
+     text only (no scores or IDs — nothing persists which passages were
+     used, keeping this milestone's DB schema untouched).
+     `LlamaCppEngine.generate()` gets a second prompt template, used only
+     when passages are non-empty, that instructs the model to use them
+     **only if relevant and fall back to its own knowledge otherwise**
+     (`docs/ARCHITECTURE.md` §4 reserves prompt construction for
+     Python) — deliberately advisory rather than a hard requirement,
+     since no measured relevance threshold exists yet (point 1 above).
+- **A real, independent bug found and fixed via live verification, not
+  caught by any unit or integration test**: uploading two documents in
+  quick succession reproducibly left exactly one of them stuck
+  `"failed"` with **no error logged anywhere** — direct file-based
+  tracing (bypassing `slog` entirely to rule out a logging-specific
+  cause) proved `documents.Worker.Tick` never even claimed the failed
+  document. The real cause was process hygiene, not this milestone's
+  code: a `go run ./cmd/api` session left running since an earlier,
+  unrelated session (confirmed via `ps`/`lsof` — it had been running for
+  over a day, listening on port 8080) was still polling the *same*
+  development Postgres database with its own, independent `Worker`,
+  racing the one started for this verification. Because that forgotten
+  process's shell never had `VAANISETU_EMBEDDING_SERVICE_URL` set, its
+  worker almost certainly used `FakeEmbeddingClient`'s 8-dimension output
+  against the real `vector(768)` column, failing silently from this
+  session's point of view (a different process's logs, never checked).
+  Fixed by killing it; `docs/DEVELOPMENT.md`'s local-dev guidance doesn't
+  yet warn about this class of stale-process interference — worth a
+  future documentation pass, not done here since no code was at fault. A
+  near-identical dual-process issue (two `ai-services` instances both
+  somehow bound to port 8090, one on `localhost:8090` specifically, one
+  on the wildcard address) was found and cleaned up the same way earlier
+  in this same verification session.
+- **Alternatives considered:**
+  - **Bundle reranking into 7d** — rejected: see point 1 above; no
+    evidence yet that it's needed, and a second model deserves its own
+    benchmark on its own evidence, not a default inclusion.
+  - **A hardcoded relevance-score cutoff** (e.g., only pass passages
+    below some cosine-distance threshold) — rejected for now: no
+    retrieval-quality evaluation data exists yet to pick a real number;
+    guessing one would violate this project's own "measure, don't guess"
+    discipline just as much as guessing a rerank model would. The
+    prompt-level "use only if relevant" instruction is the stated,
+    honest stand-in until Milestone 7e has real evidence.
+  - **Redefine `RetrievedChunk` locally in `conversation`** — rejected,
+    see point 3 above; does not compile as an interface implementation.
+- **Impact:** `backend/internal/db/queries/documents.sql` gained
+  `SearchChunks` (joins `documents`, filters `status = 'ready'`, a
+  `(... <=> $1)::float8` cast was required for sqlc to infer a concrete
+  `distance` column type — confirmed by generating without it first and
+  seeing `interface{}`); `backend/internal/documents/documents.go` gained
+  `RetrievedChunk`/`Service.Retrieve`; `backend/internal/conversation/
+  conversation.go` gained the `Retriever` interface and
+  `retrievePassages`; `backend/internal/llm/llm.go` gained
+  `GenerateRequest.Passages`; `cmd/api/main.go`'s
+  `conversation.NewService` call now passes `documentsService` as the
+  retriever. `ai-services/app/engines/base.py`/`llama_cpp_engine.py`/
+  `main.py` and `proto/llm.openapi.yaml` updated for the new `passages`
+  field. 4 new Go tests (`conversation`: passages threaded through,
+  retrieval failure non-fatal) and 2 new Docker-gated Go integration
+  tests (`documents.Service.Retrieve`: ranks a matching chunk first using
+  a content-hash fake embedding client — not a real semantic test, which
+  only the live verification below covers; never returns a pending
+  document's chunks) plus 4 new Python tests (grounded vs. plain prompt
+  construction; the new field's contract). `go build/vet/test`, `gofmt`,
+  `golangci-lint`, `ruff check`/`ruff format --check`/`pytest` all clean.
+  **Verified live**, against the real running stack (real Postgres with
+  the Milestone 7c schema, real `ai-services` with `multilingual-e5-base`
+  and `llama-3.2-3b-instruct`): a question before any document existed
+  got an unaffected, correct answer (regression check); uploading two
+  documents on deliberately obscure, LLM-unknowable topics (an internal
+  project codename's lead/launch date; a specific chai recipe's exact
+  ingredient quantities) and asking about each by name produced real,
+  correct, grounded answers quoting the uploaded facts; an unrelated
+  arithmetic question still got a normal, ungrounded answer — confirming
+  retrieval doesn't force irrelevant context onto every reply.
+- **Status:** Accepted. Milestone 7e (reranking and/or a measured
+  relevance-score cutoff, if 7d's plain top-k similarity turns out to
+  need either) and 7f (frontend upload UI) remain sketched but not
+  planned in detail or approved — each needs its own approval per
+  `AGENTS.md` §5.
+
+## ADR-040 - Phase 7 Milestone 7f: frontend document-upload UI
+
+- **Decision:** Four related choices:
+  1. **Milestone 7e (reranking / a measured relevance threshold) stays
+     deferred**; this milestone instead builds the next concretely-scoped
+     remaining piece of Phase 7 — the frontend upload UI — since nothing
+     yet shows 7d's plain top-k similarity needs either, and a rerank
+     model still deserves its own benchmark on real evidence, not a
+     default inclusion.
+  2. **`DocumentService` follows `ConversationService`'s exact shape**:
+     an abstract class as DI token (`documents`/`loading`/`error`
+     signals, `upload`/`refresh` methods), with `DocumentMockService` and
+     `DocumentRealService` implementations — the same seam
+     `docs/ARCHITECTURE.md` requires for model/capability replaceability,
+     applied here to a frontend data-access boundary instead of a
+     Python/Go capability. `app.config.ts` wires the real implementation
+     immediately (not the mock) — Milestones 7a-7d already made the
+     backend capability real and live-verified, so there is no reason to
+     default to a mock the way `ConversationService` briefly did before
+     Milestone 2b existed.
+  3. **A self-rescheduling `setTimeout`, not `setInterval` or an RxJS
+     polling operator**, for noticing a document's `"pending"` →
+     `"ready"`/`"failed"` transition — confirmed by searching the whole
+     frontend first that no polling convention existed yet (only
+     one-shot `setTimeout` uses and a single unrelated `setInterval` for
+     local silence detection). `DocumentRealService.refresh()` reschedules
+     itself only while at least one document is still `"pending"`,
+     stopping on its own otherwise — no teardown logic needed, and no
+     wasted polling once there is nothing left to notice. A manual
+     "Refresh" button stays available regardless.
+  4. **Status shown as plain text** (styled via existing `--vs-accent-*`/
+     `--vs-error*` tokens) rather than introducing a new shared
+     status-pill-style component — `app-status-pill` already exists but
+     is wired to `VoiceSessionService`'s state union, a different domain;
+     a new shared component for one list's three-value status would be
+     more machinery than this milestone needs.
+- **Reason:** Milestones 7a-7d built a real, working document-upload and
+  retrieval pipeline that nothing in the Angular app could reach — there
+  was no way for an actual user to upload a document. This is the
+  concretely-scoped remaining piece of Phase 7's own Definition of Done
+  ("Voice Q&A over an uploaded document"), unlike 7e, whose scope depends
+  on evaluation evidence that does not exist yet.
+- **Alternatives considered:**
+  - **Build Milestone 7e instead** — rejected: no evidence exists that
+    plain top-k similarity is insufficient; building a rerank stage
+    without that evidence would violate this project's own
+    "measure before selecting" discipline (ADR-008), applied here to
+    milestone sequencing rather than model choice.
+  - **A fixed-interval `setInterval` or RxJS `interval`/`switchMap`
+    polling pipeline** — rejected: this codebase has never used either;
+    a self-rescheduling, self-stopping `setTimeout` matches the existing
+    idiom more closely and needs no cleanup/teardown logic.
+  - **A new shared status-pill component** — rejected as premature for a
+    single list with three plain-text states; `app-status-pill`'s
+    existing tone vocabulary belongs to a different domain
+    (`VoiceSessionService`'s state machine), and forcing document status
+    into it would couple two unrelated concerns for no real benefit yet.
+- **Impact:** New `frontend/src/app/core/models/document.model.ts`;
+  `core/services/document.{service,mock.service,real.service}.ts`; new
+  `frontend/src/app/documents/` page (`documents.page.*`,
+  `document-upload-form/`, `document-list/`); one route added to
+  `app.routes.ts`; one nav link added to `app-header.html`; one
+  `useClass` line added to `app.config.ts`. No backend contract change —
+  `docs/openapi/documents.yaml` already covered everything this UI
+  needed. 15 new frontend tests (service pair + three components); `ng
+  lint`/`ng test`/`ng build` all clean.
+  **Verified live in a real browser** (Playwright, chromium, driving the
+  actual running dev stack — real Postgres+pgvector, real `ai-services`,
+  real Go backend, the same `ng serve` instance already running for
+  local development): navigated to `/documents`, filled and submitted
+  the upload form, watched the new document appear immediately at
+  "Pending" and the UI's own 3-second poll flip it to "Ready" with no
+  manual refresh and no page reload; navigated to `/assistant` and asked
+  a question specific to the just-uploaded document's content, got back
+  a real, correctly grounded reply quoting it — exercising Phase 7's
+  full upload-to-grounded-answer loop from the UI for the first time, not
+  just via `curl`. Zero browser console errors throughout.
+- **Status:** Accepted. Milestone 7e (reranking and/or a measured
+  relevance-score cutoff, only if real evaluation evidence shows either
+  is needed) remains sketched but not planned in detail or approved —
+  it needs its own go-ahead per `AGENTS.md` §5. With 7f done, every
+  concretely-scoped piece of Phase 7's original sketch is complete;
+  Phase 7 itself is not marked DONE while 7e's open question stands.
+
 ## Template for future ADRs
 
 ```
