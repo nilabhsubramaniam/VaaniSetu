@@ -170,3 +170,56 @@ func (q *Queries) MarkDocumentReady(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markDocumentReady, id)
 	return err
 }
+
+const searchChunks = `-- name: SearchChunks :many
+SELECT dc.id, dc.document_id, dc.chunk_index, dc.content,
+       (dc.embedding <=> $1)::float8 AS distance
+FROM document_chunks dc
+JOIN documents d ON d.id = dc.document_id
+WHERE d.status = 'ready'
+ORDER BY dc.embedding <=> $1
+LIMIT $2
+`
+
+type SearchChunksParams struct {
+	Embedding pgvector.Vector `json:"embedding"`
+	Limit     int32           `json:"limit"`
+}
+
+type SearchChunksRow struct {
+	ID         pgtype.UUID `json:"id"`
+	DocumentID pgtype.UUID `json:"document_id"`
+	ChunkIndex int32       `json:"chunk_index"`
+	Content    string      `json:"content"`
+	Distance   float64     `json:"distance"`
+}
+
+// The explicit ::float8 cast matters: sqlc can't infer a concrete type
+// for a `vector <=> vector` expression result on its own (confirmed by
+// generating without it first — the column came back as `interface{}`),
+// but can once it's cast to an ordinary Postgres type.
+func (q *Queries) SearchChunks(ctx context.Context, arg SearchChunksParams) ([]SearchChunksRow, error) {
+	rows, err := q.db.Query(ctx, searchChunks, arg.Embedding, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchChunksRow
+	for rows.Next() {
+		var i SearchChunksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DocumentID,
+			&i.ChunkIndex,
+			&i.Content,
+			&i.Distance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

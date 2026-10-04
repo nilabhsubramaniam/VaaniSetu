@@ -189,6 +189,9 @@ def get_embedding_engine() -> EmbeddingEngine:
 class GenerateRequestBody(BaseModel):
     text: str
     language: str
+    # Retrieved document chunks (Phase 7 Milestone 7d) — see
+    # proto/llm.openapi.yaml. Optional and typically empty.
+    passages: list[str] = []
 
 
 class GenerateResponseBody(BaseModel):
@@ -200,7 +203,9 @@ def generate(
     body: GenerateRequestBody, engine: LLMEngine = Depends(get_llm_engine)
 ) -> GenerateResponseBody:
     try:
-        result = engine.generate(GenerateRequest(text=body.text, language=body.language))
+        result = engine.generate(
+            GenerateRequest(text=body.text, language=body.language, passages=body.passages)
+        )
     except Exception as e:  # noqa: BLE001 - any engine failure maps to a 500;
         # Go's HTTPLLMClient treats every non-200 identically (see
         # proto/llm.openapi.yaml's "5XX" response), so no error envelope

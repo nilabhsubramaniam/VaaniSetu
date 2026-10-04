@@ -99,8 +99,8 @@ func run() error {
 		embeddingClient = embedding.NewHTTPEmbeddingClient(cfg.EmbeddingServiceURL)
 	}
 
-	convService := conversation.NewService(pool, llmClient, langIDClient, logger)
 	documentsService := documents.NewService(pool, embeddingClient)
+	convService := conversation.NewService(pool, llmClient, langIDClient, documentsService, logger)
 	server := api.NewServer(convService, documentsService, asrClient, ttsClient, logger, cfg.AllowedOrigin)
 
 	// The async chunk/embed job dispatch docs/ARCHITECTURE.md §3.2

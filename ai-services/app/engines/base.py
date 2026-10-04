@@ -8,13 +8,18 @@ concrete engine (docs/ARCHITECTURE.md §5 / ADR-006).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
 class GenerateRequest:
     text: str
     language: str
+    # Retrieved document chunks (Phase 7 Milestone 7d), most relevant
+    # first, to ground the reply in — see proto/llm.openapi.yaml. Empty by
+    # default: an engine must answer exactly as it did before this field
+    # existed when it's empty, not treat absence as an error.
+    passages: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

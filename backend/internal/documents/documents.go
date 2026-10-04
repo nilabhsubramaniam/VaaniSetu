@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	pgvector "github.com/pgvector/pgvector-go"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/embedding"
@@ -72,6 +73,51 @@ func (s *Service) ListDocuments(ctx context.Context) ([]Document, error) {
 	result := make([]Document, len(rows))
 	for i, row := range rows {
 		result[i] = toDomain(row)
+	}
+	return result, nil
+}
+
+// RetrievedChunk is one passage returned by [Service.Retrieve], ordered
+// by relevance (Distance ascending — cosine distance, 0 is identical,
+// larger is less similar, matching document_chunks's HNSW
+// vector_cosine_ops index).
+type RetrievedChunk struct {
+	DocumentID string
+	ChunkIndex int32
+	Content    string
+	Distance   float64
+}
+
+// Retrieve embeds queryText and returns the topK most similar chunks
+// across every "ready" document (Milestone 7c's Worker never leaves a
+// half-chunked document findable — a "pending" or "failed" document's
+// chunks, if any partial ones existed, are excluded by SearchChunks'
+// own join). Plain top-k cosine similarity, no reranking and no
+// relevance-score cutoff (Phase 7 Milestone 7d; see
+// docs/DECISIONS.md for why both are deferred to a later milestone
+// rather than guessed at here).
+func (s *Service) Retrieve(ctx context.Context, queryText string, topK int) ([]RetrievedChunk, error) {
+	embedded, err := s.embeddingClient.Embed(ctx, embedding.EmbedRequest{Text: queryText})
+	if err != nil {
+		return nil, fmt.Errorf("documents: embed query: %w", err)
+	}
+
+	rows, err := s.queries.SearchChunks(ctx, db.SearchChunksParams{
+		Embedding: pgvector.NewVector(embedded.Vector),
+		Limit:     int32(topK), //nolint:gosec // topK is a small, internal, fixed constant
+	})
+	if err != nil {
+		return nil, fmt.Errorf("documents: search chunks: %w", err)
+	}
+
+	result := make([]RetrievedChunk, len(rows))
+	for i, row := range rows {
+		result[i] = RetrievedChunk{
+			DocumentID: row.DocumentID.String(),
+			ChunkIndex: row.ChunkIndex,
+			Content:    row.Content,
+			Distance:   row.Distance,
+		}
 	}
 	return result, nil
 }

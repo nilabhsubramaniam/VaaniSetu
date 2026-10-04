@@ -150,6 +150,29 @@ def test_generate_passes_through_language_and_text_unchanged() -> None:
     assert fake.last_request.text == "kaisa hai"
 
 
+def test_generate_passes_through_passages_when_provided() -> None:
+    fake = FakeLLM()
+    client = _client_with_llm(fake)
+
+    client.post(
+        "/v1/generate",
+        json={"text": "kaisa hai", "language": "hi", "passages": ["passage one", "passage two"]},
+    )
+
+    assert fake.last_request is not None
+    assert fake.last_request.passages == ["passage one", "passage two"]
+
+
+def test_generate_defaults_passages_to_empty_when_omitted() -> None:
+    fake = FakeLLM()
+    client = _client_with_llm(fake)
+
+    client.post("/v1/generate", json={"text": "kaisa hai", "language": "hi"})
+
+    assert fake.last_request is not None
+    assert fake.last_request.passages == []
+
+
 def test_generate_maps_engine_failure_to_5xx() -> None:
     fake = FakeLLM(fail=True)
     client = _client_with_llm(fake)

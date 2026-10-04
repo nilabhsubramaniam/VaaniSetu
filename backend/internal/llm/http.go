@@ -15,8 +15,9 @@ import (
 // the wire format can change without touching the LLMClient interface its
 // callers depend on.
 type generateWireRequest struct {
-	Text     string `json:"text"`
-	Language string `json:"language"`
+	Text     string   `json:"text"`
+	Language string   `json:"language"`
+	Passages []string `json:"passages,omitempty"`
 }
 
 type generateWireResponse struct {
