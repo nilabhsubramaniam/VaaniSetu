@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/documents"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 )
@@ -88,28 +89,64 @@ type Turn struct {
 	DetectedLanguage *string
 }
 
+// retrievalTopK is how many passages [Retriever.Retrieve] is asked for per
+// message — a fixed, documented starting point (matching
+// docs/EVALUATION.md §4's own provisional "recall@4" target), not a tuned
+// value; revisit once Phase 7 has real retrieval-quality evaluation
+// evidence (Phase 7 Milestone 7d).
+const retrievalTopK = 4
+
+// Retriever is the narrow capability SendMessage depends on for grounding
+// a reply in previously uploaded documents (Phase 7 Milestone 7d) — the
+// same "accept a narrow interface, not another package's concrete
+// Service" shape [llm.LLMClient]/[langid.LangIDClient] already use, even
+// though satisfying it does require importing documents.RetrievedChunk
+// for the return type (Go interface satisfaction needs identical named
+// types, not just structurally equivalent ones — a locally redeclared
+// struct here would not satisfy this interface). [*documents.Service]
+// implements this directly; conversation never touches its other
+// methods or fields.
+type Retriever interface {
+	// Retrieve returns the topK passages most relevant to queryText, most
+	// relevant first, or an error if retrieval itself failed. An empty,
+	// nil-error result (no documents uploaded yet, or none relevant) is
+	// not an error.
+	Retrieve(ctx context.Context, queryText string, topK int) ([]documents.RetrievedChunk, error)
+}
+
 // Service is the business-logic layer behind the chat API. It owns getting
 // or creating Phase 2's single implicit session, persisting turns,
-// calling the configured [llm.LLMClient] for a reply, and (Phase 6
-// Milestone 6a) tagging each turn with the configured
-// [langid.LangIDClient]'s detected language.
+// calling the configured [llm.LLMClient] for a reply, (Phase 6 Milestone
+// 6a) tagging each turn with the configured [langid.LangIDClient]'s
+// detected language, and (Phase 7 Milestone 7d) grounding that reply in
+// documents retrieved via the configured [Retriever].
 type Service struct {
 	queries      *db.Queries
 	llmClient    llm.LLMClient
 	langIDClient langid.LangIDClient
+	retriever    Retriever
 	logger       *slog.Logger
 }
 
-// NewService builds a Service backed by pool, llmClient, and langIDClient.
-// Passing a [llm.FakeLLMClient] or an [llm.HTTPLLMClient] here is the
-// entire difference between Milestone 2a and Milestone 2b, and likewise a
-// [langid.FakeLangIDClient] vs [langid.HTTPLangIDClient] between Milestone
-// 6a and 6b — Service itself never changes. logger is used only to
-// observe a non-fatal langIDClient failure (see SendMessage) — everything
-// else Service does either succeeds or returns an error for the caller to
-// log, the existing convention internal/api's handlers follow.
-func NewService(pool *pgxpool.Pool, llmClient llm.LLMClient, langIDClient langid.LangIDClient, logger *slog.Logger) *Service {
-	return &Service{queries: db.New(pool), llmClient: llmClient, langIDClient: langIDClient, logger: logger}
+// NewService builds a Service backed by pool, llmClient, langIDClient, and
+// retriever. Passing a [llm.FakeLLMClient] or an [llm.HTTPLLMClient] here
+// is the entire difference between Milestone 2a and Milestone 2b, and
+// likewise a [langid.FakeLangIDClient] vs [langid.HTTPLangIDClient]
+// between Milestone 6a and 6b — Service itself never changes. retriever is
+// typically the same *documents.Service instance cmd/api/main.go already
+// constructs for the document-upload API. logger is used only to observe
+// a non-fatal langIDClient or retriever failure (see SendMessage) —
+// everything else Service does either succeeds or returns an error for
+// the caller to log, the existing convention internal/api's handlers
+// follow.
+func NewService(pool *pgxpool.Pool, llmClient llm.LLMClient, langIDClient langid.LangIDClient, retriever Retriever, logger *slog.Logger) *Service {
+	return &Service{
+		queries:      db.New(pool),
+		llmClient:    llmClient,
+		langIDClient: langIDClient,
+		retriever:    retriever,
+		logger:       logger,
+	}
 }
 
 // SendMessage persists text as a user turn, asks the configured LLMClient
@@ -150,7 +187,11 @@ func (s *Service) SendMessage(ctx context.Context, text, language string) (userT
 	userTurn = turnFromDB(dbUserTurn)
 
 	started := time.Now()
-	genResp, err := s.llmClient.Generate(ctx, llm.GenerateRequest{Text: text, Language: resolvedLanguage})
+	genResp, err := s.llmClient.Generate(ctx, llm.GenerateRequest{
+		Text:     text,
+		Language: resolvedLanguage,
+		Passages: s.retrievePassages(ctx, text),
+	})
 	if err != nil {
 		return userTurn, Turn{}, fmt.Errorf("%w: %v", ErrGenerateFailed, err)
 	}
@@ -185,6 +226,29 @@ func (s *Service) detectLanguage(ctx context.Context, text string) *string {
 		return nil
 	}
 	return &resp.Language
+}
+
+// retrievePassages calls the configured Retriever and returns just the
+// passage text, most relevant first, for grounding the LLM's reply
+// (Phase 7 Milestone 7d). Non-fatal by design, the same "additive, not
+// required" rule detectLanguage already follows: no documents uploaded
+// yet, nothing relevant found, or the retriever failing outright all
+// degrade to an empty slice — llm.GenerateRequest.Passages being empty is
+// exactly today's pre-7d behavior, not a special case the LLM needs to
+// handle differently. Logged at debug, not warn: unlike a langid
+// failure (a regression in an existing feature), an empty result here is
+// the normal, expected case on any install with no documents yet.
+func (s *Service) retrievePassages(ctx context.Context, text string) []string {
+	chunks, err := s.retriever.Retrieve(ctx, text, retrievalTopK)
+	if err != nil {
+		s.logger.Debug("retrieval failed", "error", err)
+		return nil
+	}
+	passages := make([]string, len(chunks))
+	for i, chunk := range chunks {
+		passages[i] = chunk.Content
+	}
+	return passages
 }
 
 // History returns every turn in the current session, oldest first, or an

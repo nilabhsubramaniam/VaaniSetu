@@ -61,6 +61,34 @@ def test_generate_falls_back_to_a_single_user_message_when_system_role_unsupport
     assert "hi" in fake.calls[1][0]["content"]
 
 
+def test_generate_with_no_passages_sends_the_plain_system_prompt() -> None:
+    fake = _FakeLlama(replies=["hello"])
+    engine = _engine_with_fake(fake)
+
+    engine.generate(GenerateRequest(text="hi", language="en"))
+
+    system_content = fake.calls[0][0]["content"]
+    assert "passages" not in system_content.lower()
+
+
+def test_generate_with_passages_includes_them_in_the_system_prompt() -> None:
+    fake = _FakeLlama(replies=["hello"])
+    engine = _engine_with_fake(fake)
+
+    engine.generate(
+        GenerateRequest(
+            text="Does it need the internet?",
+            language="en",
+            passages=["VaaniSetu runs entirely on-device.", "No audio leaves the device."],
+        )
+    )
+
+    system_content = fake.calls[0][0]["content"]
+    assert "VaaniSetu runs entirely on-device." in system_content
+    assert "No audio leaves the device." in system_content
+    assert "ignore them and answer from your own knowledge" in system_content
+
+
 def test_generate_reraises_unrelated_value_errors() -> None:
     class _BrokenLlama:
         def create_chat_completion(self, **kwargs):

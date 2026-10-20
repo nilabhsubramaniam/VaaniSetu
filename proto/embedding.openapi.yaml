@@ -1,0 +1,66 @@
+# The Go<->Python `embedding` capability contract (docs/ARCHITECTURE.md
+# §5).
+#
+# Both sides are JSON — text in, a vector out — the same shape as
+# proto/langid.openapi.yaml, unlike proto/asr.openapi.yaml's binary-in or
+# proto/tts.openapi.yaml's binary-out shapes.
+#
+# backend/internal/embedding.HTTPEmbeddingClient is the Go-side
+# implementation of this contract; the Python `embedding` capability
+# module (Phase 7 Milestone 7b, not yet built) is the server side, hosted
+# in the same ai-services process as the other capabilities
+# (docs/DEVELOPMENT.md §5). Written now, ahead of the Python side, the
+# same way proto/langid.openapi.yaml was written in Milestone 6a and
+# wired for real only in 6b.
+openapi: 3.0.3
+info:
+  title: VaaniSetu — embedding capability contract
+  version: "1.0.0"
+servers:
+  - url: http://ai-services:8090/v1
+
+paths:
+  /embed:
+    post:
+      summary: >
+        Vectorize a single piece of already-chunked text (a document
+        passage, or a query). Chunking itself is not this capability's
+        job — see docs/ARCHITECTURE.md §3.2/3.3.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: The text's dense embedding.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [vector, dimensions]
+                properties:
+                  vector:
+                    type: array
+                    items:
+                      type: number
+                      format: float
+                  dimensions:
+                    type: integer
+                    description: >
+                      len(vector), carried explicitly so callers (and a
+                      future pgvector column definition) never have to
+                      infer it. Not yet fixed to any value — Milestone 7b
+                      selects the real model and therefore the real
+                      dimension.
+        "5XX":
+          description: >
+            Any failure (model not loaded, OOM, timeout, empty text). Go
+            treats any non-200 response identically — it does not need a
+            typed error envelope from Python, only the HTTP status,
+            surfaced as embedding_unavailable.

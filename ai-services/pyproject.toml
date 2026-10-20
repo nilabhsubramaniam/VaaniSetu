@@ -1,7 +1,7 @@
 [project]
 name = "vaanisetu-ai-services"
 version = "0.1.0"
-description = "VaaniSetu's Python AI service — the `llm` (Milestone 2b), `asr` (Milestone 3b), and `tts` (Milestone 4b) capabilities, hosted in one FastAPI app per docs/DECISIONS.md ADR-017."
+description = "VaaniSetu's Python AI service — the `llm` (Milestone 2b), `asr` (Milestone 3b), `tts` (Milestone 4b), `langid` (Milestone 6b), and `embedding` (Milestone 7b) capabilities, hosted in one FastAPI app per docs/DECISIONS.md ADR-017."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<1",
@@ -25,6 +25,12 @@ dependencies = [
     # neural alternative (ai4bharat-transliteration) pulls in fairseq and
     # other large, legacy dependencies for uncertain quality gain.
     "indic-transliteration>=2.3,<3",
+    # Phase 7 Milestone 7b `embedding` candidates: the standard, well-tested
+    # wrapper for pooling/normalizing a transformer's hidden states into a
+    # single dense vector — torch/transformers (already deps above) could
+    # load these models directly, but sentence-transformers avoids
+    # hand-rolling that pooling logic ourselves.
+    "sentence-transformers>=3.2,<4",
 ]
 
 [dependency-groups]

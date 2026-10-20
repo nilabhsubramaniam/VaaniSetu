@@ -9,7 +9,43 @@ project moves between milestones or a phase's status changes.
   **DONE** (Milestones 3a and 3b both complete). Phase 4 - Text-to-Speech,
   **DONE** (Milestones 4a and 4b both complete, with a known Hinglish gap
   — see below). Phase 5 - End-to-End Voice MVP, **DONE** (with a known
-  latency gap — see below). Phase 6 - Indian Language Support,
+  latency gap — see below). Phase 7 - RAG, **DONE** (Milestone
+  7a: the document-upload boundary — plain-text-only `POST`/`GET
+  /api/v1/documents`, a `documents` table with no `vector` column yet,
+  and a new `embedding` Go capability boundary following the same
+  Fake/HTTP pattern every other capability uses, wired into
+  `documents.Service` but not called by any request path yet — see
+  `docs/DECISIONS.md` ADR-036 —, Milestone 7b: the real Python
+  `embedding` capability, benchmarked and wired — `intfloat/
+  multilingual-e5-base` selected on real latency/memory/dimension
+  tie-breakers after all three candidates tied at 100% retrieval
+  accuracy on the fixture set; `POST /v1/embed` live-verified — see
+  ADR-037 —, Milestone 7c: chunking (in Go), the `document_chunks`
+  table with a real `vector(768)` column and HNSW cosine index, and a
+  Postgres-`SKIP LOCKED` async worker that finally calls the embedding
+  client — live-verified end to end including a real self-deadlock bug
+  found and fixed along the way — see ADR-038 —, Milestone 7d:
+  retrieval in Go, wired into chat via a narrow `Retriever` interface,
+  and grounded prompt assembly in Python — live-verified with two
+  documents on deliberately LLM-unknowable topics, both answered
+  correctly from their real content, plus a normal ungrounded fallback
+  for an unrelated question — see ADR-039 —, and Milestone 7f: the
+  frontend upload UI (a `DocumentService` real/mock pair, a `/documents`
+  page, a self-stopping poll for the status transition) — live-verified
+  in a real browser end to end, upload through grounded chat reply — see
+  ADR-040; all five complete). The Phase 7 closeout evaluation
+  (`backend/cmd/evalrag`, a new Go tool) then measured
+  `docs/EVALUATION.md` §4's RAG metrics for real: overall recall@4
+  **1.00** (10/10), cross-lingual recall@4 **1.00** (4/4), answer-correct
+  keyword proxy **1.00** (10/10) — every query hit its gold document at
+  rank 1. Also verified real voice Q&A (not just typed chat): the Phase 5
+  voice orchestrator shares the same grounded `SendMessage` call, and a
+  real recorded Hindi question got a correctly grounded reply with real
+  synthesized audio back, a complete voice-in/voice-out round trip.
+  Based on this real evidence, **Milestone 7e (reranking / a measured
+  relevance threshold) is not needed now** — see ADR-041. Phase 7 is
+  closed.
+  Phase 6 - Indian Language Support,
   **IN PROGRESS** (Milestones 6a, 6b — the `langid` capability —, 6c —
   Malayalam enabled end to end —, 6d — Hinglish TTS fixed via
   transliteration, Malayalam's real bottleneck diagnosed —, 6e —
@@ -27,7 +63,10 @@ project moves between milestones or a phase's status changes.
   LLM-generation and ASR-capability blockers) is **deferred at the
   user's explicit request** (2026-09-30), not abandoned — see below for
   the real evidence gathered before deferring.
-- **Current focus:** none. Phase 6 has no approved work in progress.
+- **Current focus:** Phase 7 is DONE; Milestone 7e stays sketched but not
+  approved — real evaluation evidence (ADR-041) says it isn't needed
+  right now, so it is not started (`AGENTS.md` §5). No phase has approved
+  work in progress. Phase 6 has no approved work in progress either.
   Milestone 6g's real ASR-candidate search reached a confirmed dead end
   for now: a valid Hugging Face login was obtained, but both
   `ai4bharat/indic-conformer-600m-multilingual` and `ARTPARK-IISc/
@@ -38,7 +77,293 @@ project moves between milestones or a phase's status changes.
   revisiting later if access is ever granted; the user chose to defer
   rather than wait on it. Maithili's `LANGUAGE_OPTIONS.mai.enabled`
   stays `false`.
-- **Last updated:** 2026-09-29 (Phase 6 Milestone 6j: evaluated Odia, the
+- **Last updated:** 2026-10-04 (Phase 7 closeout: the real, lightweight,
+  phase-scoped RAG evaluation `docs/ROADMAP.md`'s own Definition of Done
+  for this phase required, finally run. New `backend/cmd/evalrag` (a
+  second Go binary, `cmd/`'s established multi-binary shape) seeds
+  `backend/eval_data/rag_fixtures.yaml`'s 6 composed documents (4
+  English, 2 Hindi) via the real `documents.Service.CreateDocument`,
+  drives the async worker directly until all are `"ready"`, then for 10
+  fixture queries measures retrieval recall@4 via
+  `documents.Service.Retrieve` and a keyword-presence
+  grounding/answer-correctness proxy via the real
+  `conversation.Service.SendMessage` — no LLM-judge infrastructure exists
+  in this project, so this is a simplified, honestly-labeled proxy, the
+  same precedent `benchmark_tts.py`'s proxy WER already established.
+  Deletes its own seeded documents afterward; confirmed repeatable by
+  running it twice with identical results and the database returning to
+  empty both times. **Real results**
+  (`backend/eval_results/rag_milestone_7_eval.json`): overall recall@4
+  **1.00** (10/10), cross-lingual recall@4 **1.00** (4/4), same-language
+  recall@4 **1.00** (6/6), answer-correct proxy **1.00** (10/10) — every
+  query retrieved its gold document at rank 1, not just somewhere in the
+  top-4; inspected the actual replies (not just pass/fail flags) and
+  found two genuine cross-lingual translations in the wild (a Hindi
+  document's "15 नवंबर" correctly answered as "15 November" in English;
+  an English document's "ginger" correctly answered as "अदरक" in Hindi,
+  with real added detail beyond the keyword match). Honestly caveated:
+  the 6-document fixture set is small and topically easy to discriminate
+  — the same limitation ADR-037's embedding benchmark already noted for
+  an identical reason — so this is real evidence nothing is currently
+  broken, not proof retrieval stays perfect at a realistic, larger scale.
+  **Also verified real voice Q&A**, not just typed chat (Phase 7's own
+  Definition of Done says "Voice Q&A"): confirmed the Phase 5 voice
+  orchestrator shares the exact `conversation.Service.SendMessage` call
+  retrieval was wired into, then proved it live with real recorded speech
+  (macOS `say`, the same tool `ai-services/scripts/
+  generate_audio_fixtures.py` already uses) rather than just trusting the
+  shared code path — an English spoken question about the uploaded
+  "Project Nilgiri" document got a correctly grounded reply (audio
+  synthesis skipped only due to the already-known, separate Hindi-only
+  TTS limitation from Phase 4/ADR-021, not a new RAG gap); a Hindi spoken
+  question got a correctly grounded reply **with real synthesized audio
+  returned** — a complete voice-in/voice-out grounded round trip. Based
+  on this real evidence, **Milestone 7e (reranking / a measured relevance
+  threshold) is not needed now** — revisit only if a future, larger-scale
+  evaluation finds a real gap. **Phase 7 (RAG) moves from IN PROGRESS to
+  DONE.** `docs/DEVELOPMENT.md`'s repo-structure tree and Backend
+  Conventions section were also corrected along the way: they had never
+  been updated for `internal/documents`/`internal/embedding`/
+  `internal/orchestrator` since those were added across Phases 5 and 7
+  (a real documentation-drift gap predating this task, fixed here since
+  it was touched anyway for the new `cmd/evalrag`/`eval_data`/
+  `eval_results` paths). See `docs/DECISIONS.md` ADR-041 for the full
+  reasoning and evidence.
+  The day before (2026-10-02, Phase 7 Milestone 7f: the frontend
+  document-upload UI) — the piece that finally lets an actual user reach
+  the real upload/retrieval pipeline Milestones 7a-7d built, instead of
+  only `curl`. Milestone 7e (reranking / a measured relevance threshold)
+  stays correctly deferred: nothing yet shows 7d's plain top-k similarity
+  needs either, and building it now would mean picking a second model
+  without the benchmark evidence ADR-008 requires. New `DocumentService`
+  (an abstract class as DI token, exactly `ConversationService`'s shape)
+  with `DocumentMockService`/`DocumentRealService` implementations;
+  `app.config.ts` wires the real one immediately, since the backend
+  capability has been real and live-verified since 7a-7d. A new
+  `/documents` page (`documents.page.ts` + `document-upload-form/` +
+  `document-list/`, mirroring the `settings/` page's "page + subcomponents"
+  shape) lets a user paste a plain-text document's title and content — no
+  file picker, matching the backend's own plain-text-only scope
+  (ADR-036). Noticing a document's `"pending"` → `"ready"`/`"failed"`
+  transition needed a genuinely new frontend pattern: confirmed by
+  searching first that no HTTP-polling convention existed anywhere in
+  this app (only one-shot `setTimeout` calls and one unrelated
+  `setInterval` for local silence detection) — implemented as a
+  self-rescheduling `setTimeout` in `DocumentRealService` that stops on
+  its own once nothing is pending, rather than introducing the first-ever
+  `setInterval`/RxJS-polling pattern. 15 new frontend tests (the service
+  pair plus all three new components); `ng lint`/`ng test`/`ng build` all
+  clean. **Verified live in a real browser**, not just via `curl` or unit
+  tests: used Playwright (installed in a scratch location, not added as a
+  project dependency) to drive the actual running dev stack — real
+  Postgres+pgvector, real `ai-services`, real Go backend, the same
+  `ng serve` instance already running for local development — navigated
+  to `/documents`, filled and submitted the upload form, watched the new
+  document go from "Pending" to "Ready" via the UI's own poll with no
+  manual refresh or page reload, then asked a question on `/assistant`
+  specific to that document's content and got back a correctly grounded
+  reply quoting it. Zero browser console errors throughout — Phase 7's
+  upload-to-grounded-answer loop exercised from the UI for the first
+  time. See `docs/DECISIONS.md` ADR-040 for the full reasoning and
+  evidence.
+  Earlier that day (Phase 7 Milestone 7d: retrieval and
+  grounded prompt assembly — the piece that finally makes
+  `conversation.Service.SendMessage` aware documents exist at all).
+  Before implementation, narrowed "7d" against this project's own
+  precedent the same way 7b/7c were narrowed: `docs/ROADMAP.md`'s sketch
+  bundled reranking in with retrieval + prompt assembly, but a rerank
+  stage needs its own model and its own benchmark (ADR-008 applies just
+  as much to a second model as the first), and `docs/EVALUATION.md` §4's
+  own `recall@k` targets are explicitly provisional — no evidence yet
+  that plain top-k similarity needs reranking at all. Moved reranking and
+  any measured relevance-score cutoff to a new Milestone 7e. Retrieval
+  stays in Go (the same resolution ADR-036 already gave for an identical
+  ambiguity in `docs/ARCHITECTURE.md` §4): a new
+  `documents.Service.Retrieve` method embeds the query via the existing
+  embedding client and runs a new `SearchChunks` sqlc query
+  (`document_chunks.embedding <=> $1`, joined against `documents` to
+  exclude anything not `"ready"`). `conversation.Service` depends on a
+  narrow `Retriever` interface (the same shape `llm.LLMClient`/
+  `langid.LangIDClient` already use) — caught a real mistake before it
+  compiled: a first draft redeclared `RetrievedChunk` locally in
+  `conversation` to avoid an import, which doesn't work, since Go
+  interface satisfaction needs identical named types, not just
+  structurally equivalent ones; fixed by referencing
+  `documents.RetrievedChunk` directly. Retrieval is non-fatal and always
+  attempted inside `SendMessage`, mirroring the existing `detectLanguage`
+  "additive" pattern — no documents, nothing relevant, or a retrieval
+  failure all degrade silently to pre-7d behavior. The Go↔Python `llm`
+  contract gained one optional field, `passages: list[str]`;
+  `LlamaCppEngine`'s prompt now includes retrieved passages when present,
+  explicitly instructed to use them only if relevant and otherwise answer
+  normally — deliberately advisory, since no measured relevance threshold
+  exists yet. 4 new Go unit tests, 2 new Docker-gated Go integration
+  tests, 4 new Python tests — skip cleanly without Docker, same as every
+  other integration test here; `go build/vet/test`, `gofmt`,
+  `golangci-lint`, `ruff check`/`ruff format --check`/`pytest` all clean.
+  **A real, independent bug found via live verification, not caught by
+  any test**: uploading two documents in quick succession reproducibly
+  left one stuck `"failed"` with no error logged anywhere — file-based
+  tracing (bypassing `slog` to rule out a logging-specific cause) proved
+  `Worker.Tick` never even claimed the failed document. The actual cause
+  was process hygiene, not this milestone's code: a `go run ./cmd/api`
+  session forgotten from an earlier, unrelated session had been running
+  for over a day, independently polling the same development database
+  with its own worker and almost certainly using `FakeEmbeddingClient`'s
+  8-dimension output against the real `vector(768)` column. Fixed by
+  killing the stale process; a near-identical stale-process issue (two
+  `ai-services` instances both bound to port 8090) was found and cleaned
+  up the same way earlier in this same verification session. **Verified
+  live** against the real running stack: a question before any document
+  existed got an unaffected answer (regression check); two documents on
+  deliberately obscure, LLM-unknowable topics (an internal project
+  codename's lead/launch date; a specific recipe's exact quantities) each
+  produced a real, correct, grounded answer when asked about by name; an
+  unrelated arithmetic question still got a normal, ungrounded reply. See
+  `docs/DECISIONS.md` ADR-039 for the full reasoning and evidence.
+  The day before (2026-09-30, Phase 7 Milestone 7c: chunking,
+  `document_chunks`/pgvector schema, and async job dispatch) — the piece
+  that finally makes `documents.Service`'s stored-but-unused
+  `embedding.EmbeddingClient` get called. A real architectural question
+  was flagged before implementing, not assumed: `docs/ARCHITECTURE.md`
+  §3.2 says Go should "dispatch chunking / embedding jobs to Python,"
+  read literally suggesting chunking itself could live in Python —
+  resolved the same way ADR-036 resolved an identical ambiguity for "RAG
+  retrieval mechanics": chunking is plain text-splitting, not inference,
+  so it stays in Go, and only the stateless embedding call goes to
+  Python. New `backend/internal/documents/chunk.go`
+  (`SplitIntoChunks`, a paragraph/word-boundary splitter with overlap,
+  no new interface since exactly one implementation exists) and
+  `worker.go` (`Worker`, a Postgres-`SELECT ... FOR UPDATE SKIP
+  LOCKED`-based async job dispatcher on a 2-second ticker — chosen over
+  an in-process channel or a new external queue like Redis because
+  Postgres already holds the state that matters, `documents.status`, so
+  a job survives a process restart with zero extra code and no new
+  external dependency). New migration `0005_add_document_chunks.sql`:
+  `CREATE EXTENSION IF NOT EXISTS vector`, a `document_chunks` table with
+  a real `vector(768)` column (`multilingual-e5-base`'s real, benchmarked
+  dimension from ADR-037 — not a guess, exactly what ADR-036 deferred
+  this column to avoid) and an HNSW `vector_cosine_ops` index, per
+  `docs/ARCHITECTURE.md` §3.5's own named choice. New Go dependency
+  `github.com/pgvector/pgvector-go` (pgx has no native `vector` type);
+  `internal/db/pool.go` now registers pgvector's codec on every
+  connection; `sqlc.yaml` gained a type override for it (the plain
+  `"module/path.Type"` override string produced an invalid import alias
+  since the module's last path segment isn't its real package name —
+  fixed by spelling out `import`/`package`/`type` explicitly).
+  **A real, self-inflicted deadlock found and fixed during this
+  milestone's own live verification, not a hypothetical**: the first
+  working version of `Worker.Tick` tried to mark a document `"failed"`
+  from a second database connection while its own claiming transaction
+  still held that row's lock — verified live by creating a document,
+  killing `ai-services` mid-flight, and watching it wedge in `"pending"`
+  forever (`pg_stat_activity` showed the tick's own goroutine blocked on
+  a lock only its own not-yet-run deferred rollback could release). Fixed
+  by rolling back the claiming transaction explicitly before issuing the
+  failure update; re-verified live afterward — a genuine embedding-service
+  outage now correctly marks the document `"failed"` within one tick, with
+  the real cause logged and zero orphaned rows. A related, necessary fix:
+  both `internal/documents`'s and `internal/conversation`'s Docker-gated
+  integration tests built their test Postgres from plain
+  `postgres:16-alpine`, which has no `vector` extension — both switched to
+  `pgvector/pgvector:pg16` (matching `docker-compose.yml`). Also
+  documented a real native-Postgres setup gap in `backend/SETUP.md`:
+  `pgvector` isn't a trusted extension, so a superuser must `CREATE
+  EXTENSION vector` once before the application's ordinary login role can
+  use it. `docker-compose.yml` also gained the
+  `VAANISETU_EMBEDDING_MODEL_STORE`/`VAANISETU_EMBEDDING_SERVICE_URL`
+  wiring Milestone 7b's own compose changes had missed. 6 new unit tests
+  for `SplitIntoChunks` plus 3 new Docker-gated integration tests for
+  `Worker.Tick` (happy path, no-pending-document, embedding failure with
+  no orphaned chunks) — skip cleanly without Docker in this environment,
+  same as every other integration test here; `go build/vet/test`,
+  `gofmt`, `golangci-lint` all clean. **Verified live** against a real
+  native PostgreSQL (pgvector installed via `brew install pgvector`) and
+  the real `multilingual-e5-base` service from Milestone 7b: a real
+  document's status went `"pending"` -> `"ready"` within one 2-second
+  tick, a real, non-trivial 768-dimension vector landed in
+  `document_chunks.embedding` (confirmed via `psql`, including a real
+  `embedding <=> embedding = 0` cosine self-distance query against the
+  HNSW index). See `docs/DECISIONS.md` ADR-038 for the full reasoning and
+  evidence.
+  Earlier that day (Phase 7 Milestone 7b: the real Python
+  `embedding` capability, benchmark, and real wiring). Before
+  implementation, narrowed 7b's scope against this project's own
+  precedent — every prior phase's "b" milestone (2b/3b/4b/6b) did only
+  "Python capability + benchmark + real wiring", but ADR-036's original
+  sketch had bundled chunking, the `document_chunks`/pgvector schema, and
+  an async job-dispatch mechanism into "7b" too — moved that bundle to a
+  new, not-yet-approved Milestone 7c instead. New
+  `ai-services/app/engines/embedding/` module (`EmbeddingEngine`
+  interface, `SentenceTransformersEngine`, mirroring `langid`'s
+  subpackage layout) and a new `models.yaml` `embedding` section with
+  three real, ungated, license-checked candidates
+  (`paraphrase-multilingual-mpnet-base-v2`, `multilingual-e5-base`,
+  `bge-m3`). Real benchmark (`scripts/benchmark_embedding.py`, per-
+  candidate subprocess isolation, same pattern as `benchmark_langid.py`)
+  measures retrieval quality with a cosine-similarity proxy — no pgvector
+  pipeline exists yet — against a composed fixture set
+  (`eval_data/embedding_fixtures.yaml`) that deliberately includes
+  cross-lingual query/passage pairs, per `docs/PROJECT_GOAL.md`'s
+  cross-lingual grounding goal. All three candidates tied at 100%
+  overall and cross-lingual accuracy (the fixture set is too easy to
+  discriminate quality), so `intfloat/multilingual-e5-base` was selected
+  on the real tie-breakers: ~6x faster mean passage-embed latency than
+  the slowest candidate (0.0228s vs 0.1438s), lowest peak memory
+  (719.9MB), and the smallest of the two tied-smallest embedding
+  dimensions (768). `POST /v1/embed` added to `ai-services/app/main.py`,
+  mirroring `/v1/detect`'s shape exactly; `/healthz` now reports the
+  embedding model too. Go side needed no code change: setting
+  `VAANISETU_EMBEDDING_SERVICE_URL` switches `cmd/api/main.go` from
+  `FakeEmbeddingClient` to the already-built `HTTPEmbeddingClient` from
+  Milestone 7a, the same "swap by config" mechanism (ADR-006) proven for
+  every other capability. A real, measured download-size fix found along
+  the way: `sentence_transformers`-engine snapshots were pulling
+  redundant ONNX/OpenVINO/TensorFlow/Flax/Rust weight variants this
+  project's engine never loads, roughly doubling one candidate's
+  download size — fixed with a scoped `ignore_patterns` filter in
+  `scripts/download_models.py` (the separate `.bin`/`.safetensors`
+  duplication within the PyTorch format itself was not fixed, an
+  accepted, non-blocking inefficiency). 9 new Python tests (93 total, all
+  pass); `ruff check`/`ruff format --check` clean. **Verified live, end
+  to end:** the AI service loads all five models (llm, asr, tts x12
+  languages, langid, embedding) and reports ready; a direct `POST
+  /v1/embed` call with real Hindi text returns a real 768-dimension
+  vector; the same text embedded twice produces identical vectors
+  (determinism confirmed) and different text produces a different
+  vector. See `docs/DECISIONS.md` ADR-037 for the full benchmark table,
+  scope-split reasoning, and evidence.
+  Earlier that day (Phase 7 Milestone 7a: the document-upload
+  boundary), no dependency on Phase 6 so it started even with Phase 6's
+  Maithili gap deferred. `backend/migrations/0004_add_documents.sql`
+  adds a plain `documents` table (`id`/`title`/`content`/`status`/
+  `created_at`) — deliberately no `vector` column and no `CREATE
+  EXTENSION vector` yet, even though `docker-compose.yml`'s `postgres`
+  service already runs the `pgvector/pgvector:pg16` image: the real
+  embedding dimension isn't known until Milestone 7b benchmarks a model,
+  and guessing now would mean a disruptive column-type migration later.
+  New `backend/internal/embedding` package (Fake/HTTP client pair,
+  following the exact pattern `llm`/`asr`/`tts`/`langid` established) and
+  `backend/internal/documents` package (persistence only — `CreateDocument`
+  always writes `status: "pending"` and nothing transitions it; the
+  embedding client is threaded through the constructor but not called by
+  either method yet, the same "wire it in before every method uses it"
+  shape `conversation.Service` uses). New `POST`/`GET /api/v1/documents`,
+  `proto/embedding.openapi.yaml`, `docs/openapi/documents.yaml`. `go
+  build/vet/test`, `gofmt` all clean; new unit tests for both new
+  packages (the `documents` package's are Docker-gated integration tests,
+  same pattern as `conversation`'s, skip cleanly without Docker in this
+  environment). **Verified live** against a real (native) PostgreSQL: the
+  new migration applied automatically at boot, a real `POST
+  /api/v1/documents` persisted a row, `GET` returned it, the empty-title/
+  empty-content validation paths returned clean 400s, and the existing
+  `/chat` endpoint was unaffected. A real open design question was
+  flagged, not assumed: `docs/ARCHITECTURE.md` §4's "RAG retrieval
+  mechanics | Python (called by Go)" could mean Python needs its own
+  Postgres connection — recorded for Milestone 7c to resolve when
+  retrieval is actually built, not decided now. See `docs/DECISIONS.md`
+  ADR-036 for the full reasoning.
+  The day before (2026-09-29): Phase 6 Milestone 6j: evaluated Odia, the
   last of the phase's originally-named eight languages — **not enabled**,
   a genuinely different outcome from Milestones 6h/6i's six enabled
   languages, not a rubber-stamped continuation of that pattern.

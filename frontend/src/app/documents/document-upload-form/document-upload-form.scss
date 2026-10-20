@@ -1,0 +1,51 @@
+@use '../../shared/styles/mixins';
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vs-space-2);
+  margin-bottom: var(--vs-space-5);
+}
+
+h2 {
+  font-size: var(--vs-font-size-base);
+  margin: 0 0 var(--vs-space-2);
+}
+
+.field-label {
+  font-size: var(--vs-font-size-sm);
+  font-weight: 600;
+}
+
+.field {
+  border: 1px solid var(--vs-line);
+  border-radius: var(--vs-radius-sm);
+  padding: var(--vs-space-2) var(--vs-space-3);
+  background: var(--vs-surface);
+  font-size: var(--vs-font-size-base);
+  font-family: inherit;
+
+  @include mixins.focus-ring;
+}
+
+.content {
+  resize: vertical;
+}
+
+.submit {
+  align-self: flex-start;
+  margin-top: var(--vs-space-2);
+  padding: var(--vs-space-2) var(--vs-space-4);
+  border: none;
+  border-radius: var(--vs-radius-pill);
+  background: var(--vs-accent);
+  color: var(--vs-on-accent);
+  cursor: pointer;
+
+  @include mixins.focus-ring;
+
+  &:disabled {
+    background: var(--vs-line-strong);
+    cursor: not-allowed;
+  }
+}

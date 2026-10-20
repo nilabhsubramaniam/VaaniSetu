@@ -359,7 +359,65 @@ ADR-026/ADR-027/ADR-028/ADR-029/ADR-030/ADR-031/ADR-033/ADR-034/ADR-035.
 
 ## Phase 7 - RAG
 
-**Status:** NOT STARTED
+**Status:** DONE — Milestone 7a (the document-upload boundary: a
+plain-text-only `POST`/`GET /api/v1/documents`, a `documents` table with
+no `vector` column yet, and a new `embedding` Go capability boundary
+following the exact Fake/HTTP pattern every other capability uses, wired
+into `documents.Service` but not called by any request path yet — see
+`docs/DECISIONS.md` ADR-036) and Milestone 7b (the real Python
+`embedding` capability — three real candidates benchmarked with a
+cosine-similarity retrieval-quality proxy including cross-lingual
+queries; all three tied at 100% accuracy on the small fixture set, so
+`intfloat/multilingual-e5-base` was selected on the real, measured
+tie-breakers — ~6x faster than the slowest candidate, lowest memory,
+smallest embedding dimension; `POST /v1/embed` live-verified against the
+real running service — see ADR-037; the 7b/7c scope was narrowed before
+implementation to match every prior phase's own "b" milestone shape,
+with chunking/schema/async-job design moved to 7c), and Milestone 7c
+(chunking in Go, the `document_chunks` table with a real `vector(768)`
+column and an HNSW cosine index, and a Postgres-`SKIP LOCKED`-based async
+worker — the genuinely new job-dispatch pattern confirmed absent from
+`backend/` before this milestone — that actually calls the embedding
+client for the first time; live-verified end to end including a real
+self-deadlock bug found and fixed along the way — see ADR-038), and
+Milestone 7d (retrieval in Go via `document_chunks.embedding <=> $1`,
+wired into `conversation.Service.SendMessage` through a narrow
+`Retriever` interface, and grounded prompt assembly in Python — the 7d
+scope was narrowed before implementation the same way 7b/7c were, moving
+reranking and any measured relevance-score cutoff to a new Milestone 7e;
+live-verified end to end with two documents on deliberately
+LLM-unknowable topics, including a real, independent process-hygiene bug
+found along the way, not a code defect — see ADR-039), and Milestone 7f
+(the frontend upload UI — a `DocumentService` pair mirroring
+`ConversationService`'s real/mock shape, a self-stopping `setTimeout`
+poll for the `"pending"` → `"ready"`/`"failed"` transition since no
+polling convention existed in this frontend yet, wired into a new
+`/documents` page; live-verified in a real browser via Playwright
+against the actual running stack — upload, watch status flip without a
+manual refresh, then a grounded chat reply from `/assistant` quoting the
+just-uploaded document, the full loop exercised from the UI for the
+first time — see ADR-040) are all complete. The Phase 7 closeout
+evaluation (`backend/cmd/evalrag`, a new Go tool measuring
+`docs/EVALUATION.md` §4's RAG metrics directly against the real
+pipeline) then ran the real, lightweight, phase-scoped measurement this
+phase's own Definition of Done requires: **overall recall@4 1.00
+(10/10), cross-lingual recall@4 1.00 (4/4), a keyword-presence
+answer-correctness proxy 1.00 (10/10)** — every query retrieved its gold
+document at rank 1, including two genuine cross-lingual translations
+caught in the actual replies, not just the pass/fail numbers. Based on
+that real evidence, **Milestone 7e (reranking and/or a measured
+relevance threshold) is not needed now** — see ADR-041 for the full
+numbers, the fixture set's own honestly-stated small-scale limitation,
+and the reasoning. Milestone 7e stays sketched, not approved, revisit
+only if a future larger-scale evaluation finds a real gap. Also
+confirmed **real voice Q&A**, not just typed chat — the Phase 5 voice
+orchestrator shares the exact `conversation.Service.SendMessage` call 7d
+wired retrieval into, verified live with real recorded speech: an
+English spoken question got a correctly grounded reply (audio synthesis
+skipped only due to the already-known, separate Hindi-only TTS
+limitation from Phase 4, not a RAG gap); a Hindi spoken question got a
+correctly grounded reply with real synthesized audio returned — a
+complete voice-in/voice-out round trip.
 
 - **Objective:** Let the assistant answer from user-provided documents,
   grounded and cross-lingual.

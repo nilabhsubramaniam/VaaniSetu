@@ -1,0 +1,26 @@
+<form class="card" (submit)="$event.preventDefault(); submit()">
+  <h2>Upload a document</h2>
+
+  <label class="field-label" for="document-upload-title">Title</label>
+  <input
+    id="document-upload-title"
+    class="field"
+    type="text"
+    autocomplete="off"
+    placeholder="e.g. Project Nilgiri notes"
+    [value]="title()"
+    (input)="onTitleInput($any($event.target).value)"
+  />
+
+  <label class="field-label" for="document-upload-content">Content</label>
+  <textarea
+    id="document-upload-content"
+    class="field content"
+    rows="6"
+    placeholder="Paste or type the document's text…"
+    [value]="content()"
+    (input)="onContentInput($any($event.target).value)"
+  ></textarea>
+
+  <button type="submit" class="submit" [disabled]="!canSubmit()">Upload</button>
+</form>

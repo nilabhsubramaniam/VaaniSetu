@@ -79,6 +79,20 @@ Verify the exact URL the backend will use actually connects:
 psql "postgres://vaanisetu:vaanisetu@localhost:5432/vaanisetu?sslmode=disable" -c "select 1;"
 ```
 
+Since Phase 7 Milestone 7c, migration `0005_add_document_chunks.sql` runs
+`CREATE EXTENSION IF NOT EXISTS vector` (`docker-compose.yml`'s postgres
+already uses the `pgvector/pgvector:pg16` image, which has this
+preinstalled — a native install needs one extra step). `pgvector` isn't a
+[trusted extension](https://www.postgresql.org/docs/current/sql-createextension.html),
+so the `vaanisetu` role (an ordinary login role, not a superuser) cannot
+create it itself — install the extension and enable it once, as a
+superuser, before the backend's first run against a native Postgres:
+
+```bash
+brew install pgvector
+psql -d vaanisetu -c "CREATE EXTENSION IF NOT EXISTS vector;"   # run as your own (superuser) role, not vaanisetu
+```
+
 ## Database Migration
 
 **Nothing to run separately.** Migrations (`backend/migrations/*.sql`) are

@@ -42,6 +42,27 @@ _SYSTEM_PROMPT_TEMPLATE = (
     "writing — a future phase reads this reply aloud with text-to-speech."
 )
 
+# Appended to the system prompt only when request.passages is non-empty
+# (Phase 7 Milestone 7d). Deliberately advisory, not a hard requirement:
+# no measured relevance-score cutoff exists yet
+# (docs/DECISIONS.md's Milestone 7d ADR), so an unrelated question must
+# still get a normal answer rather than being forced through irrelevant
+# retrieved text.
+_GROUNDING_INSTRUCTION_TEMPLATE = (
+    "\n\nYou have been given passages from the user's own documents, which "
+    "may or may not be relevant to their message:\n{passages_block}\n"
+    "If a passage is relevant, base your reply on it. If none are "
+    "relevant, ignore them and answer from your own knowledge as usual."
+)
+
+
+def _build_system_prompt(language_name: str, passages: list[str]) -> str:
+    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(language_name=language_name)
+    if not passages:
+        return system_prompt
+    passages_block = "\n".join(f"- {passage}" for passage in passages)
+    return system_prompt + _GROUNDING_INSTRUCTION_TEMPLATE.format(passages_block=passages_block)
+
 
 class LlamaCppEngine(LLMEngine):
     def __init__(
@@ -71,7 +92,7 @@ class LlamaCppEngine(LLMEngine):
 
     def generate(self, request: GenerateRequest) -> GenerateResponse:
         language_name = _LANGUAGE_NAMES.get(request.language, request.language)
-        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(language_name=language_name)
+        system_prompt = _build_system_prompt(language_name, request.passages)
 
         try:
             completion = self._llama.create_chat_completion(

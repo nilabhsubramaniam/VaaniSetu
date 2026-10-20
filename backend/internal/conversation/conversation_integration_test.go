@@ -18,6 +18,7 @@ import (
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/db"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/documents"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/langid"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/llm"
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/migrations"
@@ -33,7 +34,9 @@ func skipIfNoDocker(t *testing.T) {
 // newTestService starts a real Postgres container, applies the schema via
 // the exact same db.Migrate path cmd/api/main.go uses in production (not a
 // hand-rolled SQL-parsing shortcut), and returns a conversation.Service
-// backed by it, using the default FakeLangIDClient.
+// backed by it, using the default FakeLangIDClient and a retriever that
+// always returns no passages (Phase 7 Milestone 7d) — every test written
+// before retrieval existed keeps seeing exactly its old behavior.
 func newTestService(t *testing.T, llmClient llm.LLMClient) *conversation.Service {
 	t.Helper()
 	return newTestServiceWithLangID(t, llmClient, langid.NewFakeLangIDClient())
@@ -44,10 +47,24 @@ func newTestService(t *testing.T, llmClient llm.LLMClient) *conversation.Service
 // failure specifically.
 func newTestServiceWithLangID(t *testing.T, llmClient llm.LLMClient, langIDClient langid.LangIDClient) *conversation.Service {
 	t.Helper()
+	return newTestServiceWithLangIDAndRetriever(t, llmClient, langIDClient, noopRetriever{})
+}
+
+// newTestServiceWithLangIDAndRetriever is [newTestServiceWithLangID] with
+// an overridable conversation.Retriever, for tests that need to exercise
+// retrieval specifically (Phase 7 Milestone 7d).
+func newTestServiceWithLangIDAndRetriever(
+	t *testing.T, llmClient llm.LLMClient, langIDClient langid.LangIDClient, retriever conversation.Retriever,
+) *conversation.Service {
+	t.Helper()
 	skipIfNoDocker(t)
 
 	ctx := context.Background()
-	container, err := postgres.Run(ctx, "postgres:16-alpine",
+	// pgvector/pgvector:pg16 (not plain postgres:16-alpine), matching
+	// docker-compose.yml's postgres service — required since Phase 7
+	// Milestone 7c's migration runs `CREATE EXTENSION vector`, which a
+	// plain Postgres image doesn't have.
+	container, err := postgres.Run(ctx, "pgvector/pgvector:pg16",
 		postgres.WithDatabase("vaanisetu_test"),
 		postgres.WithUsername("test"),
 		postgres.WithPassword("test"),
@@ -75,7 +92,7 @@ func newTestServiceWithLangID(t *testing.T, llmClient llm.LLMClient, langIDClien
 	t.Cleanup(pool.Close)
 
 	testLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return conversation.NewService(pool, llmClient, langIDClient, testLogger)
+	return conversation.NewService(pool, llmClient, langIDClient, retriever, testLogger)
 }
 
 func TestService_SendMessage_PersistsBothTurns(t *testing.T) {
@@ -165,6 +182,55 @@ func TestService_SendMessage_LangIDFailureDoesNotFailTheTurn(t *testing.T) {
 	}
 }
 
+func TestService_SendMessage_PassesRetrievedPassagesToLLM(t *testing.T) {
+	retriever := fakeRetriever{chunks: []documents.RetrievedChunk{
+		{DocumentID: "doc-1", ChunkIndex: 0, Content: "VaaniSetu runs entirely on-device.", Distance: 0.1},
+		{DocumentID: "doc-1", ChunkIndex: 1, Content: "No audio ever leaves the user's machine.", Distance: 0.2},
+	}}
+	recorder := &recordingLLMClient{}
+	svc := newTestServiceWithLangIDAndRetriever(t, recorder, langid.NewFakeLangIDClient(), retriever)
+	ctx := context.Background()
+
+	if _, _, err := svc.SendMessage(ctx, "Does VaaniSetu need the internet?", "en"); err != nil {
+		t.Fatalf("SendMessage() error = %v", err)
+	}
+
+	if recorder.lastRequest == nil {
+		t.Fatal("LLM client never received a request")
+	}
+	want := []string{"VaaniSetu runs entirely on-device.", "No audio ever leaves the user's machine."}
+	got := recorder.lastRequest.Passages
+	if len(got) != len(want) {
+		t.Fatalf("Passages = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("Passages[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestService_SendMessage_RetrievalFailureDoesNotFailTheTurn(t *testing.T) {
+	// Retrieval is additive, the same "must never stop a turn from being
+	// sent" rule ADR-020/026 already established for TTS/langid — a
+	// retrieval-service outage must degrade to a plain, ungrounded reply,
+	// not break chat entirely.
+	recorder := &recordingLLMClient{}
+	svc := newTestServiceWithLangIDAndRetriever(t, recorder, langid.NewFakeLangIDClient(), failingRetriever{})
+	ctx := context.Background()
+
+	_, _, err := svc.SendMessage(ctx, "hello", "en")
+	if err != nil {
+		t.Fatalf("SendMessage() error = %v, want nil — a retrieval failure must not fail the turn", err)
+	}
+	if recorder.lastRequest == nil {
+		t.Fatal("LLM client never received a request")
+	}
+	if len(recorder.lastRequest.Passages) != 0 {
+		t.Errorf("Passages = %v, want empty when retrieval fails", recorder.lastRequest.Passages)
+	}
+}
+
 func TestService_SendMessage_AutoResolvesToDetectedLanguage(t *testing.T) {
 	// The fake langid client (internal/langid/fake.go) detects "en" for
 	// Latin-script text with no Devanagari — real enough to prove "auto"
@@ -238,6 +304,49 @@ type failingLLMClient struct{}
 
 func (failingLLMClient) Generate(context.Context, llm.GenerateRequest) (llm.GenerateResponse, error) {
 	return llm.GenerateResponse{}, errBoom
+}
+
+// recordingLLMClient captures the last request it received, so a test can
+// assert what SendMessage actually passed through (Phase 7 Milestone 7d:
+// specifically, Passages) without needing a real model.
+type recordingLLMClient struct {
+	lastRequest *llm.GenerateRequest
+}
+
+func (c *recordingLLMClient) Generate(_ context.Context, req llm.GenerateRequest) (llm.GenerateResponse, error) {
+	c.lastRequest = &req
+	return llm.GenerateResponse{Reply: "ok"}, nil
+}
+
+// noopRetriever implements conversation.Retriever with no documents ever
+// found — every test written before retrieval existed (Phase 7 Milestone
+// 7d) uses this by default via newTestService/newTestServiceWithLangID,
+// so it keeps seeing exactly its pre-7d behavior.
+type noopRetriever struct{}
+
+func (noopRetriever) Retrieve(context.Context, string, int) ([]documents.RetrievedChunk, error) {
+	return nil, nil
+}
+
+// fakeRetriever implements conversation.Retriever with a fixed result,
+// ignoring its arguments.
+type fakeRetriever struct {
+	chunks []documents.RetrievedChunk
+}
+
+func (f fakeRetriever) Retrieve(context.Context, string, int) ([]documents.RetrievedChunk, error) {
+	return f.chunks, nil
+}
+
+// failingRetriever implements conversation.Retriever by always failing —
+// SendMessage must treat this non-fatally (see
+// TestService_SendMessage_RetrievalFailureDoesNotFailTheTurn), the same
+// "additive, not required" rule failingLangIDClient already exercises for
+// language detection.
+type failingRetriever struct{}
+
+func (failingRetriever) Retrieve(context.Context, string, int) ([]documents.RetrievedChunk, error) {
+	return nil, errBoom
 }
 
 var errBoom = &boomErr{}

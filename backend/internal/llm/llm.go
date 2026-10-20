@@ -26,6 +26,14 @@ type GenerateRequest struct {
 	// sides are not type-shared across languages, so proto/llm.openapi.yaml
 	// is the single normative list both must match.
 	Language string
+	// Passages are retrieved document chunks (Phase 7 Milestone 7d,
+	// internal/documents.Service.Retrieve) to ground the reply in,
+	// most relevant first. Empty when retrieval found nothing or failed
+	// (non-fatal — see conversation.Service.SendMessage) — the caller
+	// never constructs a prompt from these itself
+	// (docs/ARCHITECTURE.md §4 reserves prompt construction for Python);
+	// it only decides which passages, if any, to offer.
+	Passages []string
 }
 
 // GenerateResponse is the LLM capability's answer to a [GenerateRequest].

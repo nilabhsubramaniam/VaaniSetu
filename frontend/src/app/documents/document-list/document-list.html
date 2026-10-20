@@ -1,0 +1,28 @@
+<section class="card">
+  <div class="list-header">
+    <h2>Your documents</h2>
+    <button type="button" class="refresh" (click)="refresh()" [disabled]="loading()">
+      Refresh
+    </button>
+  </div>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  @if (documents().length === 0) {
+    <p class="hint">No documents uploaded yet.</p>
+  } @else {
+    <ul class="list">
+      @for (doc of documents(); track doc.id) {
+        <li class="row">
+          <div class="row-main">
+            <p class="title">{{ doc.title }}</p>
+            <p class="preview">{{ preview(doc.content) }}</p>
+          </div>
+          <span class="status" [attr.data-status]="doc.status">{{ doc.status }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

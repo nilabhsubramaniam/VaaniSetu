@@ -23,7 +23,10 @@ servers:
 paths:
   /generate:
     post:
-      summary: Generate a reply to a single message. No conversation context/history is passed in Phase 2.
+      summary: >
+        Generate a reply to a single message. No prior-turn conversation
+        history is passed (Phase 2); optionally grounded in retrieved
+        document passages (Phase 7 Milestone 7d).
       requestBody:
         required: true
         content:
@@ -40,6 +43,22 @@ paths:
                     Same LanguageCode values as docs/openapi/chat.yaml.
                     Validation happens in Go before this call is made; the
                     Python service can assume it is one of the known codes.
+                passages:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  description: >
+                    Retrieved document chunks (Phase 7 Milestone 7d),
+                    most relevant first, to ground the reply in — plain
+                    text only, no scores or IDs. Optional and typically
+                    empty: Go decides *whether* retrieval found anything
+                    worth offering (internal/documents.Service.Retrieve),
+                    but never constructs a prompt from them itself
+                    (docs/ARCHITECTURE.md §4 reserves prompt construction
+                    for Python). An empty or missing list means today's
+                    pre-7d behavior exactly — the model should still
+                    answer normally.
       responses:
         "200":
           description: The generated reply.

@@ -82,11 +82,25 @@ VaaniSetu/
           components/               app-header, language-selector, status-pill
           styles/                   _tokens.scss, _mixins.scss
   backend/                          Go 1.26+, stdlib net/http, pgx/sqlc
-    cmd/api/                        entrypoint
+    cmd/
+      api/                          server entrypoint
+      evalrag/                      Phase 7 closeout: one-shot RAG
+                                     evaluation tool (docs/EVALUATION.md
+                                     §4's recall@k/cross-lingual/answer-
+                                     correctness-proxy metrics), not
+                                     unit-tested itself — its output
+                                     (eval_results/) is the artifact
     internal/
       api/                          HTTP handlers, DTOs, CORS
       conversation/                 turn persistence, LLM call, script +
-                                     detected-language tagging
+                                     detected-language tagging, retrieval-
+                                     grounded reply assembly (Phase 7
+                                     Milestone 7d)
+      documents/                    document upload/list/retrieve +
+                                     chunking + the async embedding
+                                     worker (Phase 7 Milestones 7a/7c/7d)
+      embedding/                    EmbeddingClient interface: Fake + HTTP
+                                     clients (Phase 7 Milestone 7a)
       llm/                          LLMClient interface: Fake + HTTP clients
       asr/                          ASRClient interface: Fake + HTTP clients
       tts/                          TTSClient interface: Fake + HTTP clients
@@ -96,6 +110,14 @@ VaaniSetu/
                                      asr/llm/tts into one voice turn
       config/, db/, logging/
     migrations/                     goose SQL, embedded into the binary
+    eval_data/                      rag_fixtures.yaml (Phase 7 closeout's
+                                     committed evaluation manifest —
+                                     composed documents/queries, not
+                                     corpus-sourced)
+    eval_results/                   stored phase-scoped evaluation
+                                     reports (rag_milestone_7_eval.json),
+                                     the Go-side counterpart to
+                                     ai-services/benchmark_results/
     SETUP.md, Makefile, .env.example
   ai-services/                      Python 3.12+, uv, FastAPI + Uvicorn
     app/
@@ -201,12 +223,13 @@ Run from `frontend/`:
 - Language: Go 1.26 (`backend/go.mod`, matching the toolchain actually used).
   Module path: `github.com/nilabhsubramaniam/VaaniSetu/backend`, matching the
   repository's real remote.
-- Layout: `cmd/api/` the entrypoint; `internal/{api,asr,conversation,llm,
-  config,db,logging}` (asr added Phase 3); `pkg/` still unused — nothing
-  has qualified as a genuinely reusable helper yet. `internal/gateway/`,
-  `internal/orchestrator/`, `internal/auth/`, `internal/documents/` are
-  deliberately not created — they belong to later phases (voice loop,
-  deferred auth, RAG).
+- Layout: `cmd/api/` the server entrypoint, `cmd/evalrag/` a second,
+  one-shot evaluation binary (Phase 7 closeout — Go's standard
+  multi-binary `cmd/` pattern, not a new one); `internal/{api,asr,tts,
+  llm,langid,embedding,conversation,documents,orchestrator,config,db,
+  logging}`; `pkg/` still unused — nothing has qualified as a genuinely
+  reusable helper yet. `internal/auth/` is deliberately not created yet —
+  it belongs to a later phase (deferred auth).
 - The backend runs no inference and imports no model. `internal/llm.LLMClient`
   is the capability interface; `FakeLLMClient` (no network) and
   `HTTPLLMClient` (calls the Python `llm` service per `proto/llm.openapi.yaml`)
@@ -266,6 +289,7 @@ get the required/optional variables. Summary:
 | `gofmt -l .` (or `make fmt`) | Formatting check |
 | `golangci-lint run ./...` (or `make lint`) | Lint |
 | `make check` | All of the above, in order |
+| `go run ./cmd/evalrag` | Phase 7 closeout: run the RAG evaluation against whatever `VAANISETU_DATABASE_URL`/`VAANISETU_EMBEDDING_SERVICE_URL`/`VAANISETU_LLM_SERVICE_URL` point at (both service URLs must be real, not the fake clients); writes `eval_results/rag_milestone_7_eval.json` |
 
 Docker (`docker compose up`) is optional — the backend runs natively
 against any reachable PostgreSQL, as `backend/SETUP.md` demonstrates.

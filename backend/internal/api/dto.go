@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/conversation"
+	"github.com/nilabhsubramaniam/VaaniSetu/backend/internal/documents"
 )
 
 // validLanguages mirrors frontend/src/app/core/models/language.model.ts's
@@ -184,4 +185,44 @@ type errorBody struct {
 	// (docs/DEVELOPMENT.md §11: user-facing errors "do not leak internal
 	// detail").
 	Message string `json:"message"`
+}
+
+// documentDTO is the wire representation of an uploaded document, per
+// docs/openapi/documents.yaml. Phase 7 Milestone 7a: Status is always
+// "pending" — nothing yet transitions it (see internal/documents' package
+// doc comment).
+type documentDTO struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func documentToDTO(d documents.Document) documentDTO {
+	return documentDTO{
+		ID:        d.ID,
+		Title:     d.Title,
+		Content:   d.Content,
+		Status:    d.Status,
+		CreatedAt: d.CreatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// createDocumentRequest is the POST /api/v1/documents request body.
+// Plain text only this milestone — no file upload/parsing yet (see
+// internal/documents' package doc comment).
+type createDocumentRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// createDocumentResponse is the POST /api/v1/documents 200 response body.
+type createDocumentResponse struct {
+	Document documentDTO `json:"document"`
+}
+
+// listDocumentsResponse is the GET /api/v1/documents 200 response body.
+type listDocumentsResponse struct {
+	Documents []documentDTO `json:"documents"`
 }
